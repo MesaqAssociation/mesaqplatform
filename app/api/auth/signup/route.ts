@@ -8,7 +8,8 @@ export const runtime = 'nodejs'
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('supabase.co') ? { rejectUnauthorized: false } : undefined,
+  // Supabase pooled and direct connections require SSL; pg does not parse sslmode
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
 })
 
 const schema = z.object({

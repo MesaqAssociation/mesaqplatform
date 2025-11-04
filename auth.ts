@@ -7,9 +7,8 @@ const databaseUrl = process.env.DATABASE_URL
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: databaseUrl?.includes('supabase.co')
-    ? { rejectUnauthorized: false }
-    : undefined,
+  // Supabase pooled and direct connections require SSL; pg does not parse sslmode
+  ssl: databaseUrl ? { rejectUnauthorized: false } : undefined,
 })
 
 const providers = [
