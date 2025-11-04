@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { Pool } from 'pg'
+import { randomUUID } from 'crypto'
+
+export const runtime = 'nodejs'
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -13,10 +16,30 @@ const schema = z.object({
   password: z.string().min(8).max(128),
 })
 
+async function ensureUsersTable() {
+  await pool.query(`
+    create table if not exists "users" (
+      "id" text primary key,
+      phone text unique not null,
+      password_hash text not null,
+      name text,
+      image text,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists users_phone_idx on "users"(phone);
+  `)
+}
+
 export async function POST(req: Request) {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 })
+    }
+
     const body = await req.json()
     const { phone, password } = schema.parse(body)
+
+    await ensureUsersTable()
 
     const { rows: existing } = await pool.query('select id from "users" where phone = $1 limit 1', [phone])
     if (existing.length) {
@@ -24,15 +47,13 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
-    const id = crypto.randomUUID()
-    await pool.query(
-      'insert into "users" (id, phone, password_hash) values ($1, $2, $3)',
-      [id, phone, passwordHash]
-    )
+    const id = randomUUID()
+    await pool.query('insert into "users" (id, phone, password_hash) values ($1, $2, $3)', [id, phone, passwordHash])
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
-    if (err.name === 'ZodError') {
+    console.error('Signup error:', err)
+    if (err?.name === 'ZodError') {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
