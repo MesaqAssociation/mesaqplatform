@@ -2,7 +2,6 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,13 +18,16 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      const res = await signIn('credentials', {
-        phone: phone.trim(),
-        password,
-        redirect: true,
-        callbackUrl: '/dashboard',
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim(), password }),
       })
-      if (res?.error) setError('Invalid credentials')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Invalid credentials')
+      }
+      window.location.href = '/dashboard'
     } catch (err) {
       setError('Something went wrong')
     } finally {

@@ -8,7 +8,6 @@ export const runtime = 'nodejs'
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Supabase pooled and direct connections require SSL; pg does not parse sslmode
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
 })
 
@@ -53,10 +52,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
-    console.error('Signup error:', err)
     if (err?.name === 'ZodError') {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
+    console.error('Signup error:', err)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
