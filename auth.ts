@@ -50,6 +50,22 @@ export const {
   providers,
   trustHost: true,
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  debug: true,
+  pages: {
+    signIn: '/',
+    error: '/',
+  },
+  logger: {
+    error(code, metadata) {
+      console.error('NextAuth error:', code, metadata)
+    },
+    warn(code) {
+      console.warn('NextAuth warn:', code)
+    },
+    debug(code, metadata) {
+      console.debug('NextAuth debug:', code, metadata)
+    },
+  },
   // Expose a stable user id across sessions
   callbacks: {
     async session({ session, token }) {
