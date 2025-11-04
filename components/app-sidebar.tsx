@@ -34,11 +34,13 @@ const data = {
     { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
     { title: "Members", url: "/members", icon: IconUsers },
     { title: "Finance", url: "/finance", icon: IconCash },
-    { title: "Events", url: "/events", icon: IconCalendarEvent },
+    { title: "Events", url: "/events", icon: IconCalendarEvent, children: [
+      { title: 'Meetings', url: '/events/meetings' },
+      { title: 'Events', url: '/events' },
+    ] },
   ],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: IconSettings },
-    { title: "Search", url: "/search", icon: IconSearch },
   ],
 }
 
@@ -52,13 +54,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+              <a href="/dashboard" className="flex items-center gap-2">
+                <img src="/cropped-logo.webp" alt="Mesaq" width="28" height="28" />
+                <span className="text-base font-semibold">Mesaq</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <div className="px-2 pt-2">
+          <input
+            placeholder="Search..."
+            className="h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-md border px-2 text-sm"
+          />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
