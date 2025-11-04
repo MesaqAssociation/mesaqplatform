@@ -46,7 +46,7 @@ if (process.env.EMAIL_SERVER && process.env.EMAIL_FROM) {
 }
 
 export const {
-  handlers: { GET, POST },
+  handlers,
   auth,
   signIn,
   signOut,
