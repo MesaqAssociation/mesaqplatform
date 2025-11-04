@@ -52,27 +52,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-transparent hover:text-inherit"
             >
-              <a href="/dashboard" className="flex items-center gap-2">
+              <a href="/dashboard" className="flex items-center">
                 <img src="/cropped-logo.webp" alt="Mesaq" width="28" height="28" />
-                <span className="text-base font-semibold">Mesaq</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="px-2 pt-2">
-          <input
-            placeholder="Search..."
-            className="h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-md border px-2 text-sm"
-          />
-        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
+        <div className="px-2 pb-2">
+          <input
+            placeholder="Search..."
+            className="h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-md border px-2 text-sm"
+          />
+        </div>
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>

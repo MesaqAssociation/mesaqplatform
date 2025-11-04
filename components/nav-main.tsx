@@ -1,6 +1,6 @@
 "use client"
 
-import { IconCirclePlusFilled, type Icon } from "@tabler/icons-react"
+import { IconCirclePlusFilled, IconChevronRight, type Icon } from "@tabler/icons-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +30,8 @@ export function NavMain({
     children?: { title: string; url: string }[]
   }[]
 }) {
+  const pathname = usePathname()
+  const [open, setOpen] = useState<Record<string, boolean>>({})
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -58,33 +62,53 @@ export function NavMain({
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title} asChild>
-                <Link href={item.url}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-              {item.children && item.children.length ? (
-                <>
-                  <ul data-sidebar="menu-sub" className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
-                    {item.children.map((child) => (
-                      <li key={child.title}>
-                        <a
-                          data-sidebar="menu-sub-button"
-                          className="flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>span:last-child]:truncate"
-                          href={child.url}
-                        >
-                          <span>{child.title}</span>
-                        </a>
-                      </li>
-                    ))}
+          {items.map((item) => {
+            const isActive = pathname === item.url || (item.children?.some(c => pathname === c.url))
+            const hasChildren = !!item.children?.length
+            const isOpen = open[item.title] || false
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  tooltip={item.title}
+                  asChild={!hasChildren}
+                  isActive={isActive}
+                  onClick={() => hasChildren && setOpen({ ...open, [item.title]: !isOpen })}
+                >
+                  {hasChildren ? (
+                    <div className="flex w-full items-center cursor-pointer">
+                      {item.icon && <item.icon />}
+                      <span className="flex-1">{item.title}</span>
+                      <IconChevronRight className={`transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    </div>
+                  ) : (
+                    <Link href={item.url}>
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                    </Link>
+                  )}
+                </SidebarMenuButton>
+                {hasChildren && isOpen ? (
+                  <ul data-sidebar="menu-sub" className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 px-2.5 py-0.5">
+                    {item.children!.map((child) => {
+                      const childActive = pathname === child.url
+                      return (
+                        <li key={child.title}>
+                          <a
+                            data-sidebar="menu-sub-button"
+                            className="flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>span:last-child]:truncate"
+                            data-active={childActive}
+                            href={child.url}
+                          >
+                            <span>{child.title}</span>
+                          </a>
+                        </li>
+                      )
+                    })}
                   </ul>
-                </>
-              ) : null}
-            </SidebarMenuItem>
-          ))}
+                ) : null}
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

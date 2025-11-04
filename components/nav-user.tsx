@@ -5,8 +5,10 @@ import {
   IconDotsVertical,
   IconLogout,
   IconNotification,
+  IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react"
+import Link from 'next/link'
 
 import {
   Avatar,
@@ -96,11 +98,21 @@ export function NavUser({
                 <IconNotification />
                 Notifications
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="flex items-center gap-2">
+                  <IconSettings />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <IconLogout />
-              Log out
+            <DropdownMenuItem asChild>
+              <form action="/api/logout" method="post">
+                <button type="submit" className="flex w-full items-center gap-2 text-left">
+                  <IconLogout />
+                  Log out
+                </button>
+              </form>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
