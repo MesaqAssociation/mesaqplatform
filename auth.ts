@@ -1,7 +1,6 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { Pool } from 'pg'
-import PgAdapter from '@auth/pg-adapter'
 import bcrypt from 'bcryptjs'
 
 const databaseUrl = process.env.DATABASE_URL
@@ -46,9 +45,8 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
-  adapter: PgAdapter(pool),
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
   },
   providers,
   trustHost: true,
