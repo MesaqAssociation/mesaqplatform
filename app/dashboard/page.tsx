@@ -1,12 +1,20 @@
 import type React from "react"
 import { redirect } from 'next/navigation'
-import { auth } from '@/auth'
+import { cookies } from 'next/headers'
+import jwt from 'jsonwebtoken'
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 export default async function Page() {
-  const session = await auth()
-  if (!session) redirect('/')
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    redirect('/')
+  }
+  try {
+    jwt.verify(token, process.env.AUTH_SECRET)
+  } catch {
+    redirect('/')
+  }
   return (
     <SidebarProvider
       style={
