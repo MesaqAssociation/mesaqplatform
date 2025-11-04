@@ -94,10 +94,7 @@ export function NavUser({
                 <IconCreditCard />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
-              </DropdownMenuItem>
+              
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="flex items-center gap-2">
                   <IconSettings />

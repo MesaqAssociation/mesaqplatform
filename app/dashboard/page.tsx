@@ -24,7 +24,7 @@ export default async function Page() {
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" />
+      <AppSidebar />
       <SidebarInset>
         <div className="flex flex-1 items-center justify-center">
           <h1 className="text-6xl font-bold text-gray-400">404</h1>

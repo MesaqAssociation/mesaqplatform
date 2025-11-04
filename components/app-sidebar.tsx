@@ -39,9 +39,7 @@ const data = {
       { title: 'Events', url: '/events' },
     ] },
   ],
-  navSecondary: [
-    { title: "Settings", url: "/settings", icon: IconSettings },
-  ],
+  navSecondary: [],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -55,7 +53,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-transparent hover:text-inherit"
             >
               <a href="/dashboard" className="flex items-center">
-                <img src="/cropped-logo.webp" alt="Mesaq" width="28" height="28" />
+                <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" />
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

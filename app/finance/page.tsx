@@ -14,7 +14,7 @@ export default async function FinancePage() {
   }
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 72)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
+      <AppSidebar />
       <SidebarInset>
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Finance</h1>
