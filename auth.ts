@@ -1,9 +1,8 @@
 import NextAuth from 'next-auth'
-import GitHub from 'next-auth/providers/github'
-import Google from 'next-auth/providers/google'
-import EmailProvider from 'next-auth/providers/email'
+import Credentials from 'next-auth/providers/credentials'
 import { Pool } from 'pg'
 import PgAdapter from '@auth/pg-adapter'
+import bcrypt from 'bcryptjs'
 
 const databaseUrl = process.env.DATABASE_URL
 
@@ -14,36 +13,32 @@ const pool = new Pool({
     : undefined,
 })
 
-const providers = [] as any[]
+const providers = [
+  Credentials({
+    name: 'Credentials',
+    credentials: {
+      phone: { label: 'Phone', type: 'text' },
+      password: { label: 'Password', type: 'password' },
+    },
+    authorize: async (credentials) => {
+      const phone = (credentials?.phone || '').trim()
+      const password = credentials?.password || ''
+      if (!/^0\d{9}$/.test(phone) || password.length < 8) {
+        return null
+      }
 
-if (process.env.GITHUB_ID && process.env.GITHUB_SECRET) {
-  providers.push(
-    GitHub({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
-      allowDangerousEmailAccountLinking: true,
-    })
-  )
-}
-
-if (process.env.GOOGLE_ID && process.env.GOOGLE_SECRET) {
-  providers.push(
-    Google({
-      clientId: process.env.GOOGLE_ID,
-      clientSecret: process.env.GOOGLE_SECRET,
-      allowDangerousEmailAccountLinking: true,
-    })
-  )
-}
-
-if (process.env.EMAIL_SERVER && process.env.EMAIL_FROM) {
-  providers.push(
-    EmailProvider({
-      server: process.env.EMAIL_SERVER,
-      from: process.env.EMAIL_FROM,
-    })
-  )
-}
+      const { rows } = await pool.query(
+        'select id, name, email, image, phone, password_hash from "users" where phone = $1 limit 1',
+        [phone]
+      )
+      const user = rows[0]
+      if (!user || !user.password_hash) return null
+      const ok = await bcrypt.compare(password, user.password_hash)
+      if (!ok) return null
+      return { id: user.id, name: user.name, email: user.email, image: user.image }
+    },
+  }),
+] as any[]
 
 export const {
   handlers,
