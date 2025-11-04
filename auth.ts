@@ -69,6 +69,4 @@ export const {
   },
 })
 
-export { GET, POST }
-
 
