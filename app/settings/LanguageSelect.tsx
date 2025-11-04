@@ -28,6 +28,14 @@ export default function LanguageSelect() {
     setValue(v)
     try {
       localStorage.setItem('lang', v)
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('lang', v)
+        if (v === 'ar' || v === 'fa') {
+          document.documentElement.setAttribute('dir', 'rtl')
+        } else {
+          document.documentElement.setAttribute('dir', 'ltr')
+        }
+      }
     } catch {}
   }
 

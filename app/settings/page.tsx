@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 72)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="md:ml-[--sidebar-width]">
         <div className="p-6 space-y-4">
           <h1 className="text-2xl font-semibold">Settings</h1>
           <div className="max-w-sm">

@@ -15,7 +15,7 @@ export default async function MeetingsPage() {
   return (
     <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 72)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="md:ml-[--sidebar-width]">
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Meetings</h1>
         </div>

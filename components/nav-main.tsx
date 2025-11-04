@@ -63,9 +63,11 @@ export function NavMain({
         </SidebarMenu>
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = pathname === item.url || (item.children?.some(c => pathname === c.url))
             const hasChildren = !!item.children?.length
-            const isOpen = open[item.title] || false
+            const childActive = !!item.children?.some((c) => pathname === c.url || pathname.startsWith(c.url))
+            const itemActive = pathname === item.url || pathname.startsWith(item.url)
+            const isActive = itemActive || childActive
+            const isOpen = open[item.title] ?? (hasChildren && (childActive || itemActive))
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
