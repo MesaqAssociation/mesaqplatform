@@ -1,7 +1,4 @@
-export { auth as middleware } from '@/auth'
-
-export const config = {
-  matcher: ['/dashboard/:path*'],
-}
+// Middleware removed to avoid Edge bundling node-only modules (pg).
+// Route protection is now handled in server components.
 
 

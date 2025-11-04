@@ -1,8 +1,12 @@
 import type React from "react"
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
-export default function Page() {
+export default async function Page() {
+  const session = await auth()
+  if (!session) redirect('/')
   return (
     <SidebarProvider
       style={
