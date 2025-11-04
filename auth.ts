@@ -52,9 +52,9 @@ export const {
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   // Expose a stable user id across sessions
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        ;(session.user as any).id = user.id
+    async session({ session, token }) {
+      if (session?.user && token?.sub) {
+        ;(session.user as any).id = token.sub
       }
       return session
     },
