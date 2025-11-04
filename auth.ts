@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth'
 import GitHub from 'next-auth/providers/github'
 import Google from 'next-auth/providers/google'
-import EmailProvider from 'next-auth/providers/nodemailer'
+import EmailProvider from 'next-auth/providers/email'
 import { Pool } from 'pg'
 import PgAdapter from '@auth/pg-adapter'
 
