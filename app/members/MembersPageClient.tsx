@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import MembersClient from './MembersClient'
 import { IconX } from '@tabler/icons-react'
+import { useI18n } from '@/components/I18nProvider'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 type Member = {
   id: string
@@ -16,6 +19,7 @@ type Member = {
 }
 
 export default function MembersPageClient({ initial }: { initial: Member[] }) {
+  const { t } = useI18n()
   const searchParams = useSearchParams()
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
@@ -39,7 +43,13 @@ export default function MembersPageClient({ initial }: { initial: Member[] }) {
   }, [searchParams])
 
   return (
-    <>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">{t("members")}</h1>
+        <Link href="/members/create">
+          <Button>{t("createNew")}</Button>
+        </Link>
+      </div>
       <MembersClient initial={initial} />
       
       {showToast && (
@@ -57,7 +67,7 @@ export default function MembersPageClient({ initial }: { initial: Member[] }) {
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
