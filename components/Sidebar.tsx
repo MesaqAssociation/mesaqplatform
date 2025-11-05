@@ -65,7 +65,7 @@ export function Sidebar() {
           {NAV_ITEMS.map((item) => {
             const hasChildren = !!item.children?.length
             const childActive = !!item.children?.some((c) => pathname === c.url || pathname.startsWith(c.url))
-            const itemActive = pathname === item.url
+            const itemActive = pathname === item.url || pathname.startsWith(item.url + '/')
             const isOpen = open[item.title] ?? (hasChildren && childActive)
 
             return (

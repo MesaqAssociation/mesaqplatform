@@ -1,6 +1,7 @@
 -- Add new columns to users table if they don't exist
 ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'Community Member';

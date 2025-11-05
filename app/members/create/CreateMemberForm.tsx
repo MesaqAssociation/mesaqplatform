@@ -50,6 +50,14 @@ export default function CreateMemberForm() {
     if (!mapsLoaded || !addressInputRef.current) return
     const autocomplete = new (window as any).google.maps.places.Autocomplete(addressInputRef.current, {
       types: ['address'],
+      componentRestrictions: { country: 'au' },
+      bounds: {
+        north: -37.5,
+        south: -38.5,
+        east: 145.5,
+        west: 144.5,
+      },
+      strictBounds: false,
     })
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace()
@@ -142,6 +150,7 @@ export default function CreateMemberForm() {
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           required
           className="mt-1"
+          autoComplete="off"
         />
       </div>
 
@@ -156,6 +165,7 @@ export default function CreateMemberForm() {
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           required
           className="mt-1"
+          autoComplete="off"
         />
       </div>
 
@@ -170,6 +180,7 @@ export default function CreateMemberForm() {
           placeholder="0456789012"
           required
           className="mt-1"
+          autoComplete="off"
         />
       </div>
 
@@ -185,6 +196,7 @@ export default function CreateMemberForm() {
           required
           minLength={8}
           className="mt-1"
+          autoComplete="new-password"
         />
       </div>
 
@@ -199,6 +211,7 @@ export default function CreateMemberForm() {
           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
           placeholder="Start typing address..."
           className="mt-1"
+          autoComplete="off"
         />
       </div>
 
@@ -224,9 +237,6 @@ export default function CreateMemberForm() {
             <Progress value={uploadProgress} className="w-full" />
             <p className="text-sm text-muted-foreground">Uploading: {uploadProgress}%</p>
           </div>
-        )}
-        {imageUrl && uploadProgress === null && (
-          <p className="text-sm text-green-600 mt-2">✓ Image uploaded successfully</p>
         )}
       </div>
 
