@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle } from '@tabler/icons-react'
+import PaymentStatusCard from './PaymentStatusCard'
 
 type Member = {
   id: string
@@ -198,6 +199,9 @@ export default function MemberDetailClient({
               </div>
             </CardContent>
           </Card>
+
+          {/* Membership Payment Status */}
+          <PaymentStatusCard memberId={member.member_id} />
 
           {/* Events Attended */}
           <Card>

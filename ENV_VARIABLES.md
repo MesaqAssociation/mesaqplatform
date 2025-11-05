@@ -48,6 +48,16 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 6. Copy the API key and add it to Vercel environment variables
 7. **Important:** Redeploy your app after adding the env var for it to take effect
 
+### Membership Settings
+```
+MONTHLY_FEE=50.00
+```
+
+**Description:**
+- Monthly membership fee amount in dollars (e.g., 50.00 for $50)
+- Used to detect membership payments in bank statements
+- Used to calculate payment status for members
+
 ## Database Migration
 
 Run this SQL in your Supabase SQL Editor:

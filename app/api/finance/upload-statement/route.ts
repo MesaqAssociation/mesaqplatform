@@ -125,11 +125,12 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        await pool.query(
+        const { rows: inserted } = await pool.query(
           `INSERT INTO transactions 
            (account_id, transaction_date, description, amount, transaction_type, balance_after, created_by, source, reference) 
            VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'bank_statement', $8)
-           ON CONFLICT DO NOTHING`,
+           ON CONFLICT DO NOTHING
+           RETURNING id, transaction_date, description`,
           [
             accountId,
             txn.date,
@@ -141,7 +142,9 @@ export async function POST(req: NextRequest) {
             txn.reference,
           ]
         )
-        insertedCount.push(txn)
+        if (inserted.length > 0) {
+          insertedCount.push(inserted[0])
+        }
       } catch (err: any) {
         const error = err.message || 'Unknown error'
         console.error(`Failed to insert transaction (date: ${txn.date}, desc: ${txn.description}):`, error)
@@ -191,6 +194,57 @@ export async function POST(req: NextRequest) {
         accountNumber: parsed.accountNumber,
       })]
     )
+
+    // Auto-detect membership payments after upload
+    try {
+      const monthlyFee = parseFloat(process.env.MONTHLY_FEE || '50.00')
+      
+      const { rows: members } = await pool.query(`
+        SELECT id, banking_name, name, date_joined
+        FROM users
+        WHERE banking_name IS NOT NULL AND date_joined IS NOT NULL
+      `)
+
+      let paymentsDetected = 0
+
+      for (const member of members) {
+        const { rows: matchingTransactions } = await pool.query(`
+          SELECT id, transaction_date
+          FROM transactions
+          WHERE 
+            transaction_type = 'credit'
+            AND ABS(amount) = $1
+            AND (LOWER(description) LIKE LOWER($2) OR LOWER(description) LIKE LOWER($3))
+            AND transaction_date >= $4
+            AND id = ANY($5::uuid[])
+        `, [
+          monthlyFee,
+          `%${member.banking_name}%`,
+          `%${member.name}%`,
+          member.date_joined,
+          insertedCount.map(t => t.id)
+        ])
+
+        for (const txn of matchingTransactions) {
+          const paymentMonth = new Date(txn.transaction_date)
+          paymentMonth.setDate(1)
+          const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
+
+          await pool.query(`
+            INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
+            VALUES ($1, $2, $3, $4, $5, 'paid')
+            ON CONFLICT (user_id, payment_month) DO NOTHING
+          `, [member.id, paymentMonthStr, monthlyFee, txn.id, txn.transaction_date])
+          
+          paymentsDetected++
+        }
+      }
+
+      console.log(`Auto-detected ${paymentsDetected} membership payments`)
+    } catch (err) {
+      console.error('Failed to auto-detect payments:', err)
+      // Don't fail the upload if payment detection fails
+    }
 
     return NextResponse.json({ 
       success: true,
