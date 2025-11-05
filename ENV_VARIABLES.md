@@ -42,10 +42,11 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 **Setup Instructions:**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing
-3. Enable **Places API** and **Maps JavaScript API**
+3. Enable **Places API** (this is the main one needed for autocomplete)
 4. Go to **Credentials** → Create Credentials → API Key
-5. Restrict the key to your domain for security
-6. Copy the API key
+5. Restrict the key to your domain for security (optional but recommended)
+6. Copy the API key and add it to Vercel environment variables
+7. **Important:** Redeploy your app after adding the env var for it to take effect
 
 ## Database Migration
 

@@ -32,15 +32,18 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (name, email, phone, password, address, image, role) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'Community Member') 
+      `INSERT INTO users (id, name, email, phone, password, address, image, role) 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 'Community Member') 
        RETURNING id, name, email, phone, role`,
       [name, email || null, phone, hashed, address || null, image || null]
     )
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {
     console.error('Create member error:', err)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: err.message || 'Server error',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    }, { status: 500 })
   }
 }
 

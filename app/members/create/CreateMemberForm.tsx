@@ -1,11 +1,30 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { Progress } from '@/components/ui/progress'
+
+// Load Google Maps script
+function useGoogleMaps() {
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if ((window as any).google?.maps?.places) {
+      setLoaded(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.async = true
+    script.onload = () => setLoaded(true)
+    document.head.appendChild(script)
+  }, [])
+  return loaded
+}
 
 export default function CreateMemberForm() {
   const router = useRouter()
@@ -13,6 +32,10 @@ export default function CreateMemberForm() {
   const [error, setError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const addressInputRef = useRef<HTMLInputElement>(null)
+  const mapsLoaded = useGoogleMaps()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -22,13 +45,65 @@ export default function CreateMemberForm() {
     password: '',
   })
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // Setup Google Maps autocomplete
+  useEffect(() => {
+    if (!mapsLoaded || !addressInputRef.current) return
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ['address'],
+    })
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace()
+      if (place.formatted_address) {
+        setFormData(prev => ({ ...prev, address: place.formatted_address }))
+      }
+    })
+  }, [mapsLoaded])
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
+    if (!file) return
+    
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(file)
+
+    // Start upload immediately
+    setUploadProgress(0)
+    setError(null)
+    try {
+      const imageForm = new FormData()
+      imageForm.append('file', file)
+
+      // Simulate progress (since fetch doesn't provide upload progress easily)
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev === null) return 10
+          if (prev >= 90) return 90
+          return prev + 10
+        })
+      }, 200)
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: imageForm,
+      })
+
+      clearInterval(progressInterval)
+
+      if (!uploadRes.ok) {
+        throw new Error('Upload failed')
+      }
+
+      const { url } = await uploadRes.json()
+      setImageUrl(url)
+      setUploadProgress(100)
+      setTimeout(() => setUploadProgress(null), 1000)
+    } catch (err: any) {
+      setError(err.message || 'Image upload failed')
+      setUploadProgress(null)
+      setImageFile(null)
+      setImagePreview(null)
     }
   }
 
@@ -37,21 +112,6 @@ export default function CreateMemberForm() {
     setLoading(true)
     setError(null)
     try {
-      // Upload image to Cloudflare R2 if present
-      let imageUrl = null
-      if (imageFile) {
-        const imageForm = new FormData()
-        imageForm.append('file', imageFile)
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: imageForm,
-        })
-        if (uploadRes.ok) {
-          const { url } = await uploadRes.json()
-          imageUrl = url
-        }
-      }
-
       // Create member
       const res = await fetch('/api/members/create', {
         method: 'POST',
@@ -70,85 +130,123 @@ export default function CreateMemberForm() {
     }
   }
 
+  const canSubmit = !loading && uploadProgress === null
+
   return (
-    <Card className="max-w-2xl">
-      <CardContent className="pt-6">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div>
+        <Label htmlFor="name">Name *</Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+          className="mt-1"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="email">Email *</Label>
+        <Input
+          id="email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+          className="mt-1"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="phone">Phone Number *</Label>
+        <Input
+          id="phone"
+          value={formData.phone}
+          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+          placeholder="0456789012"
+          required
+          className="mt-1"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="password">Password * (minimum 8 characters)</Label>
+        <Input
+          id="password"
+          type="password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          required
+          minLength={8}
+          className="mt-1"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="address">Address</Label>
+        <Input
+          ref={addressInputRef}
+          id="address"
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          placeholder="Start typing address..."
+          className="mt-1"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="image">Profile Image</Label>
+        <Input
+          id="image"
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          disabled={uploadProgress !== null}
+          className="mt-1"
+        />
+        {imagePreview && (
+          <div className="mt-3">
+            <img src={imagePreview} alt="Preview" className="w-24 h-24 object-cover rounded-lg" />
           </div>
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-            />
+        )}
+        {uploadProgress !== null && (
+          <div className="mt-3 space-y-2">
+            <Progress value={uploadProgress} className="w-full" />
+            <p className="text-sm text-muted-foreground">Uploading: {uploadProgress}%</p>
           </div>
-          <div>
-            <Label htmlFor="phone">Phone (e.g. 0456789012)</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="0456789012"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">Password (min 8)</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Start typing address..."
-            />
-            <p className="text-xs text-muted-foreground mt-1">Google Maps autocomplete coming soon</p>
-          </div>
-          <div>
-            <Label htmlFor="image">Profile Image</Label>
-            <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-            />
-            {imagePreview && (
-              <div className="mt-2">
-                <img src={imagePreview} alt="Preview" className="w-24 h-24 object-cover rounded-lg" />
-              </div>
-            )}
-          </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <div className="flex gap-3">
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Member'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => router.push('/members')}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        )}
+        {imageUrl && uploadProgress === null && (
+          <p className="text-sm text-green-600 mt-2">✓ Image uploaded successfully</p>
+        )}
+      </div>
+
+      {error ? (
+        <>
+          <Separator />
+          <p className="text-sm text-red-600">{error}</p>
+        </>
+      ) : null}
+
+      <Separator />
+
+      <div className="flex gap-3">
+        <Button type="submit" disabled={!canSubmit}>
+          {loading ? 'Creating Member...' : uploadProgress !== null ? 'Uploading...' : 'Create Member'}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.push('/members')} disabled={loading}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }
-
