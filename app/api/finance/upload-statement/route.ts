@@ -81,6 +81,12 @@ export async function POST(req: NextRequest) {
       if (amount === 0) continue
 
       try {
+        // Validate date format (YYYY-MM-DD)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(txn.date)) {
+          console.error(`Invalid date format for transaction: "${txn.date}", description: "${txn.description}"`)
+          continue
+        }
+
         await pool.query(
           `INSERT INTO transactions 
            (account_id, transaction_date, description, amount, transaction_type, balance_after, created_by, source, reference) 
@@ -98,8 +104,8 @@ export async function POST(req: NextRequest) {
           ]
         )
         insertedCount.push(txn)
-      } catch (err) {
-        console.error('Failed to insert transaction:', err)
+      } catch (err: any) {
+        console.error(`Failed to insert transaction (date: ${txn.date}, desc: ${txn.description}):`, err.message)
       }
     }
 

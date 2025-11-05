@@ -61,97 +61,132 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
   }
 
   // Parse transaction lines
-  // CommBank format: Date Transaction details Amount Balance
-  // Example: 01 Oct 2025 COLES 8786 NARRE WARREN AU -$15.25 $1,282.78
+  // CommBank format: Date Transaction details (can be multi-line) Amount Balance
+  // Multi-line transactions continue until we find amounts
   
   const lines = text.split('\n')
+  let i = 0
   
-  for (let i = 0; i < lines.length; i++) {
+  while (i < lines.length) {
     const line = lines[i].trim()
-    if (!line) continue
-
-    // Try to match transaction patterns
-    // Pattern: DD MMM YYYY or DD/MM/YY at start
-    const datePatterns = [
-      /^(\d{1,2}\s+\w{3}\s+\d{2,4})\s+(.+)/,  // 01 Oct 2025
-      /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(.+)/,  // 01/10/25
-    ]
-
-    for (const pattern of datePatterns) {
-      const match = line.match(pattern)
-      if (!match) continue
-
-      const dateStr = match[1]
-      const rest = match[2]
-
-      // Look for amounts with $ and optional - prefix
-      // Matches: -$15.25 or $1,282.78
+    
+    // Check if this line starts with a date
+    const dateMatch = line.match(/^(\d{1,2}\s+\w{3}\s+\d{2,4})\s+(.+)/)
+    
+    if (dateMatch) {
+      const dateStr = dateMatch[1]
+      let fullTransaction = dateMatch[2]
+      
+      // Look ahead to collect multi-line transaction details
+      // Continue until we find a line with amounts ($ symbols) or another date
+      let j = i + 1
+      while (j < lines.length) {
+        const nextLine = lines[j].trim()
+        
+        // Stop if we hit another date line
+        if (/^\d{1,2}\s+\w{3}\s+\d{2,4}\s+/.test(nextLine)) {
+          break
+        }
+        
+        // Stop if this line has amounts (means current transaction is complete)
+        if (/(?:-?\$)[\d,]+\.\d{2}/.test(fullTransaction)) {
+          break
+        }
+        
+        // Add this line to the transaction
+        if (nextLine && !nextLine.startsWith('Page ') && !nextLine.startsWith('Account ')) {
+          fullTransaction += ' ' + nextLine
+        }
+        
+        j++
+      }
+      
+      // Now parse the complete transaction
       const amountPattern = /(?:-?\$)([\d,]+\.\d{2})/g
       const amounts: { value: number; isNegative: boolean }[] = []
       let amountMatch
-
-      while ((amountMatch = amountPattern.exec(rest)) !== null) {
+      
+      while ((amountMatch = amountPattern.exec(fullTransaction)) !== null) {
         const fullMatch = amountMatch[0]
         const value = parseFloat(amountMatch[1].replace(/,/g, ''))
         const isNegative = fullMatch.startsWith('-')
         amounts.push({ value, isNegative })
       }
-
-      if (amounts.length === 0) continue
-
-      // Extract description (remove all amounts and clean up)
-      let description = rest
-        .replace(/(?:-?\$)[\d,]+\.\d{2}/g, '') // Remove all amounts with $
-        .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
-        .replace(/Value Date:.*$/i, '') // Remove value date line
-        .replace(/Card xx\d+/gi, '') // Remove card references
-        .replace(/\s+/g, ' ') // Normalize whitespace
-        .trim()
-        .substring(0, 200)
-
-      let debit: number | undefined
-      let credit: number | undefined
-      let balance: number | undefined
-
-      if (amounts.length === 1) {
-        // Only one amount
-        if (amounts[0].isNegative) {
-          debit = amounts[0].value
-        } else {
-          credit = amounts[0].value
-        }
-      } else if (amounts.length === 2) {
-        // Two amounts - transaction + balance
-        const txnAmount = amounts[0]
-        balance = amounts[1].value
+      
+      // Only proceed if we found amounts
+      if (amounts.length > 0) {
+        // Extract description (remove all amounts and clean up)
+        let description = fullTransaction
+          .replace(/(?:-?\$)[\d,]+\.\d{2}/g, '') // Remove all amounts with $
+          .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
+          .replace(/Value Date:[^\n]*/gi, '') // Remove value date
+          .replace(/Card xx\d+[^\n]*/gi, '') // Remove card references
+          .replace(/USD\s+[\d.]+/gi, '') // Remove USD amounts
+          .replace(/EUR\s+[\d.]+/gi, '') // Remove EUR amounts
+          .replace(/GBP\s+[\d.]+/gi, '') // Remove GBP amounts
+          .replace(/AUD\s+[\d.]+/gi, '') // Remove AUD amounts
+          .replace(/PayID Phone from CommBank App/gi, '') // Remove common phrases
+          .replace(/CommBank [Aa]pp/gi, '') // Remove app references
+          .replace(/to PayID Phone/gi, '')
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim()
         
-        if (txnAmount.isNegative) {
-          debit = txnAmount.value
-        } else {
-          credit = txnAmount.value
+        // Limit description length
+        if (description.length > 200) {
+          description = description.substring(0, 200)
         }
-      } else if (amounts.length >= 3) {
-        // Multiple amounts - last is balance, find the transaction amount
-        balance = amounts[amounts.length - 1].value
-        const txnAmount = amounts[amounts.length - 2]
         
-        if (txnAmount.isNegative) {
-          debit = txnAmount.value
-        } else {
-          credit = txnAmount.value
+        let debit: number | undefined
+        let credit: number | undefined
+        let balance: number | undefined
+        
+        if (amounts.length === 1) {
+          // Only one amount
+          if (amounts[0].isNegative) {
+            debit = amounts[0].value
+          } else {
+            credit = amounts[0].value
+          }
+        } else if (amounts.length === 2) {
+          // Two amounts - transaction + balance
+          const txnAmount = amounts[0]
+          balance = amounts[1].value
+          
+          if (txnAmount.isNegative) {
+            debit = txnAmount.value
+          } else {
+            credit = txnAmount.value
+          }
+        } else if (amounts.length >= 3) {
+          // Multiple amounts - last is balance, second-to-last is transaction
+          balance = amounts[amounts.length - 1].value
+          const txnAmount = amounts[amounts.length - 2]
+          
+          if (txnAmount.isNegative) {
+            debit = txnAmount.value
+          } else {
+            credit = txnAmount.value
+          }
+        }
+        
+        // Only add if we have a valid transaction amount
+        if (debit || credit) {
+          const parsedDate = parseAUDate(dateStr)
+          
+          transactions.push({
+            date: parsedDate,
+            description: cleanDescription(description),
+            debit,
+            credit,
+            balance,
+          })
         }
       }
-
-      // Skip if no valid transaction amount
-      if (!debit && !credit) continue
-
-      transactions.push({
-        date: parseAUDate(dateStr),
-        description: cleanDescription(description),
-        debit,
-        credit,
-        balance,
-      })
+      
+      // Move to next potential transaction
+      i = j
+    } else {
+      i++
     }
   }
 

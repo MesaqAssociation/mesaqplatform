@@ -56,7 +56,8 @@ export default function FinanceClient({
 
   const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+    // Allow negative numbers, decimals, and empty string
+    if (value === '' || value === '-' || /^-?\d*\.?\d{0,2}$/.test(value)) {
       setEditValue(value)
     }
   }
