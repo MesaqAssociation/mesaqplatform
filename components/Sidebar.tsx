@@ -14,7 +14,7 @@ type SidebarProps = {
     name: string
     email: string | null
     image: string | null
-  }
+  } | null
 }
 
 export function Sidebar({ user }: SidebarProps) {
@@ -149,7 +149,7 @@ export function Sidebar({ user }: SidebarProps) {
   )
 }
 
-export function MainLayout({ children, user }: { children: React.ReactNode; user?: { name: string; email: string | null; image: string | null } }) {
+export function MainLayout({ children, user }: { children: React.ReactNode; user?: { name: string; email: string | null; image: string | null } | null }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar user={user} />
