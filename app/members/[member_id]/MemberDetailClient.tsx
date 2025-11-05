@@ -43,8 +43,13 @@ export default function MemberDetailClient({
   attendedEvents: Event[]
   allEvents: Event[]
 }) {
-  const [events, setEvents] = useState<Event[]>(attendedEvents)
+  const [events, setEvents] = useState<Event[]>(attendedEvents || [])
   const [loading, setLoading] = useState(false)
+
+  // Debug logging
+  console.log('Member:', member)
+  console.log('Attended Events:', attendedEvents)
+  console.log('All Events:', allEvents)
 
   async function addEvent(eventId: string) {
     setLoading(true)
@@ -80,16 +85,30 @@ export default function MemberDetailClient({
     }
   }
 
-  const formatDate = (date: string | null) => {
+  const formatDate = (date: string | null | undefined) => {
     if (!date) return '-'
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    })
+    try {
+      return new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      })
+    } catch (error) {
+      console.error('Date formatting error:', error, date)
+      return '-'
+    }
   }
 
-  const availableEvents = allEvents.filter(e => !events.find(ae => ae.id === e.id))
+  const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
+
+  // Safety check
+  if (!member) {
+    return (
+      <div className="p-6">
+        <p>Member not found</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-6xl">
@@ -170,7 +189,7 @@ export default function MemberDetailClient({
                 <IconUsers className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Household Members</p>
-                  <p className="font-medium">{member.household_members}</p>
+                  <p className="font-medium">{member.household_members || 1}</p>
                 </div>
               </div>
               <Separator />
@@ -194,7 +213,7 @@ export default function MemberDetailClient({
                 <IconUserCircle className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Account Created</p>
-                  <p className="font-medium">{formatDate(member.created_at?.split('T')[0])}</p>
+                  <p className="font-medium">{formatDate(member.created_at ? member.created_at.split('T')[0] : null)}</p>
                 </div>
               </div>
             </CardContent>
