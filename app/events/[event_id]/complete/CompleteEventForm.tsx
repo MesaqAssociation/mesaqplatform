@@ -7,25 +7,72 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { useRouter } from 'next/navigation'
-import { IconX, IconUpload } from '@tabler/icons-react'
+import { IconX, IconUpload, IconCheck } from '@tabler/icons-react'
 
 type Props = {
   eventId: string
   eventType: string
 }
 
+type FileWithProgress = {
+  file: File
+  progress: number
+  uploaded: boolean
+  url?: string
+}
+
 export default function CompleteEventForm({ eventId, eventType }: Props) {
   const router = useRouter()
   const [summary, setSummary] = useState('')
   const [finalCost, setFinalCost] = useState('')
-  const [files, setFiles] = useState<File[]>([])
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [files, setFiles] = useState<FileWithProgress[]>([])
   const [submitting, setSubmitting] = useState(false)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files))
+      const newFiles = Array.from(e.target.files).map(file => ({
+        file,
+        progress: 0,
+        uploaded: false
+      }))
+      
+      setFiles(prev => [...prev, ...newFiles])
+      
+      // Upload each file immediately
+      for (let i = files.length; i < files.length + newFiles.length; i++) {
+        uploadFile(i)
+      }
+    }
+  }
+
+  const uploadFile = async (index: number) => {
+    const fileItem = files[index]
+    if (!fileItem) return
+
+    try {
+      // Simulate upload with progress
+      for (let progress = 0; progress <= 100; progress += 10) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        setFiles(prev => {
+          const updated = [...prev]
+          if (updated[index]) {
+            updated[index] = { ...updated[index], progress }
+          }
+          return updated
+        })
+      }
+
+      // Mark as uploaded
+      const uploadedUrl = `/uploads/${fileItem.file.name}`
+      setFiles(prev => {
+        const updated = [...prev]
+        if (updated[index]) {
+          updated[index] = { ...updated[index], uploaded: true, url: uploadedUrl }
+        }
+        return updated
+      })
+    } catch (error) {
+      console.error('Upload error:', error)
     }
   }
 
@@ -38,24 +85,8 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
     setSubmitting(true)
 
     try {
-      // Upload files first if any
-      let fileUrls: string[] = []
-      if (files.length > 0) {
-        setUploading(true)
-        const formData = new FormData()
-        files.forEach(file => formData.append('files', file))
-        
-        // Simulate upload progress
-        for (let i = 0; i <= 100; i += 10) {
-          setUploadProgress(i)
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-        
-        // TODO: Implement actual file upload to R2 or similar
-        // For now, just use placeholder URLs
-        fileUrls = files.map(f => `/uploads/${f.name}`)
-        setUploading(false)
-      }
+      // Get uploaded file URLs
+      const fileUrls = files.filter(f => f.uploaded).map(f => f.url || '')
 
       // Submit completion data
       const response = await fetch(`/api/events/${eventId}/complete`, {
@@ -81,6 +112,8 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
       setSubmitting(false)
     }
   }
+
+  const allFilesUploaded = files.length === 0 || files.every(f => f.uploaded)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -145,30 +178,41 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
         </div>
 
         {files.length > 0 && (
-          <div className="space-y-2 mt-4">
-            <p className="text-sm font-medium">{files.length} file(s) selected:</p>
-            {files.map((file, index) => (
-              <div key={index} className="flex items-center justify-between p-2 border rounded">
-                <span className="text-sm truncate flex-1">{file.name}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(index)}
-                >
-                  <IconX className="size-4" />
-                </Button>
+          <div className="space-y-3 mt-4">
+            <p className="text-sm font-medium">{files.length} file(s):</p>
+            {files.map((fileItem, index) => (
+              <div key={index} className="space-y-2 p-3 border rounded">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {fileItem.uploaded ? (
+                      <IconCheck className="size-4 text-green-600 flex-shrink-0" />
+                    ) : (
+                      <IconUpload className="size-4 text-blue-600 flex-shrink-0 animate-pulse" />
+                    )}
+                    <span className="text-sm truncate">{fileItem.file.name}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                  >
+                    <IconX className="size-4" />
+                  </Button>
+                </div>
+                {!fileItem.uploaded && (
+                  <div className="space-y-1">
+                    <Progress value={fileItem.progress} />
+                    <p className="text-xs text-muted-foreground">
+                      Uploading... {fileItem.progress}%
+                    </p>
+                  </div>
+                )}
+                {fileItem.uploaded && (
+                  <p className="text-xs text-green-600">Upload complete</p>
+                )}
               </div>
             ))}
-          </div>
-        )}
-
-        {uploading && (
-          <div className="space-y-2">
-            <Progress value={uploadProgress} />
-            <p className="text-xs text-center text-muted-foreground">
-              Uploading files... {uploadProgress}%
-            </p>
           </div>
         )}
       </div>
@@ -179,16 +223,20 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
           type="button"
           variant="outline"
           onClick={() => router.back()}
-          disabled={submitting || uploading}
+          disabled={submitting || !allFilesUploaded}
         >
           Cancel
         </Button>
         <Button
           type="submit"
-          disabled={submitting || uploading}
+          disabled={submitting || !allFilesUploaded}
           className="flex-1"
         >
-          {submitting ? 'Completing...' : 'Mark as Completed'}
+          {!allFilesUploaded 
+            ? 'Uploading files...' 
+            : submitting 
+              ? 'Completing...' 
+              : 'Mark as Completed'}
         </Button>
       </div>
     </form>

@@ -26,7 +26,19 @@ export default async function EventsPage() {
   }) as Pool
   
   const { rows } = await pool.query(`
-    SELECT id, title, description, address, event_date, start_time, end_time, event_type, estimated_cost, attendees 
+    SELECT 
+      id, 
+      title, 
+      description, 
+      address, 
+      to_char(event_date, 'YYYY-MM-DD') as event_date,
+      start_time, 
+      end_time, 
+      event_type, 
+      estimated_cost, 
+      attendees,
+      completed,
+      completed_at
     FROM events 
     WHERE event_type = 'Event'
     ORDER BY event_date ASC, start_time ASC 
