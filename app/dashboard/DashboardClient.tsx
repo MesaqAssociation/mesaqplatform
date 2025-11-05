@@ -125,7 +125,7 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
               <p className="text-sm text-muted-foreground">{t("noUpcomingEvents")}</p>
             ) : (
               upcomingEvents.map((event) => (
-                <div key={event.id} className="py-2 border-b border-border last:border-0">
+                <Link href={`/events/${event.id}`} key={event.id} className="block py-2 border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{event.title}</p>
@@ -147,7 +147,7 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
                       {event.event_type === 'meeting' ? t("meetings") : t("events")}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </div>

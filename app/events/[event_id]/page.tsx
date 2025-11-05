@@ -136,19 +136,29 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
             )}
           </div>
 
-          {event.agenda && (
-            <div className="border rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Agenda</h2>
-              <div className="space-y-2">
-                {JSON.parse(event.agenda).map((item: any, index: number) => (
-                  <div key={index} className="flex gap-3 pb-2 border-b last:border-0">
-                    <div className="text-sm text-muted-foreground w-20">{item.time}</div>
-                    <div className="flex-1 text-sm">{item.title}</div>
+          {event.agenda && (() => {
+            try {
+              const agendaData = typeof event.agenda === 'string' ? JSON.parse(event.agenda) : event.agenda
+              if (Array.isArray(agendaData) && agendaData.length > 0) {
+                return (
+                  <div className="border rounded-lg p-6">
+                    <h2 className="text-xl font-semibold mb-4">Agenda</h2>
+                    <div className="space-y-2">
+                      {agendaData.map((item: any, index: number) => (
+                        <div key={index} className="flex gap-3 pb-2 border-b last:border-0">
+                          <div className="text-sm text-muted-foreground w-20">{item.time}</div>
+                          <div className="flex-1 text-sm">{item.title}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )
+              }
+            } catch (e) {
+              console.error('Error parsing agenda:', e)
+            }
+            return null
+          })()}
         </div>
       </div>
     </MainLayout>
