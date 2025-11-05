@@ -20,7 +20,7 @@ export default async function MembersPage() {
   }) as Pool
   const { rows } = await pool.query('select id, phone, name from "users" order by created_at desc limit 200')
   return (
-    <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 72)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="md:ml-[--sidebar-width]">
         <div className="p-6">

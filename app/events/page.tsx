@@ -13,7 +13,7 @@ export default async function EventsPage() {
     redirect('/')
   }
   return (
-    <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 72)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="md:ml-[--sidebar-width]">
         <div className="p-6">
