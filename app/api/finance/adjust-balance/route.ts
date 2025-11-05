@@ -45,14 +45,15 @@ export async function POST(req: NextRequest) {
       [newBalance, accountId]
     )
 
-    // Create adjustment transaction
+    // Create adjustment transaction with proper date handling
     const difference = newBalance - oldBalance
+    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
     const { rows } = await pool.query(
       `INSERT INTO transactions 
        (account_id, transaction_date, description, amount, transaction_type, balance_after, created_by, source) 
-       VALUES ($1, CURRENT_DATE, $2, $3, 'adjustment', $4, $5, 'manual') 
+       VALUES ($1, $2, $3, $4, 'adjustment', $5, $6, 'manual') 
        RETURNING *`,
-      [accountId, `Balance Adjustment: ${reason}`, difference, newBalance, userId]
+      [accountId, today, `Balance Adjustment: ${reason}`, difference, newBalance, userId]
     )
 
     // Log the action

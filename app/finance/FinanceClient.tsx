@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown } from '@tabler/icons-react'
+import { Progress } from '@/components/ui/progress'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
@@ -26,6 +27,7 @@ type Transaction = {
   balance_after: number | null
   creator_name: string | null
   created_at: string
+  source?: string | null
 }
 
 export default function FinanceClient({ 
@@ -42,6 +44,10 @@ export default function FinanceClient({
   const [showReasonDialog, setShowReasonDialog] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<string>('')
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [showTransactionDialog, setShowTransactionDialog] = useState(false)
 
   const handleBalanceClick = () => {
     setIsEditing(true)
@@ -99,33 +105,88 @@ export default function FinanceClient({
     if (!file) return
 
     setLoading(true)
+    setUploadProgress(0)
+    setUploadStatus('Uploading PDF...')
+    
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('accountId', account.id || '')
 
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev === null) return 30
+          if (prev < 90) return prev + 10
+          return prev
+        })
+      }, 200)
+
+      setUploadStatus('Parsing bank statement...')
+      
       const res = await fetch('/api/finance/upload-statement', {
         method: 'POST',
         body: formData,
       })
 
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+      setUploadStatus('Processing complete!')
+
       const data = await res.json()
 
       if (res.ok) {
-        alert(`Success! ${data.message}\n\nTransactions imported: ${data.transactionsImported}/${data.totalFound}`)
-        // Refresh page to show new transactions
-        window.location.reload()
+        setTimeout(() => {
+          alert(`Success! ${data.message}\n\nTransactions imported: ${data.transactionsImported}/${data.totalFound}`)
+          window.location.reload()
+        }, 500)
       } else {
+        setUploadProgress(null)
+        setUploadStatus('')
         alert(`Error: ${data.error}`)
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)
+      setUploadProgress(null)
+      setUploadStatus('')
       alert('Failed to upload statement. Please try again.')
     } finally {
       setLoading(false)
-      // Reset file input
       e.target.value = ''
     }
+  }
+
+  const handleClearAll = async () => {
+    if (!confirm('Are you sure you want to delete ALL transactions? This cannot be undone!')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/clear-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: account.id }),
+      })
+
+      if (res.ok) {
+        alert('All transactions cleared successfully!')
+        window.location.reload()
+      } else {
+        const data = await res.json()
+        alert(`Error: ${data.error}`)
+      }
+    } catch (err) {
+      console.error('Failed to clear transactions', err)
+      alert('Failed to clear transactions. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTransactionClick = (txn: Transaction) => {
+    setSelectedTransaction(txn)
+    setShowTransactionDialog(true)
   }
 
   const formatCurrency = (amount: number) => {
@@ -151,13 +212,14 @@ export default function FinanceClient({
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
             {isEditing ? (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-3">
                 <span className="text-5xl font-bold">$</span>
                 <Input
                   type="text"
                   value={editValue}
                   onChange={handleBalanceChange}
-                  className="text-5xl font-bold text-center max-w-md h-20 text-5xl"
+                  className="text-5xl font-bold text-center w-[400px] h-20 px-4"
+                  style={{ fontSize: '3rem', lineHeight: '1' }}
                   autoFocus
                 />
                 <div className="flex flex-col gap-2">
@@ -172,7 +234,7 @@ export default function FinanceClient({
             ) : (
               <div 
                 onClick={handleBalanceClick}
-                className="text-5xl font-bold cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-2"
+                className="text-5xl font-bold cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-3"
               >
                 {formatCurrency(balance)}
                 <IconEdit className="size-6 text-muted-foreground" />
@@ -182,20 +244,43 @@ export default function FinanceClient({
         </CardContent>
       </Card>
 
+      {/* Upload Progress */}
+      {uploadProgress !== null && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">{uploadStatus}</p>
+                <p className="text-sm text-muted-foreground">{uploadProgress}%</p>
+              </div>
+              <Progress value={uploadProgress} className="w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Upload Bank Statement */}
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <Button 
+          variant="destructive" 
+          onClick={handleClearAll} 
+          disabled={loading || transactions.length === 0}
+        >
+          <IconTrash className="mr-2 size-4" />
+          Clear All Transactions
+        </Button>
         <label htmlFor="statement-upload">
           <Button asChild disabled={loading}>
             <span>
               <IconUpload className="mr-2 size-4" />
-              Upload Bank Statement
+              {loading ? 'Uploading...' : 'Upload Bank Statement'}
             </span>
           </Button>
         </label>
         <input
           id="statement-upload"
           type="file"
-          accept=".pdf,.csv,.xlsx,.xls"
+          accept=".pdf"
           onChange={handleFileUpload}
           className="hidden"
         />
@@ -225,7 +310,11 @@ export default function FinanceClient({
                   </tr>
                 ) : (
                   transactions.map((txn) => (
-                    <tr key={txn.id} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr 
+                      key={txn.id} 
+                      className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleTransactionClick(txn)}
+                    >
                       <td className="py-3 px-2">{formatDate(txn.transaction_date)}</td>
                       <td className="py-3 px-2">
                         <div>
@@ -294,6 +383,112 @@ export default function FinanceClient({
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Detail Dialog */}
+      <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Transaction ID</Label>
+                  <p className="font-mono text-sm">{selectedTransaction.id}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Date</Label>
+                  <p className="font-medium">{formatDate(selectedTransaction.transaction_date)}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground text-xs">Description</Label>
+                <p className="font-medium text-lg">{selectedTransaction.description}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Type</Label>
+                  <p className={`font-semibold capitalize ${
+                    selectedTransaction.transaction_type === 'credit' 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : selectedTransaction.transaction_type === 'debit'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-blue-600 dark:text-blue-400'
+                  }`}>
+                    {selectedTransaction.transaction_type}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Amount</Label>
+                  <p className={`font-bold text-xl ${
+                    selectedTransaction.transaction_type === 'credit' 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : selectedTransaction.transaction_type === 'debit'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-blue-600 dark:text-blue-400'
+                  }`}>
+                    {selectedTransaction.transaction_type === 'credit' ? '+' : '-'}
+                    {formatCurrency(Math.abs(selectedTransaction.amount))}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Balance After</Label>
+                  <p className="font-medium">
+                    {selectedTransaction.balance_after !== null 
+                      ? formatCurrency(selectedTransaction.balance_after) 
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Category</Label>
+                  <p className="font-medium">{selectedTransaction.category || 'Uncategorized'}</p>
+                </div>
+              </div>
+
+              {selectedTransaction.reference && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Reference</Label>
+                  <p className="font-mono text-sm">{selectedTransaction.reference}</p>
+                </div>
+              )}
+
+              {selectedTransaction.source && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Source</Label>
+                  <p className="font-medium capitalize">{selectedTransaction.source.replace('_', ' ')}</p>
+                </div>
+              )}
+
+              {selectedTransaction.creator_name && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Created By</Label>
+                  <p className="font-medium">{selectedTransaction.creator_name}</p>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-muted-foreground text-xs">Created At</Label>
+                <p className="text-sm">
+                  {new Date(selectedTransaction.created_at).toLocaleString('en-AU', {
+                    dateStyle: 'long',
+                    timeStyle: 'short',
+                  })}
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={() => setShowTransactionDialog(false)}>Close</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

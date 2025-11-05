@@ -101,9 +101,14 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
       const hasDR = /\bDR\b/i.test(rest)
       const hasCR = /\bCR\b/i.test(rest)
       
-      // Extract description (everything before first amount)
-      const descMatch = rest.match(/^(.+?)\s+[\d,]+\.\d{2}/)
-      const description = descMatch ? descMatch[1].trim() : rest.substring(0, 50).trim()
+      // Extract description (everything before first amount, excluding amounts and DR/CR markers)
+      let description = rest
+        .replace(/[\d,]+\.\d{2}/g, '') // Remove all amounts
+        .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
+        .replace(/[-$]+/g, '') // Remove dashes and dollar signs
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim()
+        .substring(0, 200)
 
       let debit: number | undefined
       let credit: number | undefined
