@@ -122,23 +122,32 @@ export default function FinanceClient({
 
     setLoading(true)
     setUploadProgress(0)
-    setUploadStatus('Uploading PDF...')
+    setUploadStatus('📄 Uploading PDF...')
     
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('accountId', account.id || '')
 
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev === null) return 30
-          if (prev < 90) return prev + 10
-          return prev
-        })
-      }, 200)
+      // Simulate upload progress with detailed steps
+      const progressSteps = [
+        { progress: 10, status: '📤 Uploading file...' },
+        { progress: 20, status: '📖 Reading PDF...' },
+        { progress: 30, status: '🔍 Parsing transactions...' },
+        { progress: 50, status: '💾 Saving to database...' },
+        { progress: 70, status: '📱 Step 1: Matching phone numbers...' },
+        { progress: 80, status: '🏦 Step 2: Matching banking names...' },
+        { progress: 90, status: '🤖 Step 3: AI matching (if needed)...' },
+      ]
 
-      setUploadStatus('Adding transactions...')
+      let currentStep = 0
+      const progressInterval = setInterval(() => {
+        if (currentStep < progressSteps.length) {
+          setUploadProgress(progressSteps[currentStep].progress)
+          setUploadStatus(progressSteps[currentStep].status)
+          currentStep++
+        }
+      }, 800)
       
       const res = await fetch('/api/finance/upload-statement', {
         method: 'POST',
@@ -147,7 +156,7 @@ export default function FinanceClient({
 
       clearInterval(progressInterval)
       setUploadProgress(100)
-      setUploadStatus('Complete!')
+      setUploadStatus('✅ Complete!')
 
       const data = await res.json()
 

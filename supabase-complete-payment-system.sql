@@ -62,6 +62,13 @@ SELECT
     WHEN u.role IN ('Board Member', 'Head Board Member') THEN 'EXEMPT'
     -- Not joined yet or joined after current month
     WHEN u.date_joined IS NULL OR u.date_joined > DATE_TRUNC('month', CURRENT_DATE)::DATE THEN 'N/A'
+    -- Check if payment exists for current month with REVIEW status
+    WHEN EXISTS (
+      SELECT 1 FROM membership_payments mp
+      WHERE mp.user_id = u.id 
+      AND mp.payment_month = DATE_TRUNC('month', CURRENT_DATE)::DATE
+      AND mp.status = 'review'
+    ) THEN 'REVIEW'
     -- Check if payment exists for current month
     WHEN EXISTS (
       SELECT 1 FROM membership_payments mp
@@ -85,7 +92,7 @@ SELECT
 FROM users u;
 
 COMMENT ON VIEW current_month_payment_status IS 
-'Shows payment status for current month only. Status values: PAID, UNPAID, OVERDUE, EXEMPT (board members), N/A (not joined yet)';
+'Shows payment status for current month only. Status values: PAID, UNPAID, OVERDUE, REVIEW (ambiguous match), EXEMPT (board members), N/A (not joined yet)';
 
 
 -- STEP 5: Create member_payment_status view (historical)

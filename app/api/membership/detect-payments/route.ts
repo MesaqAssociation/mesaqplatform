@@ -120,9 +120,21 @@ export async function POST(req: NextRequest) {
     // ========================================================================
     console.log('\n🏦 STEP 2: Searching by banking names...')
     let step2Matches = 0
+    let step2Reviews = 0
     
     for (const member of allMembers) {
       if (!member.banking_name || matchedMemberIds.has(member.id)) continue
+
+      // Check if this banking name is shared by multiple members
+      const { rows: duplicateCheck } = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM users
+        WHERE LOWER(banking_name) = LOWER($1)
+        AND role NOT IN ('Board Member', 'Head Board Member')
+        AND date_joined IS NOT NULL
+      `, [member.banking_name])
+      
+      const hasDuplicate = duplicateCheck[0].count > 1
 
       const { rows: bankingMatches } = await pool.query(`
         SELECT id, transaction_date, description, amount
@@ -143,17 +155,21 @@ export async function POST(req: NextRequest) {
         const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
         const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
 
+        // If banking name is shared, mark as REVIEW instead of PAID
+        const paymentStatus = hasDuplicate ? 'review' : 'paid'
+
         try {
           const { rowCount } = await pool.query(`
             INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
-            VALUES ($1, $2, $3, $4, $5, 'paid')
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (user_id, payment_month) DO NOTHING
-          `, [member.id, paymentMonthStr, txn.amount, txn.id, txn.transaction_date])
+          `, [member.id, paymentMonthStr, txn.amount, txn.id, txn.transaction_date, paymentStatus])
           
           if (rowCount && rowCount > 0) {
             matchedMemberIds.add(member.id)
             matchedTransactionIds.add(txn.id)
             step2Matches++
+            if (hasDuplicate) step2Reviews++
             totalAdded++
             detectionLog.push({
               step: 2,
@@ -163,7 +179,8 @@ export async function POST(req: NextRequest) {
               transaction: txn.description,
               amount: txn.amount,
               month: paymentMonthStr,
-              status: 'matched'
+              status: hasDuplicate ? 'review' : 'matched',
+              note: hasDuplicate ? 'Banking name shared by multiple members - needs manual review' : undefined
             })
           }
         } catch (err) {
@@ -171,7 +188,7 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-    console.log(`✅ Step 2 complete: ${step2Matches} matches by banking name`)
+    console.log(`✅ Step 2 complete: ${step2Matches} matches by banking name (${step2Reviews} marked for review)`)
 
     // ========================================================================
     // STEP 3: Get remaining unpaid members
