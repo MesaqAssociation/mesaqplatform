@@ -66,7 +66,7 @@ export function NavMain({
             const hasChildren = !!item.children?.length
             const childActive = !!item.children?.some((c) => pathname === c.url || pathname.startsWith(c.url))
             const itemActive = pathname === item.url || pathname.startsWith(item.url)
-            const isActive = itemActive || childActive
+            const isActive = itemActive
             const isOpen = open[item.title] ?? (hasChildren && (childActive || itemActive))
             return (
               <SidebarMenuItem key={item.title}>
@@ -77,10 +77,10 @@ export function NavMain({
                   onClick={() => hasChildren && setOpen({ ...open, [item.title]: !isOpen })}
                 >
                   {hasChildren ? (
-                    <div className="flex w-full items-center cursor-pointer">
+                    <div className="flex w-full items-center cursor-pointer gap-2">
                       {item.icon && <item.icon className="size-4" />}
                       <span className="flex-1">{item.title}</span>
-                      <IconChevronRight className={`transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                      <IconChevronRight className={`size-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                     </div>
                   ) : (
                     <Link href={item.url}>
@@ -97,7 +97,7 @@ export function NavMain({
                         <li key={child.title}>
                           <a
                             data-sidebar="menu-sub-button"
-                            className="flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>span:last-child]:truncate"
+                            className="flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground [&>span:last-child]:truncate"
                             data-active={childActive}
                             href={child.url}
                           >
