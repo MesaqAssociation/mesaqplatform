@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS events (
 -- Create member_events junction table for tracking attendance
 CREATE TABLE IF NOT EXISTS member_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
   event_id UUID REFERENCES events(id) ON DELETE CASCADE,
   attended BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
