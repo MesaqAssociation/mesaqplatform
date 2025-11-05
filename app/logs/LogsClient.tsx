@@ -49,42 +49,25 @@ export default function LogsClient({ initial }: { initial: AuditLog[] }) {
             className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-1">
+              <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
                   <IconActivity className={`size-4 ${getActionColor(log.action)}`} />
-                  <span className="font-medium">{log.action}</span>
+                  <span className="font-medium capitalize">{log.action.replace(/_/g, ' ')}</span>
                   <span className="text-muted-foreground">•</span>
-                  <span className="text-sm text-muted-foreground">{log.entity_type}</span>
-                  {log.entity_id && (
-                    <>
-                      <span className="text-muted-foreground">•</span>
-                      <span className="text-sm text-muted-foreground">ID: {log.entity_id}</span>
-                    </>
-                  )}
+                  <span className="text-sm text-muted-foreground capitalize">{log.entity_type}</span>
                 </div>
                 
-                {log.details && Object.keys(log.details).length > 0 && (
-                  <div className="text-sm text-muted-foreground pl-6">
-                    <pre className="font-mono text-xs bg-muted p-2 rounded mt-2 overflow-x-auto">
-                      {JSON.stringify(log.details, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                
-                <div className="flex items-center gap-4 text-xs text-muted-foreground pl-6">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground pl-6">
                   {log.user_name && (
-                    <div className="flex items-center gap-1">
-                      <IconUser className="size-3" />
-                      <span>{log.user_name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <IconUser className="size-4" />
+                      <span className="font-medium">{log.user_name}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1">
-                    <IconClock className="size-3" />
+                  <div className="flex items-center gap-1.5">
+                    <IconClock className="size-4" />
                     <span>{formatTimestamp(log.created_at)}</span>
                   </div>
-                  {log.ip_address && (
-                    <span>IP: {log.ip_address}</span>
-                  )}
                 </div>
               </div>
             </div>

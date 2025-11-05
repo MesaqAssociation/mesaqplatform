@@ -31,7 +31,7 @@ export function Sidebar({ user }: SidebarProps) {
       url: "/events", 
       icon: IconCalendarEvent,
       children: [
-        { title: t("meetings"), url: '/events/meetings' },
+        { title: t("meetings"), url: '/meetings' },
         { title: t("events"), url: '/events' },
       ]
     },
@@ -50,20 +50,20 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="px-4 pb-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
               <IconCirclePlusFilled className="size-4" />
               <span>{t("quickCreate")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="right">
             <DropdownMenuItem asChild>
-              <Link href="#">Bank Statement</Link>
+              <Link href="/finance" className="cursor-pointer">Bank Statement</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="#">Event</Link>
+              <Link href="/events/create" className="cursor-pointer">Event</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="#">Meeting</Link>
+              <Link href="/meetings/create" className="cursor-pointer">Meeting</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -74,8 +74,16 @@ export function Sidebar({ user }: SidebarProps) {
         <ul className="space-y-1">
           {NAV_ITEMS.map((item) => {
             const hasChildren = !!item.children?.length
-            const childActive = !!item.children?.some((c) => pathname === c.url || pathname.startsWith(c.url))
-            const itemActive = pathname === item.url || pathname.startsWith(item.url + '/')
+            const childActive = !!item.children?.some((c) => {
+              // Check exact match or if pathname starts with the child URL
+              if (pathname === c.url || pathname.startsWith(c.url + '/')) return true
+              // Special case: highlight Meetings for /meetings/create
+              if (c.url === '/meetings' && pathname.startsWith('/meetings')) return true
+              // Special case: highlight Events for /events/create
+              if (c.url === '/events' && pathname.startsWith('/events') && !pathname.startsWith('/meetings')) return true
+              return false
+            })
+            const itemActive = pathname === item.url || (pathname.startsWith(item.url + '/') && !hasChildren)
             const isOpen = open[item.title] ?? (hasChildren && childActive)
 
             return (
@@ -96,11 +104,12 @@ export function Sidebar({ user }: SidebarProps) {
                           <li key={child.url}>
                             <Link
                               href={child.url}
-                              className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                                 pathname === child.url
                                   ? 'bg-primary text-primary-foreground'
                                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                               }`}
+                              prefetch={true}
                             >
                               {child.title}
                             </Link>
@@ -112,11 +121,12 @@ export function Sidebar({ user }: SidebarProps) {
                 ) : (
                   <Link
                     href={item.url}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                       itemActive
                         ? 'bg-primary text-primary-foreground'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                     }`}
+                    prefetch={true}
                   >
                     {item.icon && <item.icon className="size-4" />}
                     <span>{item.title}</span>
