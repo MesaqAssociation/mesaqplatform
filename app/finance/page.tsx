@@ -32,7 +32,6 @@ export default async function FinancePage() {
       t.description,
       t.amount,
       t.transaction_type,
-      t.category,
       t.reference,
       t.balance_after,
       t.created_by,

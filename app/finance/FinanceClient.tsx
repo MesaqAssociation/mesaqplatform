@@ -22,7 +22,6 @@ type Transaction = {
   description: string
   amount: number
   transaction_type: string
-  category: string | null
   reference: string | null
   balance_after: number | null
   creator_name: string | null
@@ -385,11 +384,13 @@ export default function FinanceClient({
                           ? 'text-green-600 dark:text-green-400' 
                           : txn.transaction_type === 'debit'
                           ? 'text-red-600 dark:text-red-400'
-                          : 'text-blue-600 dark:text-blue-400'
+                          : txn.amount > 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
                       }`}>
                         <div className="flex items-center justify-end gap-1">
-                          {txn.transaction_type === 'credit' && <IconArrowDown className="size-3" />}
-                          {txn.transaction_type === 'debit' && <IconArrowUp className="size-3" />}
+                          {(txn.transaction_type === 'credit' || (txn.transaction_type === 'adjustment' && txn.amount > 0)) && <IconArrowUp className="size-3" />}
+                          {(txn.transaction_type === 'debit' || (txn.transaction_type === 'adjustment' && txn.amount < 0)) && <IconArrowDown className="size-3" />}
                           {formatCurrency(Math.abs(txn.amount))}
                         </div>
                       </td>
@@ -446,15 +447,9 @@ export default function FinanceClient({
           </DialogHeader>
           {selectedTransaction && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Transaction ID</Label>
-                  <p className="font-mono text-sm">{selectedTransaction.id}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Date</Label>
-                  <p className="font-medium">{formatDate(selectedTransaction.transaction_date)}</p>
-                </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Date</Label>
+                <p className="font-medium">{formatDate(selectedTransaction.transaction_date)}</p>
               </div>
 
               <div>
@@ -490,19 +485,13 @@ export default function FinanceClient({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Balance After</Label>
-                  <p className="font-medium">
-                    {selectedTransaction.balance_after !== null 
-                      ? formatCurrency(selectedTransaction.balance_after) 
-                      : 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Category</Label>
-                  <p className="font-medium">{selectedTransaction.category || 'Uncategorized'}</p>
-                </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Balance After</Label>
+                <p className="font-medium">
+                  {selectedTransaction.balance_after !== null 
+                    ? formatCurrency(selectedTransaction.balance_after) 
+                    : 'N/A'}
+                </p>
               </div>
 
               {selectedTransaction.reference && (
