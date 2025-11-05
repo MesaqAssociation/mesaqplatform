@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/components/I18nProvider'
 
 export function NavUser({
   user,
@@ -34,6 +35,8 @@ export function NavUser({
     avatar: string
   }
 }) {
+  const { t } = useI18n()
+  
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
@@ -62,20 +65,20 @@ export function NavUser({
           <DropdownMenuItem asChild>
             <Link href="/settings">
               <IconSettings className="mr-2 size-4" />
-              Settings
+              {t("settings")}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/logs">
               <IconActivity className="mr-2 size-4" />
-              Activity Logs
+              {t("activityLogs")}
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <IconLogout className="mr-2 size-4" />
-          Log out
+          {t("logout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

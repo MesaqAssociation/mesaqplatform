@@ -7,21 +7,7 @@ import { IconCirclePlusFilled, IconChevronRight, IconDashboard, IconUsers, IconC
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { NavUser } from '@/components/nav-user'
-
-const NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
-  { title: "Members", url: "/members", icon: IconUsers },
-  { title: "Finance", url: "/finance", icon: IconCash },
-  { 
-    title: "Events", 
-    url: "/events", 
-    icon: IconCalendarEvent,
-    children: [
-      { title: 'Meetings', url: '/events/meetings' },
-      { title: 'Events', url: '/events' },
-    ]
-  },
-]
+import { useI18n } from '@/components/I18nProvider'
 
 type SidebarProps = {
   user?: {
@@ -34,6 +20,22 @@ type SidebarProps = {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const { t } = useI18n()
+
+  const NAV_ITEMS = [
+    { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
+    { title: t("members"), url: "/members", icon: IconUsers },
+    { title: t("finance"), url: "/finance", icon: IconCash },
+    { 
+      title: t("events"), 
+      url: "/events", 
+      icon: IconCalendarEvent,
+      children: [
+        { title: t("meetings"), url: '/events/meetings' },
+        { title: t("events"), url: '/events' },
+      ]
+    },
+  ]
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -50,7 +52,7 @@ export function Sidebar({ user }: SidebarProps) {
           <DropdownMenuTrigger asChild>
             <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               <IconCirclePlusFilled className="size-4" />
-              <span>Quick Create</span>
+              <span>{t("quickCreate")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="right">
@@ -130,7 +132,7 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="px-4 pb-2">
         <input
           type="search"
-          placeholder="Search..."
+          placeholder={t("search")}
           className="w-full h-8 px-3 text-sm bg-background border border-sidebar-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
