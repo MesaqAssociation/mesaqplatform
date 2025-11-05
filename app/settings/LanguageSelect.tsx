@@ -35,6 +35,8 @@ export default function LanguageSelect() {
         } else {
           document.documentElement.setAttribute('dir', 'ltr')
         }
+        // Reload page to apply language changes
+        window.location.reload()
       }
     } catch {}
   }

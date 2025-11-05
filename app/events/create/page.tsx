@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import Link from 'next/link'
 import { MainLayout } from '@/components/Sidebar'
+import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import CreateEventForm from './CreateEventForm'
@@ -11,13 +12,17 @@ import { IconArrowLeft } from '@tabler/icons-react'
 export default async function CreateEventPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
+  
+  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  
+  const user = await getUserFromToken()
   }
   return (
-    <MainLayout>
+    <MainLayout user={user}>
       <div className="p-6 max-w-3xl">
         <Link href="/events">
           <Button variant="ghost" className="mb-4">

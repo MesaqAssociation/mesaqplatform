@@ -2,16 +2,21 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
+import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import LogsClient from './LogsClient'
 
 export default async function LogsPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
+  
+  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  
+  const user = await getUserFromToken()
   }
 
   const pool = new (require('pg').Pool)({
@@ -26,7 +31,7 @@ export default async function LogsPage() {
   `)
 
   return (
-    <MainLayout>
+    <MainLayout user={user}>
       <div className="p-6">
         <h1 className="text-2xl font-semibold mb-6">Activity Logs</h1>
         <LogsClient initial={rows} />

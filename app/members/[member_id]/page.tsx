@@ -2,16 +2,21 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
+import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import MemberDetailClient from './MemberDetailClient'
 
 export default async function MemberDetailPage({ params }: { params: { member_id: string } }) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
+  
+  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  
+  const user = await getUserFromToken()
   }
 
   const pool = new (require('pg').Pool)({
@@ -46,7 +51,7 @@ export default async function MemberDetailPage({ params }: { params: { member_id
   )
 
   return (
-    <MainLayout>
+    <MainLayout user={user}>
       <MemberDetailClient 
         member={member} 
         attendedEvents={attendedEvents}

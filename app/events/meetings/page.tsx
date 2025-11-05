@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
+import { getUserFromToken } from '@/lib/getUserFromToken'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import EventsClient from '../EventsClient'
@@ -10,10 +11,14 @@ import { Pool } from 'pg'
 export default async function MeetingsPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
+  
+  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  
+  const user = await getUserFromToken()
   }
 
   const pool = new (require('pg').Pool)({
@@ -30,7 +35,7 @@ export default async function MeetingsPage() {
   `)
 
   return (
-    <MainLayout>
+    <MainLayout user={user}>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold">Meetings</h1>

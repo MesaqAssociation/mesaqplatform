@@ -30,48 +30,35 @@ export function NavUser({
 }: {
   user: {
     name: string
-    email: string
+    email: string | null
     avatar: string
   }
 }) {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      window.location.href = '/'
+    } catch (err) {
+      console.error('Logout failed:', err)
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-sidebar-accent">
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+            <AvatarFallback className="rounded-lg">{user.name[0]?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start flex-1 ml-2 text-left">
             <span className="text-sm font-medium">{user.name}</span>
-            <span className="text-xs text-muted-foreground">{user.email}</span>
           </div>
           <IconDotsVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" side="right">
-        <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{user.name}</span>
-              <span className="text-xs text-muted-foreground">{user.email}</span>
-            </div>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <IconUserCircle className="mr-2 size-4" />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <IconCreditCard className="mr-2 size-4" />
-            Billing
-          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/settings">
               <IconSettings className="mr-2 size-4" />
@@ -86,13 +73,9 @@ export function NavUser({
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <form action="/api/logout" method="post" className="w-full">
-            <button type="submit" className="flex w-full items-center">
-              <IconLogout className="mr-2 size-4" />
-              Log out
-            </button>
-          </form>
+        <DropdownMenuItem onClick={handleLogout}>
+          <IconLogout className="mr-2 size-4" />
+          Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

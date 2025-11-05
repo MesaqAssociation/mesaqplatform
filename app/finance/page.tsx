@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
 import { Pool } from 'pg'
 import FinanceClient from './FinanceClient'
+import { getUserFromToken } from '@/lib/getUserFromToken'
 
 export default async function FinancePage() {
   const token = cookies().get('auth_token')?.value
@@ -13,6 +14,8 @@ export default async function FinancePage() {
   } catch {
     redirect('/')
   }
+  
+  const user = await getUserFromToken()
 
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
@@ -46,7 +49,7 @@ export default async function FinancePage() {
   `, [account.id])
 
   return (
-    <MainLayout>
+    <MainLayout user={user}>
       <div className="p-6">
         <FinanceClient account={account} initialTransactions={transactions} />
       </div>

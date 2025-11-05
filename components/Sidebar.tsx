@@ -23,7 +23,15 @@ const NAV_ITEMS = [
   },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  user?: {
+    name: string
+    email: string | null
+    image: string | null
+  }
+}
+
+export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState<Record<string, boolean>>({})
 
@@ -129,16 +137,20 @@ export function Sidebar() {
 
       {/* User */}
       <div className="p-4 border-t border-sidebar-border">
-        <NavUser user={{ name: "User", email: "user@example.com", avatar: "/placeholder-user.jpg" }} />
+        <NavUser user={{ 
+          name: user?.name || "User", 
+          email: user?.email || null, 
+          avatar: user?.image || "/placeholder-user.jpg" 
+        }} />
       </div>
     </aside>
   )
 }
 
-export function MainLayout({ children }: { children: React.ReactNode }) {
+export function MainLayout({ children, user }: { children: React.ReactNode; user?: { name: string; email: string | null; image: string | null } }) {
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar user={user} />
       <main className="flex-1 ml-64 bg-background">
         {children}
       </main>
