@@ -61,10 +61,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
   }
 
   // Parse transaction lines
-  // Pattern: Date Description Amount (Debit/Credit) Balance
-  // Common formats:
-  // 01 Jan 2025   Payment to WOOLWORTHS     45.50 DR      1,234.56
-  // 02/01/2025    SALARY CREDIT                   2,500.00 CR  3,734.56
+  // CommBank format: Date Transaction details Amount Balance
+  // Example: 01 Oct 2025 COLES 8786 NARRE WARREN AU -$15.25 $1,282.78
   
   const lines = text.split('\n')
   
@@ -73,9 +71,10 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     if (!line) continue
 
     // Try to match transaction patterns
-    // Pattern 1: DD MMM YYYY or DD/MM/YYYY at start
+    // Pattern: DD MMM YYYY or DD/MM/YY at start
     const datePatterns = [
-      /^(\d{1,2}[\s\/]\w{3}[\s\/]\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4})\s+(.+)/,
+      /^(\d{1,2}\s+\w{3}\s+\d{2,4})\s+(.+)/,  // 01 Oct 2025
+      /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(.+)/,  // 01/10/25
     ]
 
     for (const pattern of datePatterns) {
@@ -85,27 +84,27 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
       const dateStr = match[1]
       const rest = match[2]
 
-      // Parse the rest of the line for description and amounts
-      // Look for amounts: 123.45 or 1,234.56
-      const amountPattern = /([\d,]+\.\d{2})/g
-      const amounts: number[] = []
+      // Look for amounts with $ and optional - prefix
+      // Matches: -$15.25 or $1,282.78
+      const amountPattern = /(?:-?\$)([\d,]+\.\d{2})/g
+      const amounts: { value: number; isNegative: boolean }[] = []
       let amountMatch
 
       while ((amountMatch = amountPattern.exec(rest)) !== null) {
-        amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')))
+        const fullMatch = amountMatch[0]
+        const value = parseFloat(amountMatch[1].replace(/,/g, ''))
+        const isNegative = fullMatch.startsWith('-')
+        amounts.push({ value, isNegative })
       }
 
       if (amounts.length === 0) continue
 
-      // Determine transaction type
-      const hasDR = /\bDR\b/i.test(rest)
-      const hasCR = /\bCR\b/i.test(rest)
-      
-      // Extract description (everything before first amount, excluding amounts and DR/CR markers)
+      // Extract description (remove all amounts and clean up)
       let description = rest
-        .replace(/[\d,]+\.\d{2}/g, '') // Remove all amounts
+        .replace(/(?:-?\$)[\d,]+\.\d{2}/g, '') // Remove all amounts with $
         .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
-        .replace(/[-$]+/g, '') // Remove dashes and dollar signs
+        .replace(/Value Date:.*$/i, '') // Remove value date line
+        .replace(/Card xx\d+/gi, '') // Remove card references
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim()
         .substring(0, 200)
@@ -115,34 +114,36 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
       let balance: number | undefined
 
       if (amounts.length === 1) {
-        // Only one amount - could be debit/credit with no balance
-        if (hasDR) {
-          debit = amounts[0]
-        } else if (hasCR) {
-          credit = amounts[0]
+        // Only one amount
+        if (amounts[0].isNegative) {
+          debit = amounts[0].value
         } else {
-          // Assume it's a debit if no indicator
-          debit = amounts[0]
+          credit = amounts[0].value
         }
       } else if (amounts.length === 2) {
         // Two amounts - transaction + balance
-        if (hasDR || (!hasCR && !hasDR)) {
-          debit = amounts[0]
-          balance = amounts[1]
+        const txnAmount = amounts[0]
+        balance = amounts[1].value
+        
+        if (txnAmount.isNegative) {
+          debit = txnAmount.value
         } else {
-          credit = amounts[0]
-          balance = amounts[1]
+          credit = txnAmount.value
         }
       } else if (amounts.length >= 3) {
-        // Three amounts - debit, credit, balance (or similar)
-        // Take last as balance, previous as transaction
-        balance = amounts[amounts.length - 1]
-        if (hasDR) {
-          debit = amounts[amounts.length - 2]
+        // Multiple amounts - last is balance, find the transaction amount
+        balance = amounts[amounts.length - 1].value
+        const txnAmount = amounts[amounts.length - 2]
+        
+        if (txnAmount.isNegative) {
+          debit = txnAmount.value
         } else {
-          credit = amounts[amounts.length - 2]
+          credit = txnAmount.value
         }
       }
+
+      // Skip if no valid transaction amount
+      if (!debit && !credit) continue
 
       transactions.push({
         date: parseAUDate(dateStr),
@@ -170,10 +171,10 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
  * Parse Australian date formats to YYYY-MM-DD
  */
 function parseAUDate(dateStr: string): string {
-  // Handle formats: DD/MM/YYYY, DD MMM YYYY, DD-MM-YYYY, etc.
+  // Handle formats: DD/MM/YYYY, DD/MM/YY, DD MMM YYYY, DD-MM-YYYY, etc.
   const cleaned = dateStr.trim().replace(/\s+/g, ' ')
   
-  // Try DD MMM YYYY (01 Jan 2025)
+  // Try DD MMM YYYY (01 Jan 2025, 01 Oct 2025)
   const monthNames: { [key: string]: string } = {
     jan: '01', january: '01',
     feb: '02', february: '02',
@@ -193,23 +194,36 @@ function parseAUDate(dateStr: string): string {
   if (monthMatch) {
     const day = monthMatch[1].padStart(2, '0')
     const monthStr = monthMatch[2].toLowerCase()
-    const year = monthMatch[3].length === 2 ? `20${monthMatch[3]}` : monthMatch[3]
+    let year = monthMatch[3]
+    // Convert 2-digit year to 4-digit
+    if (year.length === 2) {
+      const yearNum = parseInt(year)
+      // If year is 00-50, assume 2000-2050, if 51-99, assume 1951-1999
+      year = yearNum <= 50 ? `20${year}` : `19${year}`
+    }
     const month = monthNames[monthStr]
     if (month) {
       return `${year}-${month}-${day}`
     }
   }
 
-  // Try DD/MM/YYYY
+  // Try DD/MM/YYYY or DD/MM/YY
   const slashMatch = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/)
   if (slashMatch) {
     const day = slashMatch[1].padStart(2, '0')
     const month = slashMatch[2].padStart(2, '0')
-    const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3]
+    let year = slashMatch[3]
+    // Convert 2-digit year to 4-digit
+    if (year.length === 2) {
+      const yearNum = parseInt(year)
+      // If year is 00-50, assume 2000-2050, if 51-99, assume 1951-1999
+      year = yearNum <= 50 ? `20${year}` : `19${year}`
+    }
     return `${year}-${month}-${day}`
   }
 
   // Fallback to current date if parsing fails
+  console.warn(`Failed to parse date: "${dateStr}", using current date`)
   return new Date().toISOString().split('T')[0]
 }
 

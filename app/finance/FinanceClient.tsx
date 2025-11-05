@@ -100,6 +100,22 @@ export default function FinanceClient({
     }
   }
 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    const toastDiv = document.createElement('div')
+    toastDiv.className = 'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white animate-slideInRight z-50 max-w-md'
+    toastDiv.style.backgroundColor = type === 'success' ? '#34b14e' : '#ef4444'
+    toastDiv.innerHTML = `
+      <div class="flex items-start justify-between gap-3">
+        <span class="flex-1">${message}</span>
+        <button class="text-white font-bold hover:opacity-70" onclick="this.parentElement.parentElement.remove()">✕</button>
+      </div>
+    `
+    document.body.appendChild(toastDiv)
+    setTimeout(() => {
+      toastDiv.remove()
+    }, 5000)
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -122,7 +138,7 @@ export default function FinanceClient({
         })
       }, 200)
 
-      setUploadStatus('Parsing bank statement...')
+      setUploadStatus('Adding transactions...')
       
       const res = await fetch('/api/finance/upload-statement', {
         method: 'POST',
@@ -131,25 +147,27 @@ export default function FinanceClient({
 
       clearInterval(progressInterval)
       setUploadProgress(100)
-      setUploadStatus('Processing complete!')
+      setUploadStatus('Complete!')
 
       const data = await res.json()
 
       if (res.ok) {
         setTimeout(() => {
-          alert(`Success! ${data.message}\n\nTransactions imported: ${data.transactionsImported}/${data.totalFound}`)
-          window.location.reload()
+          showToast(`Success! ${data.message}<br><br>Transactions imported: ${data.transactionsImported}/${data.totalFound}`, 'success')
+          setTimeout(() => {
+            window.location.reload()
+          }, 2000)
         }, 500)
       } else {
         setUploadProgress(null)
         setUploadStatus('')
-        alert(`Error: ${data.error}`)
+        showToast(`Error: ${data.error}`, 'error')
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)
       setUploadProgress(null)
       setUploadStatus('')
-      alert('Failed to upload statement. Please try again.')
+      showToast('Failed to upload statement. Please try again.', 'error')
     } finally {
       setLoading(false)
       e.target.value = ''
@@ -170,15 +188,17 @@ export default function FinanceClient({
       })
 
       if (res.ok) {
-        alert('All transactions cleared successfully!')
-        window.location.reload()
+        showToast('All transactions cleared successfully!', 'success')
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
       } else {
         const data = await res.json()
-        alert(`Error: ${data.error}`)
+        showToast(`Error: ${data.error}`, 'error')
       }
     } catch (err) {
       console.error('Failed to clear transactions', err)
-      alert('Failed to clear transactions. Please try again.')
+      showToast('Failed to clear transactions. Please try again.', 'error')
     } finally {
       setLoading(false)
     }
