@@ -19,7 +19,7 @@ export default async function MembersPage() {
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
-  const { rows } = await pool.query('select id, phone, name, email, address, image, role, household_members from "users" order by created_at desc limit 200')
+  const { rows } = await pool.query('select id, member_id, phone, name, email, address, image, role, household_members from "users" order by created_at desc limit 200')
   return (
     <MainLayout>
       <div className="p-6">
