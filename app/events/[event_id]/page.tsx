@@ -71,19 +71,20 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
 
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                event.event_type === 'Meeting' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'bg-purple-100 text-purple-700'
-              }`}>
-                {event.event_type}
-              </span>
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold">{event.title}</h1>
+                {event.description && (
+                  <p className="text-muted-foreground mt-2">{event.description}</p>
+                )}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <Link href={`/events/${event.id}/complete`}>
+                  <Button variant="outline">Mark as Completed</Button>
+                </Link>
+                <Button variant="destructive">Delete</Button>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold">{event.title}</h1>
-            {event.description && (
-              <p className="text-muted-foreground mt-2">{event.description}</p>
-            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -130,7 +131,13 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
                 <IconUsers className="size-5 text-primary mt-0.5" />
                 <div>
                   <div className="font-medium">Attendees</div>
-                  <div className="text-sm text-muted-foreground">{event.attendees}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {Array.isArray(event.attendees) 
+                      ? event.attendees.join(', ') 
+                      : typeof event.attendees === 'string' 
+                        ? event.attendees 
+                        : JSON.stringify(event.attendees).replace(/[\[\]"]/g, '').split(',').join(', ')}
+                  </div>
                 </div>
               </div>
             )}
