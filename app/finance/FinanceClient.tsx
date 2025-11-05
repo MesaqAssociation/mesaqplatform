@@ -109,15 +109,22 @@ export default function FinanceClient({
         body: formData,
       })
 
+      const data = await res.json()
+
       if (res.ok) {
-        const data = await res.json()
-        // Refresh transactions
+        alert(`Success! ${data.message}\n\nTransactions imported: ${data.transactionsImported}/${data.totalFound}`)
+        // Refresh page to show new transactions
         window.location.reload()
+      } else {
+        alert(`Error: ${data.error}`)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to upload statement', err)
+      alert('Failed to upload statement. Please try again.')
     } finally {
       setLoading(false)
+      // Reset file input
+      e.target.value = ''
     }
   }
 
