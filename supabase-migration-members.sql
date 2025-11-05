@@ -13,10 +13,37 @@ CREATE TABLE IF NOT EXISTS events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
-  event_date TIMESTAMPTZ NOT NULL,
+  event_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
   event_type TEXT DEFAULT 'Event',
+  estimated_cost DECIMAL(10, 2),
+  email_attendees BOOLEAN DEFAULT false,
+  attendees JSONB DEFAULT '[]'::jsonb,
+  agenda JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add columns if table already exists
+ALTER TABLE events ADD COLUMN IF NOT EXISTS start_time TIME;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time TIME;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS estimated_cost DECIMAL(10, 2);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS email_attendees BOOLEAN DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS attendees JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda JSONB DEFAULT '[]'::jsonb;
+
+-- Update event_date column type if needed
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'events' 
+    AND column_name = 'event_date' 
+    AND data_type = 'timestamp with time zone'
+  ) THEN
+    ALTER TABLE events ALTER COLUMN event_date TYPE DATE USING event_date::date;
+  END IF;
+END $$;
 
 -- Create member_events junction table for tracking attendance
 CREATE TABLE IF NOT EXISTS member_events (

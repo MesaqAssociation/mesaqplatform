@@ -239,14 +239,69 @@ export default function CreateMemberForm() {
 
       <div>
         <Label htmlFor="date_joined">Date Joined *</Label>
-        <Input
-          id="date_joined"
-          type="date"
-          value={formData.date_joined}
-          onChange={(e) => setFormData({ ...formData, date_joined: e.target.value })}
-          required
-          className="mt-1"
-        />
+        <div className="flex gap-2 mt-1">
+          <Select 
+            value={formData.date_joined.split('-')[2]} 
+            onValueChange={(day) => {
+              const [year, month] = formData.date_joined.split('-')
+              setFormData({ ...formData, date_joined: `${year}-${month}-${day}` })
+            }}
+          >
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                <SelectItem key={day} value={day.toString().padStart(2, '0')}>
+                  {day.toString().padStart(2, '0')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select 
+            value={formData.date_joined.split('-')[1]} 
+            onValueChange={(month) => {
+              const [year, , day] = formData.date_joined.split('-')
+              setFormData({ ...formData, date_joined: `${year}-${month}-${day}` })
+            }}
+          >
+            <SelectTrigger className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="01">January</SelectItem>
+              <SelectItem value="02">February</SelectItem>
+              <SelectItem value="03">March</SelectItem>
+              <SelectItem value="04">April</SelectItem>
+              <SelectItem value="05">May</SelectItem>
+              <SelectItem value="06">June</SelectItem>
+              <SelectItem value="07">July</SelectItem>
+              <SelectItem value="08">August</SelectItem>
+              <SelectItem value="09">September</SelectItem>
+              <SelectItem value="10">October</SelectItem>
+              <SelectItem value="11">November</SelectItem>
+              <SelectItem value="12">December</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select 
+            value={formData.date_joined.split('-')[0]} 
+            onValueChange={(year) => {
+              const [, month, day] = formData.date_joined.split('-')
+              setFormData({ ...formData, date_joined: `${year}-${month}-${day}` })
+            }}
+          >
+            <SelectTrigger className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Separator />
