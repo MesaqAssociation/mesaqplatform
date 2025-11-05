@@ -25,17 +25,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, email, phone, password, address, image, role, banking_name, date_joined } = body
+    const { name, email, phone, password, address, image, role, banking_name, date_joined, household_members } = body
     if (!phone || !password || !name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const hashed = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, banking_name, date_joined) 
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9) 
+      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, banking_name, date_joined, household_members) 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
        RETURNING id, name, email, phone, role`,
-      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', banking_name || null, date_joined || null]
+      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', banking_name || null, date_joined || null, household_members ? parseInt(household_members) : null]
     )
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {

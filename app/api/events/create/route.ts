@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { 
       title, 
+      description,
+      address,
       attendees, 
       estimated_cost, 
       event_date, 
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
       `INSERT INTO events (
         id, 
         title, 
+        description,
+        address,
         event_type, 
         event_date, 
         start_time, 
@@ -57,16 +61,20 @@ export async function POST(req: NextRequest) {
         gen_random_uuid(), 
         $1, 
         $2, 
-        $3, 
+        $3,
         $4, 
         $5, 
         $6, 
         $7, 
-        $8,
-        $9
+        $8, 
+        $9, 
+        $10,
+        $11
       ) RETURNING id, title, event_type, event_date`,
       [
         title, 
+        description || null,
+        address || null,
         event_type || 'Event', 
         event_date, 
         start_time, 

@@ -7,12 +7,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'Community Member';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banking_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS date_joined DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS household_members INTEGER DEFAULT 1;
 
 -- Create events table for tracking member event attendance
 CREATE TABLE IF NOT EXISTS events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
+  address TEXT,
   event_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
@@ -31,6 +33,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS estimated_cost DECIMAL(10, 2);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS email_attendees BOOLEAN DEFAULT false;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS attendees JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS agenda JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS address TEXT;
 
 -- Update event_date column type if needed
 DO $$

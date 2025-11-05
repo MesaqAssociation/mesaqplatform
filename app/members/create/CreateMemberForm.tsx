@@ -47,7 +47,13 @@ export default function CreateMemberForm() {
     role: 'Community Member',
     banking_name: '',
     date_joined: new Date().toISOString().split('T')[0], // Default to today
+    household_members: '1',
   })
+
+  // Get days in month
+  function getDaysInMonth(year: number, month: number) {
+    return new Date(year, month, 0).getDate()
+  }
 
   // Setup Google Maps autocomplete
   useEffect(() => {
@@ -224,6 +230,24 @@ export default function CreateMemberForm() {
       <Separator />
 
       <div>
+        <Label htmlFor="household_members">Household Members *</Label>
+        <Select value={formData.household_members} onValueChange={(value) => setFormData({ ...formData, household_members: value })}>
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 20 }, (_, i) => i + 1).map(num => (
+              <SelectItem key={num} value={num.toString()}>
+                {num}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
+      <div>
         <Label htmlFor="banking_name">Banking Name</Label>
         <Input
           id="banking_name"
@@ -251,11 +275,15 @@ export default function CreateMemberForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                <SelectItem key={day} value={day.toString().padStart(2, '0')}>
-                  {day.toString().padStart(2, '0')}
-                </SelectItem>
-              ))}
+              {(() => {
+                const [year, month] = formData.date_joined.split('-')
+                const daysInMonth = getDaysInMonth(parseInt(year), parseInt(month))
+                return Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                  <SelectItem key={day} value={day.toString().padStart(2, '0')}>
+                    {day.toString().padStart(2, '0')}
+                  </SelectItem>
+                ))
+              })()}
             </SelectContent>
           </Select>
           <Select 

@@ -10,17 +10,19 @@ type Member = {
   address: string | null
   image: string | null
   role: string | null
+  household_members: number | null
 }
 
 export default function MembersClient({ initial }: { initial: Member[] }) {
   return (
     <div className="overflow-auto">
-      <table className="min-w-[500px] w-full text-sm">
+      <table className="min-w-[600px] w-full text-sm">
         <thead>
           <tr className="text-left">
             <th className="py-3 px-2">Name</th>
             <th className="py-3 px-2">Email</th>
             <th className="py-3 px-2">Phone Number</th>
+            <th className="py-3 px-2">Household Members</th>
           </tr>
         </thead>
         <tbody>
@@ -37,6 +39,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
               </td>
               <td className="py-3 px-2 text-muted-foreground">{m.email || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
+              <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
             </tr>
           ))}
         </tbody>

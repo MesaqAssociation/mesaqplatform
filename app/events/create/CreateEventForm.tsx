@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,26 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import { IconTrash } from '@tabler/icons-react'
+
+// Load Google Maps script
+function useGoogleMaps() {
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if ((window as any).google?.maps?.places) {
+      setLoaded(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.async = true
+    script.onload = () => setLoaded(true)
+    document.head.appendChild(script)
+  }, [])
+  return loaded
+}
 
 type AgendaItem = {
   id: string
@@ -20,6 +39,8 @@ export default function CreateEventForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isMeeting = searchParams.get('type') === 'meeting'
+  const addressInputRef = useRef<HTMLInputElement>(null)
+  const mapsLoaded = useGoogleMaps()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,6 +48,8 @@ export default function CreateEventForm() {
 
   const [formData, setFormData] = useState({
     title: '',
+    description: '',
+    address: '',
     attendees: [] as string[],
     estimated_cost: '',
     event_date: new Date().toISOString().split('T')[0],
@@ -35,14 +58,48 @@ export default function CreateEventForm() {
     email_attendees: false,
   })
 
-  // Generate time options in 15-minute increments
+  // Get days in month
+  function getDaysInMonth(year: number, month: number) {
+    return new Date(year, month, 0).getDate()
+  }
+
+  // Setup Google Maps autocomplete
+  useEffect(() => {
+    if (!mapsLoaded || !addressInputRef.current) return
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ['address'],
+      componentRestrictions: { country: 'au' },
+      bounds: {
+        north: -37.5,
+        south: -38.5,
+        east: 145.5,
+        west: 144.5,
+      },
+      strictBounds: false,
+    })
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace()
+      if (place.formatted_address) {
+        setFormData(prev => ({ ...prev, address: place.formatted_address }))
+      }
+    })
+  }, [mapsLoaded])
+
+  // Generate time options in 15-minute increments (12-hour format)
   const generateTimeOptions = () => {
-    const times: string[] = []
+    const times: { value: string; label: string }[] = []
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
-        const h = hour.toString().padStart(2, '0')
+        const h24 = hour.toString().padStart(2, '0')
         const m = minute.toString().padStart(2, '0')
-        times.push(`${h}:${m}`)
+        const value = `${h24}:${m}`
+        
+        // Convert to 12-hour format for display
+        const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+        const period = hour < 12 ? 'AM' : 'PM'
+        const label = `${h12}:${m} ${period}`
+        
+        times.push({ value, label })
       }
     }
     return times
@@ -54,7 +111,7 @@ export default function CreateEventForm() {
   const getValidAgendaTimes = () => {
     const start = formData.start_time
     const end = formData.end_time
-    return timeOptions.filter(time => time >= start && time <= end)
+    return timeOptions.filter(time => time.value >= start && time.value <= end)
   }
 
   function addAgendaItem() {
@@ -128,6 +185,34 @@ export default function CreateEventForm() {
       <Separator />
 
       <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          className="mt-1 min-h-[100px]"
+          placeholder="Describe the event..."
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="address">Address</Label>
+        <Input
+          ref={addressInputRef}
+          id="address"
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          placeholder="Start typing address..."
+          className="mt-1"
+          autoComplete="off"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
         <Label>Attendees *</Label>
         <div className="mt-2 space-y-2">
           <div className="flex items-center space-x-2">
@@ -171,11 +256,16 @@ export default function CreateEventForm() {
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
           <Input
             id="estimated_cost"
-            type="number"
-            step="0.01"
+            type="text"
             value={formData.estimated_cost}
-            onChange={(e) => setFormData({ ...formData, estimated_cost: e.target.value })}
-            className="pl-7"
+            onChange={(e) => {
+              const value = e.target.value
+              // Only allow numbers and one decimal point, max 2 decimal places
+              if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                setFormData({ ...formData, estimated_cost: value })
+              }
+            }}
+            className="pl-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             placeholder="0.00"
             autoComplete="off"
           />
@@ -198,11 +288,15 @@ export default function CreateEventForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                <SelectItem key={day} value={day.toString().padStart(2, '0')}>
-                  {day.toString().padStart(2, '0')}
-                </SelectItem>
-              ))}
+              {(() => {
+                const [year, month] = formData.event_date.split('-')
+                const daysInMonth = getDaysInMonth(parseInt(year), parseInt(month))
+                return Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                  <SelectItem key={day} value={day.toString().padStart(2, '0')}>
+                    {day.toString().padStart(2, '0')}
+                  </SelectItem>
+                ))
+              })()}
             </SelectContent>
           </Select>
           <Select 
@@ -265,8 +359,8 @@ export default function CreateEventForm() {
             </SelectTrigger>
             <SelectContent>
               {timeOptions.map(time => (
-                <SelectItem key={time} value={time}>
-                  {time}
+                <SelectItem key={time.value} value={time.value}>
+                  {time.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -283,8 +377,8 @@ export default function CreateEventForm() {
             </SelectTrigger>
             <SelectContent>
               {timeOptions.map(time => (
-                <SelectItem key={time} value={time}>
-                  {time}
+                <SelectItem key={time.value} value={time.value}>
+                  {time.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -330,8 +424,8 @@ export default function CreateEventForm() {
                 </SelectTrigger>
                 <SelectContent>
                   {getValidAgendaTimes().map(time => (
-                    <SelectItem key={time} value={time}>
-                      {time}
+                    <SelectItem key={time.value} value={time.value}>
+                      {time.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
