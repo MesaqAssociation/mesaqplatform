@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
+import { Pool } from 'pg'
+import FinanceClient from './FinanceClient'
 
 export default async function FinancePage() {
   const token = cookies().get('auth_token')?.value
@@ -11,10 +13,30 @@ export default async function FinancePage() {
   } catch {
     redirect('/')
   }
+
+  const pool = new (require('pg').Pool)({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+  }) as Pool
+
+  // Get main account
+  const { rows: accounts } = await pool.query('SELECT * FROM financial_accounts LIMIT 1')
+  const account = accounts[0] || { id: null, current_balance: 0 }
+
+  // Get recent transactions
+  const { rows: transactions } = await pool.query(`
+    SELECT t.*, u.name as creator_name 
+    FROM transactions t 
+    LEFT JOIN users u ON t.created_by = u.id 
+    WHERE t.account_id = $1 OR t.account_id IS NULL
+    ORDER BY t.transaction_date DESC, t.created_at DESC 
+    LIMIT 200
+  `, [account.id])
+
   return (
     <MainLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-semibold">Finance</h1>
+        <FinanceClient account={account} initialTransactions={transactions} />
       </div>
     </MainLayout>
   )

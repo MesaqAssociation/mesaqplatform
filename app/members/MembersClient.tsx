@@ -44,7 +44,13 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
               <td className="py-3 px-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  m.role === 'Head Board Member' 
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                    : m.role === 'Board Member'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                }`}>
                   {m.role || 'Community Member'}
                 </span>
               </td>

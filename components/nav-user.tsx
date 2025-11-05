@@ -6,6 +6,7 @@ import {
   IconLogout,
   IconSettings,
   IconUserCircle,
+  IconActivity,
 } from "@tabler/icons-react"
 import Link from 'next/link'
 import {
@@ -75,6 +76,12 @@ export function NavUser({
             <Link href="/settings">
               <IconSettings className="mr-2 size-4" />
               Settings
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/logs">
+              <IconActivity className="mr-2 size-4" />
+              Activity Logs
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

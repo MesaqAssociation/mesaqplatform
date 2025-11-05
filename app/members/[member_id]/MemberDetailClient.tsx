@@ -110,7 +110,13 @@ export default function MemberDetailClient({
                   <AvatarFallback className="text-4xl">{member.name?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
                 <h1 className="text-2xl font-semibold mb-2">{member.name}</h1>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary mb-4">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 ${
+                  member.role === 'Head Board Member' 
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                    : member.role === 'Board Member'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                }`}>
                   {member.role}
                 </span>
                 <p className="text-sm text-muted-foreground">Member #{member.member_id}</p>
