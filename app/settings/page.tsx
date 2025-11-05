@@ -3,7 +3,6 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
 import { getUserFromToken } from '@/lib/getUserFromToken'
-import LanguageSelect from './LanguageSelect'
 import MonthlyFeeSettings from './MonthlyFeeSettings'
 import { Pool } from 'pg'
 
@@ -50,12 +49,6 @@ function SettingsClient({ user, currentFee }: { user: any, currentFee: string })
       <h1 className="text-2xl font-semibold">Settings</h1>
       
       <div className="max-w-2xl space-y-6">
-        {/* Language Settings */}
-        <div className="border rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Language</h2>
-          <LanguageSelect />
-        </div>
-
         {/* Monthly Fee Settings - Only for Head Board Member */}
         {user?.role === 'Head Board Member' && (
           <div className="border rounded-lg p-6">

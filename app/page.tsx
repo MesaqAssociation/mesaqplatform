@@ -40,7 +40,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <Image src="/placeholder-logo.png" alt="Mesaq" width={120} height={120} className="rounded-lg" />
+            <Image src="/crop-logo.webp" alt="Mesaq" width={120} height={120} className="rounded-lg" />
           </div>
           <CardTitle className="text-center">Sign in to Mesaq</CardTitle>
         </CardHeader>

@@ -40,10 +40,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {
     console.error('Create member error:', err)
+    
+    // Convert technical errors to user-friendly messages
+    let userMessage = 'Failed to create member. Please try again.'
+    
+    if (err.code === '23505') { // Unique constraint violation
+      if (err.constraint?.includes('phone')) {
+        userMessage = 'This phone number is already registered. Please use a different phone number.'
+      } else if (err.constraint?.includes('email')) {
+        userMessage = 'This email address is already registered. Please use a different email.'
+      } else {
+        userMessage = 'A member with these details already exists. Please check the information and try again.'
+      }
+    } else if (err.code === '23503') { // Foreign key violation
+      userMessage = 'Invalid reference data. Please check all fields and try again.'
+    } else if (err.code === '23502') { // Not null violation
+      userMessage = 'Required information is missing. Please fill in all required fields.'
+    } else if (err.code === '22P02') { // Invalid input syntax
+      userMessage = 'Invalid data format. Please check your input and try again.'
+    }
+    
     return NextResponse.json({ 
-      error: err.message || 'Server error',
-      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    }, { status: 500 })
+      error: userMessage
+    }, { status: 400 })
   }
 }
 
