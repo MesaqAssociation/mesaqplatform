@@ -42,17 +42,17 @@ export default function LoginPage() {
           <CardTitle className="text-center">Sign in to Mesaq</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
             <div className="flex justify-center pb-2">
               <Image src="/placeholder-logo.svg" alt="Mesaq" width={48} height={48} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (e.g. 0456789012)</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required />
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required autoComplete="off" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
             </div>
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
             <Button className="w-full" type="submit" disabled={loading}>

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (id, name, email, phone, password, address, image, role) 
+      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role) 
        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 'Community Member') 
        RETURNING id, name, email, phone, role`,
       [name, email || null, phone, hashed, address || null, image || null]

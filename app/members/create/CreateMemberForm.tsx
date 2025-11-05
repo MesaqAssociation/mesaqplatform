@@ -141,7 +141,7 @@ export default function CreateMemberForm() {
   const canSubmit = !loading && uploadProgress === null
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6" autoComplete="off">
       <div>
         <Label htmlFor="name">Name *</Label>
         <Input

@@ -24,9 +24,12 @@ html {
   --font-sans: ${GeistSans.variable};
   --font-mono: ${GeistMono.variable};
 }
+input, textarea, select {
+  -webkit-autofill: none !important;
+}
         `}</style>
       </head>
-      <body>
+      <body autoComplete="off">
         <LangLoader />
         {children}
       </body>

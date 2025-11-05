@@ -43,14 +43,14 @@ export default function SignupPage() {
           <CardTitle className="text-center">Create your account</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (e.g. 0456789012)</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required />
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required autoComplete="off" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password (min 8)</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
             </div>
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
             <Button className="w-full" type="submit" disabled={loading}>
