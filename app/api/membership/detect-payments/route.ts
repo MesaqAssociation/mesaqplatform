@@ -25,36 +25,45 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const monthlyFee = parseFloat(process.env.MONTHLY_FEE || '50.00')
+    // Get monthly fee from system settings
+    const { rows: settingsRows } = await pool.query(`
+      SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'
+    `)
+    const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
     
-    // Get all members with banking names
+    // Get all community members (exclude board members and head board member)
     const { rows: members } = await pool.query(`
-      SELECT id, member_id, name, banking_name, date_joined
+      SELECT id, member_id, name, phone_number, date_joined, role
       FROM users
-      WHERE banking_name IS NOT NULL AND date_joined IS NOT NULL
+      WHERE 
+        date_joined IS NOT NULL
+        AND role NOT IN ('Board Member', 'Head Board Member')
     `)
 
     let totalDetected = 0
     let totalAdded = 0
+    const detectionLog: any[] = []
 
     for (const member of members) {
-      // Find transactions that match this member's banking name and the monthly fee amount
+      if (!member.phone_number) {
+        detectionLog.push({ member: member.name, status: 'skipped', reason: 'no phone number' })
+        continue
+      }
+
+      // Find transactions that contain this member's phone number
+      // Look for 10-digit phone starting with 04
       const { rows: matchingTransactions } = await pool.query(`
         SELECT id, transaction_date, description, amount
         FROM transactions
         WHERE 
           transaction_type = 'credit'
           AND ABS(amount) = $1
-          AND (
-            LOWER(description) LIKE LOWER($2)
-            OR LOWER(description) LIKE LOWER($3)
-          )
-          AND transaction_date >= $4
+          AND description ~ $2
+          AND transaction_date >= $3
         ORDER BY transaction_date ASC
       `, [
         monthlyFee,
-        `%${member.banking_name}%`,
-        `%${member.name}%`,
+        member.phone_number, // Regex pattern for phone
         member.date_joined
       ])
 
@@ -62,13 +71,13 @@ export async function POST(req: NextRequest) {
 
       for (const txn of matchingTransactions) {
         // Determine which month this payment is for based on transaction date
-        const paymentMonth = new Date(txn.transaction_date)
-        paymentMonth.setDate(1) // First day of the month
+        const txnDate = new Date(txn.transaction_date + 'T00:00:00')
+        const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
         const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
 
         try {
           // Insert payment record (ignore if already exists)
-          await pool.query(`
+          const { rowCount } = await pool.query(`
             INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
             VALUES ($1, $2, $3, $4, $5, 'paid')
             ON CONFLICT (user_id, payment_month) DO NOTHING
@@ -79,9 +88,24 @@ export async function POST(req: NextRequest) {
             txn.id,
             txn.transaction_date
           ])
-          totalAdded++
+          
+          if (rowCount && rowCount > 0) {
+            totalAdded++
+            detectionLog.push({
+              member: member.name,
+              phone: member.phone_number,
+              month: paymentMonthStr,
+              amount: monthlyFee,
+              status: 'added'
+            })
+          }
         } catch (err) {
           console.error(`Failed to insert payment for ${member.name}:`, err)
+          detectionLog.push({
+            member: member.name,
+            status: 'error',
+            error: (err as Error).message
+          })
         }
       }
     }
@@ -90,13 +114,14 @@ export async function POST(req: NextRequest) {
     await pool.query(
       `INSERT INTO audit_logs (user_id, action, entity_type, details) 
        VALUES ($1, 'detect_membership_payments', 'membership_payments', $2)`,
-      [userId, JSON.stringify({ totalDetected, totalAdded })]
+      [userId, JSON.stringify({ totalDetected, totalAdded, log: detectionLog })]
     )
 
     return NextResponse.json({ 
       success: true,
       totalDetected,
       totalAdded,
+      detectionLog,
       message: `Detected ${totalDetected} potential payments, added ${totalAdded} new payment records.`
     })
   } catch (err: any) {

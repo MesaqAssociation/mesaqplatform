@@ -24,7 +24,25 @@ export default async function MembersPage() {
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
-  const { rows } = await pool.query('select id, member_id, phone, name, email, address, image, role, household_members from "users" order by created_at desc limit 200')
+  
+  // Fetch members with their current month payment status
+  const { rows } = await pool.query(`
+    SELECT 
+      u.id, 
+      u.member_id, 
+      u.phone, 
+      u.name, 
+      u.email, 
+      u.address, 
+      u.image, 
+      u.role, 
+      u.household_members,
+      cps.payment_status
+    FROM users u
+    LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
+    ORDER BY u.created_at DESC 
+    LIMIT 200
+  `)
   return (
     <MainLayout user={user}>
       <MembersPageWrapper initial={rows} />

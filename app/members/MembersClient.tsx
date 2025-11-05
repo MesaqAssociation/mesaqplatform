@@ -14,6 +14,7 @@ type Member = {
   image: string | null
   role: string | null
   household_members: number | null
+  payment_status: string | null
 }
 
 export default function MembersClient({ initial }: { initial: Member[] }) {
@@ -24,10 +25,29 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
     if (role === 'Board Member') return t('boardMember')
     return t('communityMember')
   }
+
+  const getPaymentStatusBadge = (status: string | null) => {
+    if (!status || status === 'N/A') return null
+    
+    const configs = {
+      'PAID': { bg: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', label: 'PAID' },
+      'UNPAID': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'UNPAID' },
+      'OVERDUE': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'OVERDUE' },
+      'EXEMPT': { bg: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400', label: 'EXEMPT' },
+    }
+    
+    const config = configs[status as keyof typeof configs] || configs.UNPAID
+    
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg}`}>
+        {config.label}
+      </span>
+    )
+  }
   
   return (
     <div className="overflow-auto">
-      <table className="min-w-[700px] w-full text-sm">
+      <table className="min-w-[800px] w-full text-sm">
         <thead>
           <tr className="text-left">
             <th className="py-3 px-2">{t("name")}</th>
@@ -35,6 +55,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
             <th className="py-3 px-2">{t("phone")}</th>
             <th className="py-3 px-2">{t("householdMembers")}</th>
             <th className="py-3 px-2">{t("role")}</th>
+            <th className="py-3 px-2">Payment Status</th>
           </tr>
         </thead>
         <tbody>
@@ -62,6 +83,9 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 }`}>
                   {getRoleTranslation(m.role)}
                 </span>
+              </td>
+              <td className="py-3 px-2">
+                {getPaymentStatusBadge(m.payment_status)}
               </td>
             </tr>
           ))}
