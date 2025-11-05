@@ -141,11 +141,14 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         let balance: number | undefined
         
         if (amounts.length === 1) {
-          // Only one amount
+          // Only one amount - could be transaction or balance
+          // If we only have one amount, assume it's both transaction and balance
           if (amounts[0].isNegative) {
             debit = amounts[0].value
+            balance = amounts[0].value // Use the amount as running balance
           } else {
             credit = amounts[0].value
+            balance = amounts[0].value
           }
         } else if (amounts.length === 2) {
           // Two amounts - transaction + balance
@@ -169,18 +172,16 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
           }
         }
         
-        // Only add if we have a valid transaction amount
-        if (debit || credit) {
-          const parsedDate = parseAUDate(dateStr)
-          
-          transactions.push({
-            date: parsedDate,
-            description: cleanDescription(description),
-            debit,
-            credit,
-            balance,
-          })
-        }
+        // Add all transactions (even if debit/credit is undefined, as long as we have amounts)
+        const parsedDate = parseAUDate(dateStr)
+        
+        transactions.push({
+          date: parsedDate,
+          description: cleanDescription(description),
+          debit,
+          credit,
+          balance,
+        })
       }
       
       // Move to next potential transaction

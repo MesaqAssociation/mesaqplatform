@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
     // Insert transactions
     const insertedCount = []
     const failedTransactions: any[] = []
+    const skippedTransactions: any[] = []
+    
+    console.log(`\n=== Parsed ${parsed.transactions.length} transactions from PDF ===`)
     
     for (const txn of parsed.transactions) {
       // Determine amount and type
@@ -78,9 +81,26 @@ export async function POST(req: NextRequest) {
         amount = -txn.debit
         txnType = 'debit'
         runningBalance -= txn.debit
+      } else {
+        // If no debit/credit specified but we have a balance, calculate from balance change
+        if (txn.balance !== undefined && txn.balance !== null) {
+          const balanceChange = txn.balance - runningBalance
+          if (balanceChange !== 0) {
+            amount = balanceChange
+            txnType = balanceChange > 0 ? 'credit' : 'debit'
+            runningBalance = txn.balance
+          }
+        }
       }
 
-      if (amount === 0) continue
+      if (amount === 0) {
+        skippedTransactions.push({ 
+          date: txn.date, 
+          description: txn.description?.substring(0, 50) || 'No description',
+          reason: 'No transaction amount found'
+        })
+        continue
+      }
 
       try {
         // Validate date format (YYYY-MM-DD)
@@ -133,7 +153,14 @@ export async function POST(req: NextRequest) {
     console.log(`\n=== Upload Summary ===`)
     console.log(`Total found: ${parsed.transactions.length}`)
     console.log(`Successfully inserted: ${insertedCount.length}`)
+    console.log(`Skipped (no amount): ${skippedTransactions.length}`)
     console.log(`Failed: ${failedTransactions.length}`)
+    
+    if (skippedTransactions.length > 0) {
+      console.log(`\nSkipped transactions:`)
+      skippedTransactions.forEach(s => console.log(`  - Date: ${s.date}, Desc: ${s.description}, Reason: ${s.reason}`))
+    }
+    
     if (failedTransactions.length > 0) {
       console.log(`\nFailed transactions:`)
       failedTransactions.forEach(f => console.log(`  - Date: ${f.date}, Desc: ${f.description}, Error: ${f.error}`))
