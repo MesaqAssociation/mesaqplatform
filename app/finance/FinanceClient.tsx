@@ -230,11 +230,36 @@ export default function FinanceClient({
   }
 
   const formatDate = (date: string) => {
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-AU', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
+    try {
+      // Handle various date formats from database
+      let dateObj: Date
+      
+      if (date.includes('T')) {
+        // Already has time component
+        dateObj = new Date(date)
+      } else if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // YYYY-MM-DD format - add time to avoid timezone issues
+        dateObj = new Date(date + 'T00:00:00')
+      } else {
+        // Try parsing as-is
+        dateObj = new Date(date)
+      }
+      
+      // Check if valid date
+      if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date:', date)
+        return 'Invalid Date'
+      }
+      
+      return dateObj.toLocaleDateString('en-AU', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    } catch (err) {
+      console.error('Error formatting date:', date, err)
+      return 'Invalid Date'
+    }
   }
 
   return (

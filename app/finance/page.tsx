@@ -23,9 +23,22 @@ export default async function FinancePage() {
   const { rows: accounts } = await pool.query('SELECT * FROM financial_accounts LIMIT 1')
   const account = accounts[0] || { id: null, current_balance: 0 }
 
-  // Get recent transactions
+  // Get recent transactions with explicit date formatting
   const { rows: transactions } = await pool.query(`
-    SELECT t.*, u.name as creator_name 
+    SELECT 
+      t.id,
+      t.account_id,
+      to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
+      t.description,
+      t.amount,
+      t.transaction_type,
+      t.category,
+      t.reference,
+      t.balance_after,
+      t.created_by,
+      t.source,
+      t.created_at,
+      u.name as creator_name 
     FROM transactions t 
     LEFT JOIN users u ON t.created_by = u.id 
     WHERE t.account_id = $1 OR t.account_id IS NULL
