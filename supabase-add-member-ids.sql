@@ -18,7 +18,10 @@ BEGIN
   END LOOP;
   
   -- Set the sequence to continue from the last assigned ID
-  PERFORM setval('users_member_id_seq', next_id - 1);
+  -- Only set if there were existing users (next_id > 1)
+  IF next_id > 1 THEN
+    PERFORM setval('users_member_id_seq', next_id - 1);
+  END IF;
 END $$;
 
 -- Make member_id NOT NULL after populating existing records
