@@ -13,14 +13,13 @@ export default async function CreateMemberPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
   
-  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  }
   
   const user = await getUserFromToken()
-  }
   return (
     <MainLayout user={user}>
       <div className="p-6 max-w-3xl">

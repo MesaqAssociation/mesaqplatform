@@ -10,14 +10,13 @@ export default async function LogsPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
   
-  const user = await getUserFromToken()
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
+  }
   
   const user = await getUserFromToken()
-  }
 
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
