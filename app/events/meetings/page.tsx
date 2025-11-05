@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { MainLayout } from '@/components/Sidebar'
 
 export default async function MeetingsPage() {
   const token = cookies().get('auth_token')?.value
@@ -13,14 +12,11 @@ export default async function MeetingsPage() {
     redirect('/')
   }
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="md:ml-[--sidebar-width]">
-        <div className="p-6">
-          <h1 className="text-2xl font-semibold">Meetings</h1>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <MainLayout>
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold">Meetings</h1>
+      </div>
+    </MainLayout>
   )
 }
 

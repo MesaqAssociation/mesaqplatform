@@ -1,28 +1,21 @@
-import type React from "react"
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { AppSidebar } from "@/components/app-sidebar"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { MainLayout } from '@/components/Sidebar'
 
-export default async function Page() {
+export default async function DashboardPage() {
   const token = cookies().get('auth_token')?.value
-  if (!token || !process.env.AUTH_SECRET) {
-    redirect('/')
-  }
+  if (!token || !process.env.AUTH_SECRET) redirect('/')
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
     redirect('/')
   }
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="md:ml-[--sidebar-width]">
-        <div className="flex flex-1 items-center justify-center">
-          <h1 className="text-6xl font-bold text-gray-400">404</h1>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <MainLayout>
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+      </div>
+    </MainLayout>
   )
 }

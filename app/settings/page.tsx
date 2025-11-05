@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { MainLayout } from '@/components/Sidebar'
 import LanguageSelect from './LanguageSelect'
 
 export default async function SettingsPage() {
@@ -14,18 +13,15 @@ export default async function SettingsPage() {
     redirect('/')
   }
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="md:ml-[--sidebar-width]">
-        <div className="p-6 space-y-4">
-          <h1 className="text-2xl font-semibold">Settings</h1>
-          <div className="max-w-sm">
-            <label className="block text-sm font-medium mb-2">Language</label>
-            <LanguageSelect />
-          </div>
+    <MainLayout>
+      <div className="p-6 space-y-4">
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <div className="max-w-sm">
+          <label className="block text-sm font-medium mb-2">Language</label>
+          <LanguageSelect />
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </MainLayout>
   )
 }
 
