@@ -27,7 +27,8 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
   }
 
   const getPaymentStatusBadge = (status: string | null) => {
-    if (!status || status === 'N/A') return null
+    // Don't show badge for N/A (not joined yet)
+    if (status === 'N/A') return null
     
     const configs = {
       'PAID': { bg: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', label: 'PAID' },
@@ -36,6 +37,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
       'EXEMPT': { bg: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400', label: 'EXEMPT' },
     }
     
+    // Default to UNPAID if status is null or unknown
     const config = configs[status as keyof typeof configs] || configs.UNPAID
     
     return (

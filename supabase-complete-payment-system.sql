@@ -23,16 +23,13 @@ CREATE INDEX IF NOT EXISTS idx_membership_payments_month ON membership_payments(
 CREATE INDEX IF NOT EXISTS idx_membership_payments_status ON membership_payments(status);
 
 
--- STEP 2: Add phone number and custom fee columns to users
+-- STEP 2: Add custom fee column to users (phone already exists)
 -- ============================================================================
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS phone_number TEXT;
-
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS custom_monthly_fee DECIMAL(10, 2);
 
--- Create index for phone number lookups
-CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
+-- Create index for phone number lookups (phone column already exists)
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 
 
 -- STEP 3: Create system_settings table
@@ -57,7 +54,7 @@ SELECT
   u.id as user_id,
   u.member_id,
   u.name,
-  u.phone_number,
+  u.phone as phone_number,  -- Alias phone as phone_number for compatibility
   u.role,
   u.date_joined,
   CASE

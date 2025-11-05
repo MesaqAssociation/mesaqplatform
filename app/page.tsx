@@ -39,13 +39,13 @@ export default function LoginPage() {
     <main className="min-h-dvh grid place-items-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="flex justify-center mb-4">
+            <Image src="/placeholder-logo.png" alt="Mesaq" width={120} height={120} className="rounded-lg" />
+          </div>
           <CardTitle className="text-center">Sign in to Mesaq</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
-            <div className="flex justify-center pb-2">
-              <Image src="/placeholder-logo.svg" alt="Mesaq" width={48} height={48} />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (e.g. 0456789012)</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required autoComplete="off" />

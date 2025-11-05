@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     
     // Get all community members (exclude board members and head board member)
     const { rows: members } = await pool.query(`
-      SELECT id, member_id, name, phone_number, date_joined, role
+      SELECT id, member_id, name, phone, date_joined, role
       FROM users
       WHERE 
         date_joined IS NOT NULL
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const detectionLog: any[] = []
 
     for (const member of members) {
-      if (!member.phone_number) {
+      if (!member.phone) {
         detectionLog.push({ member: member.name, status: 'skipped', reason: 'no phone number' })
         continue
       }
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         ORDER BY transaction_date ASC
       `, [
         monthlyFee,
-        member.phone_number, // Regex pattern for phone
+        member.phone, // Regex pattern for phone
         member.date_joined
       ])
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
             totalAdded++
             detectionLog.push({
               member: member.name,
-              phone: member.phone_number,
+              phone: member.phone,
               month: paymentMonthStr,
               amount: monthlyFee,
               status: 'added'
