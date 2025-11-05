@@ -5,6 +5,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'Community Member';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banking_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS date_joined DATE;
 
 -- Create events table for tracking member event attendance
 CREATE TABLE IF NOT EXISTS events (

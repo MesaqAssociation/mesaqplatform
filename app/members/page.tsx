@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
-import MembersClient from './MembersClient'
+import MembersPageClient from './MembersPageClient'
 import { Pool } from 'pg'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ export default async function MembersPage() {
             <Button>Create New</Button>
           </Link>
         </div>
-        <MembersClient initial={rows} />
+        <MembersPageClient initial={rows} />
       </div>
     </MainLayout>
   )

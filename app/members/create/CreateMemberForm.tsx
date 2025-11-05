@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 // Load Google Maps script
 function useGoogleMaps() {
@@ -43,6 +44,9 @@ export default function CreateMemberForm() {
     phone: '',
     address: '',
     password: '',
+    role: 'Community Member',
+    banking_name: '',
+    date_joined: new Date().toISOString().split('T')[0], // Default to today
   })
 
   // Setup Google Maps autocomplete
@@ -117,6 +121,7 @@ export default function CreateMemberForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return // Prevent double submission
     setLoading(true)
     setError(null)
     try {
@@ -130,10 +135,10 @@ export default function CreateMemberForm() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Failed to create member')
       }
-      router.push('/members')
+      // Keep loading state during redirect
+      router.push('/members?success=Member created successfully')
     } catch (err: any) {
       setError(err.message || 'Error creating member')
-    } finally {
       setLoading(false)
     }
   }
@@ -197,6 +202,50 @@ export default function CreateMemberForm() {
           minLength={8}
           className="mt-1"
           autoComplete="new-password"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="role">Role *</Label>
+        <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Community Member">Community Member</SelectItem>
+            <SelectItem value="Board Member">Board Member</SelectItem>
+            <SelectItem value="Head Board Member">Head Board Member</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="banking_name">Banking Name</Label>
+        <Input
+          id="banking_name"
+          value={formData.banking_name}
+          onChange={(e) => setFormData({ ...formData, banking_name: e.target.value })}
+          placeholder="Name as it appears on bank account"
+          className="mt-1"
+          autoComplete="off"
+        />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="date_joined">Date Joined *</Label>
+        <Input
+          id="date_joined"
+          type="date"
+          value={formData.date_joined}
+          onChange={(e) => setFormData({ ...formData, date_joined: e.target.value })}
+          required
+          className="mt-1"
         />
       </div>
 
