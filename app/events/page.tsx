@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import EventsClient from './EventsClient'
+import { Pool } from 'pg'
 
 export default async function EventsPage() {
   const token = cookies().get('auth_token')?.value
@@ -13,6 +15,20 @@ export default async function EventsPage() {
   } catch {
     redirect('/')
   }
+
+  const pool = new (require('pg').Pool)({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+  }) as Pool
+  
+  const { rows } = await pool.query(`
+    SELECT id, title, description, address, event_date, start_time, end_time, event_type, estimated_cost, attendees 
+    FROM events 
+    WHERE event_type = 'Event'
+    ORDER BY event_date ASC, start_time ASC 
+    LIMIT 200
+  `)
+
   return (
     <MainLayout>
       <div className="p-6">
@@ -22,6 +38,7 @@ export default async function EventsPage() {
             <Button>Create New</Button>
           </Link>
         </div>
+        <EventsClient initial={rows} />
       </div>
     </MainLayout>
   )
