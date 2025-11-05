@@ -62,17 +62,33 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
           </tr>
         </thead>
         <tbody>
-          {initial.map(m => (
-            <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
-              <td className="py-3 px-2">
-                <Link href={`/members/${m.member_id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
-                    <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium">{m.name || '-'}</span>
-                </Link>
-              </td>
+          {initial.map(m => {
+            console.log('Member ID:', m.member_id, 'Link:', `/members/${m.member_id}`)
+            return (
+              <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
+                <td className="py-3 px-2">
+                  {m.member_id ? (
+                    <Link 
+                      href={`/members/${m.member_id}`} 
+                      className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+                      prefetch={true}
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
+                        <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{m.name || '-'}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
+                        <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{m.name || '-'}</span>
+                    </div>
+                  )}
+                </td>
               <td className="py-3 px-2 text-muted-foreground">{m.email || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
@@ -91,7 +107,8 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 {getPaymentStatusBadge(m.payment_status)}
               </td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
