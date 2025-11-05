@@ -154,10 +154,22 @@ export default function FinanceClient({
 
       if (res.ok) {
         setTimeout(() => {
-          showToast(`Success! ${data.message}<br><br>Transactions imported: ${data.transactionsImported}/${data.totalFound}`, 'success')
+          let message = `Success! ${data.message}<br><br>Transactions imported: ${data.transactionsImported}/${data.totalFound}`
+          
+          if (data.failedDetails && data.failedDetails.length > 0) {
+            message += `<br><br><strong>Failed Transactions:</strong>`
+            data.failedDetails.slice(0, 3).forEach((f: any) => {
+              message += `<br>• ${f.description?.substring(0, 40) || 'Unknown'}: ${f.error}`
+            })
+            if (data.failedDetails.length > 3) {
+              message += `<br>• ... and ${data.failedDetails.length - 3} more`
+            }
+          }
+          
+          showToast(message, data.failed > 0 ? 'error' : 'success')
           setTimeout(() => {
             window.location.reload()
-          }, 2000)
+          }, data.failed > 0 ? 5000 : 2000)
         }, 500)
       } else {
         setUploadProgress(null)

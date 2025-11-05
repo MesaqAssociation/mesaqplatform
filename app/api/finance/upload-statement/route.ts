@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
 
     // Insert transactions
     const insertedCount = []
+    const failedTransactions: any[] = []
+    
     for (const txn of parsed.transactions) {
       // Determine amount and type
       let amount = 0
@@ -83,14 +85,30 @@ export async function POST(req: NextRequest) {
       try {
         // Validate date format (YYYY-MM-DD)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(txn.date)) {
-          console.error(`Invalid date format for transaction: "${txn.date}", description: "${txn.description}"`)
+          const error = `Invalid date format: "${txn.date}"`
+          console.error(`${error} for transaction: "${txn.description}"`)
+          failedTransactions.push({ date: txn.date, description: txn.description, error })
+          continue
+        }
+
+        // Additional date validation - check if it's a valid date
+        const dateParts = txn.date.split('-')
+        const year = parseInt(dateParts[0])
+        const month = parseInt(dateParts[1])
+        const day = parseInt(dateParts[2])
+        
+        const testDate = new Date(year, month - 1, day)
+        if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+          const error = `Invalid date values: ${txn.date}`
+          console.error(`${error} for transaction: "${txn.description}"`)
+          failedTransactions.push({ date: txn.date, description: txn.description, error })
           continue
         }
 
         await pool.query(
           `INSERT INTO transactions 
            (account_id, transaction_date, description, amount, transaction_type, balance_after, created_by, source, reference) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'bank_statement', $8)
+           VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'bank_statement', $8)
            ON CONFLICT DO NOTHING`,
           [
             accountId,
@@ -105,8 +123,20 @@ export async function POST(req: NextRequest) {
         )
         insertedCount.push(txn)
       } catch (err: any) {
-        console.error(`Failed to insert transaction (date: ${txn.date}, desc: ${txn.description}):`, err.message)
+        const error = err.message || 'Unknown error'
+        console.error(`Failed to insert transaction (date: ${txn.date}, desc: ${txn.description}):`, error)
+        failedTransactions.push({ date: txn.date, description: txn.description, error })
       }
+    }
+    
+    // Log summary
+    console.log(`\n=== Upload Summary ===`)
+    console.log(`Total found: ${parsed.transactions.length}`)
+    console.log(`Successfully inserted: ${insertedCount.length}`)
+    console.log(`Failed: ${failedTransactions.length}`)
+    if (failedTransactions.length > 0) {
+      console.log(`\nFailed transactions:`)
+      failedTransactions.forEach(f => console.log(`  - Date: ${f.date}, Desc: ${f.description}, Error: ${f.error}`))
     }
 
     // Update account balance to closing balance if available
@@ -139,8 +169,10 @@ export async function POST(req: NextRequest) {
       success: true,
       transactionsImported: insertedCount.length,
       totalFound: parsed.transactions.length,
+      failed: failedTransactions.length,
+      failedDetails: failedTransactions.length > 0 ? failedTransactions : undefined,
       newBalance: runningBalance,
-      message: `Successfully imported ${insertedCount.length} transactions from bank statement.`
+      message: `Successfully imported ${insertedCount.length} of ${parsed.transactions.length} transactions.${failedTransactions.length > 0 ? ` ${failedTransactions.length} failed.` : ''}`
     })
   } catch (err: any) {
     console.error('Upload statement error:', err)
