@@ -62,10 +62,8 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
           </tr>
         </thead>
         <tbody>
-          {initial.map(m => {
-            console.log('Member ID:', m.member_id, 'Link:', `/members/${m.member_id}`)
-            return (
-              <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
+          {initial.map(m => (
+            <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
                 <td className="py-3 px-2">
                   {m.member_id ? (
                     <Link 
@@ -107,8 +105,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 {getPaymentStatusBadge(m.payment_status)}
               </td>
             </tr>
-            )
-          })}
+          ))}
         </tbody>
       </table>
     </div>

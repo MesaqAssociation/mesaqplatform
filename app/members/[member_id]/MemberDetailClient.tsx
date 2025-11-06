@@ -46,11 +46,6 @@ export default function MemberDetailClient({
   const [events, setEvents] = useState<Event[]>(attendedEvents || [])
   const [loading, setLoading] = useState(false)
 
-  // Debug logging
-  console.log('Member:', member)
-  console.log('Attended Events:', attendedEvents)
-  console.log('All Events:', allEvents)
-
   async function addEvent(eventId: string) {
     setLoading(true)
     try {
