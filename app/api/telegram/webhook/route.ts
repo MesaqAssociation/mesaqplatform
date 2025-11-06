@@ -189,42 +189,13 @@ export async function POST(req: NextRequest) {
 
         // Send success message
         let responseMessage = `✅ Bank statement processed successfully!\n\n`
-        responseMessage += `📊 Summary:\n`
+        responseMessage += `📊 Summary:\n\n`
         responseMessage += `• Total transactions found: ${parsed.transactions.length}\n`
         responseMessage += `• Successfully imported: ${insertedCount.length}\n`
-
-        if (skippedTransactions.length > 0) {
-          responseMessage += `• Skipped (no amount): ${skippedTransactions.length}\n`
-        }
-
-        if (failedTransactions.length > 0) {
-          responseMessage += `• Failed: ${failedTransactions.length}\n`
-        }
-
         responseMessage += `\n💰 New balance: $${runningBalance.toFixed(2)}`
 
         if (parsed.accountNumber) {
           responseMessage += `\n🏦 Account: ${parsed.accountNumber}`
-        }
-
-        if (skippedTransactions.length > 0) {
-          responseMessage += `\n\n⚠️ Skipped transactions:\n`
-          skippedTransactions.slice(0, 3).forEach(s => {
-            responseMessage += `• ${s.date}: ${s.description}\n`
-          })
-          if (skippedTransactions.length > 3) {
-            responseMessage += `• ... and ${skippedTransactions.length - 3} more\n`
-          }
-        }
-
-        if (failedTransactions.length > 0) {
-          responseMessage += `\n\n❌ Failed transactions:\n`
-          failedTransactions.slice(0, 3).forEach(f => {
-            responseMessage += `• ${f.date}: ${f.description}\n`
-          })
-          if (failedTransactions.length > 3) {
-            responseMessage += `• ... and ${failedTransactions.length - 3} more\n`
-          }
         }
 
         await sendTelegramMessage(chatId, responseMessage)
@@ -274,12 +245,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          if (paymentsDetected > 0) {
-            await sendTelegramMessage(
-              chatId,
-              `💳 Detected ${paymentsDetected} membership payment${paymentsDetected !== 1 ? 's' : ''}!`
-            )
-          }
+          // Silently detect payments without notification
         } catch (err) {
           console.error('Failed to auto-detect payments:', err)
         }
@@ -295,36 +261,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Handle /start command
-    if (update.message?.text === '/start') {
-      const chatId = update.message.chat.id
-      const userName = update.message.from.first_name || 'there'
-
-      await sendTelegramMessage(
-        chatId,
-        `👋 Hello ${userName}!\n\n` +
-        `I'm the Mesaq Association Bank Statement Bot.\n\n` +
-        `📄 Send me a PDF bank statement and I'll automatically:\n` +
-        `• Extract all transactions\n` +
-        `• Add them to your finance system\n` +
-        `• Detect membership payments\n` +
-        `• Update account balances\n\n` +
-        `Just send me a PDF file to get started!`
-      )
-      return NextResponse.json({ ok: true })
-    }
-
-    // Handle other text messages
-    if (update.message?.text) {
-      const chatId = update.message.chat.id
-      await sendTelegramMessage(
-        chatId,
-        '📄 Please send me a PDF bank statement to process.\n\n' +
-        'Type /start for more information.'
-      )
-      return NextResponse.json({ ok: true })
-    }
-
+    // Silently ignore all other messages (text, /start, etc.)
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error('Telegram webhook error:', err)
