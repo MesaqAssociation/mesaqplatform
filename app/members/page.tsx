@@ -40,7 +40,7 @@ export default async function MembersPage() {
       cps.payment_status
     FROM users u
     LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
-    ORDER BY u.created_at DESC 
+    ORDER BY u.name ASC 
     LIMIT 200
   `)
   return (
