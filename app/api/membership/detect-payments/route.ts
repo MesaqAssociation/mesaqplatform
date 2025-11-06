@@ -36,13 +36,13 @@ export async function POST(req: NextRequest) {
     const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
     console.log(`💰 Monthly fee: $${monthlyFee}`)
     
-    // Get all members who need to pay (everyone with a join date)
+    // Get all members who need to pay (everyone, regardless of join date)
     const { rows: allMembers } = await pool.query(`
       SELECT id, member_id, name, phone, email, banking_name, address, date_joined, role
       FROM users
-      WHERE date_joined IS NOT NULL
+      ORDER BY name ASC
     `)
-    console.log(`👥 Total community members: ${allMembers.length}`)
+    console.log(`👥 Total members: ${allMembers.length}`)
 
     // Get current month for payment matching
     const currentMonth = new Date()
@@ -71,11 +71,11 @@ export async function POST(req: NextRequest) {
           transaction_type = 'credit'
           AND ABS(amount) >= $1 - 0.50 AND ABS(amount) <= $1 + 0.50
           AND description ~ $2
-          AND transaction_date >= $3
+          AND DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
           AND id NOT IN (SELECT transaction_id FROM membership_payments WHERE transaction_id IS NOT NULL)
         ORDER BY transaction_date DESC
         LIMIT 1
-      `, [monthlyFee, member.phone, member.date_joined])
+      `, [monthlyFee, member.phone])
 
       if (phoneMatches.length > 0) {
         const txn = phoneMatches[0]
@@ -128,8 +128,6 @@ export async function POST(req: NextRequest) {
         SELECT COUNT(*) as count
         FROM users
         WHERE LOWER(banking_name) = LOWER($1)
-        AND role NOT IN ('Board Member', 'Head Board Member')
-        AND date_joined IS NOT NULL
       `, [member.banking_name])
       
       const hasDuplicate = duplicateCheck[0].count > 1
@@ -141,11 +139,11 @@ export async function POST(req: NextRequest) {
           transaction_type = 'credit'
           AND ABS(amount) >= $1 - 0.50 AND ABS(amount) <= $1 + 0.50
           AND LOWER(description) LIKE LOWER($2)
-          AND transaction_date >= $3
+          AND DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
           AND id NOT IN (SELECT transaction_id FROM membership_payments WHERE transaction_id IS NOT NULL)
         ORDER BY transaction_date DESC
         LIMIT 1
-      `, [monthlyFee, `%${member.banking_name}%`, member.date_joined])
+      `, [monthlyFee, `%${member.banking_name}%`])
 
       if (bankingMatches.length > 0) {
         const txn = bankingMatches[0]
@@ -196,7 +194,7 @@ export async function POST(req: NextRequest) {
     console.log(`📋 Unpaid members remaining: ${unpaidMembers.length}`)
 
     // ========================================================================
-    // STEP 4: Get unmatched transactions
+    // STEP 4: Get unmatched transactions (current month only)
     // ========================================================================
     console.log('\n💳 STEP 4: Identifying unmatched transactions...')
     const { rows: unmatchedTransactions } = await pool.query(`
@@ -205,10 +203,11 @@ export async function POST(req: NextRequest) {
       WHERE 
         transaction_type = 'credit'
         AND ABS(amount) >= $1 - 0.50 AND ABS(amount) <= $1 + 0.50
+        AND DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
         AND id NOT IN (SELECT transaction_id FROM membership_payments WHERE transaction_id IS NOT NULL)
       ORDER BY transaction_date DESC
     `, [monthlyFee])
-    console.log(`💰 Unmatched transactions: ${unmatchedTransactions.length}`)
+    console.log(`💰 Unmatched transactions (current month): ${unmatchedTransactions.length}`)
 
     // ========================================================================
     // STEP 5: Use AI to match remaining transactions
