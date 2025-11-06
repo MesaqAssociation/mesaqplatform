@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "telegram:setup": "tsx scripts/setup-telegram-bot.ts",
+    "telegram:remove": "tsx scripts/setup-telegram-bot.ts remove"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.699.0",
@@ -81,6 +83,7 @@
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }
