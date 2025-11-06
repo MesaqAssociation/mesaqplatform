@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "start": "next start",
     "telegram:setup": "tsx scripts/setup-telegram-bot.ts",
-    "telegram:remove": "tsx scripts/setup-telegram-bot.ts remove"
+    "telegram:remove": "tsx scripts/setup-telegram-bot.ts remove",
+    "members:bulk-create": "tsx scripts/create-bulk-members.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.699.0",
