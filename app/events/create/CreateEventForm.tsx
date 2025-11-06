@@ -227,12 +227,42 @@ export default function CreateEventForm() {
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox 
-              id="head-board-member" 
-              checked={formData.attendees.includes('Head Board Member')}
-              onCheckedChange={() => toggleAttendee('Head Board Member')}
+              id="manager" 
+              checked={formData.attendees.includes('Manager')}
+              onCheckedChange={() => toggleAttendee('Manager')}
             />
-            <label htmlFor="head-board-member" className="text-sm cursor-pointer">
-              Head Board Member
+            <label htmlFor="manager" className="text-sm cursor-pointer">
+              Manager
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="public-officer" 
+              checked={formData.attendees.includes('Public Officer')}
+              onCheckedChange={() => toggleAttendee('Public Officer')}
+            />
+            <label htmlFor="public-officer" className="text-sm cursor-pointer">
+              Public Officer
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="finance-officer" 
+              checked={formData.attendees.includes('Finance Officer')}
+              onCheckedChange={() => toggleAttendee('Finance Officer')}
+            />
+            <label htmlFor="finance-officer" className="text-sm cursor-pointer">
+              Finance Officer
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="logistics-officer" 
+              checked={formData.attendees.includes('Logistics Officer')}
+              onCheckedChange={() => toggleAttendee('Logistics Officer')}
+            />
+            <label htmlFor="logistics-officer" className="text-sm cursor-pointer">
+              Logistics Officer
             </label>
           </div>
           <div className="flex items-center space-x-2">

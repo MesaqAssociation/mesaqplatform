@@ -126,10 +126,12 @@ export default function MemberDetailClient({
                 </Avatar>
                 <h1 className="text-2xl font-semibold mb-2">{member.name}</h1>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 ${
-                  member.role === 'Head Board Member' 
+                  member.role === 'Manager' 
                     ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
                     : member.role === 'Board Member'
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : member.role === 'Public Officer' || member.role === 'Finance Officer' || member.role === 'Logistics Officer'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                     : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                 }`}>
                   {member.role}

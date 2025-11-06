@@ -49,8 +49,8 @@ function SettingsClient({ user, currentFee }: { user: any, currentFee: string })
       <h1 className="text-2xl font-semibold">Settings</h1>
       
       <div className="max-w-2xl space-y-6">
-        {/* Monthly Fee Settings - Only for Head Board Member */}
-        {user?.role === 'Head Board Member' && (
+        {/* Monthly Fee Settings - Only for Manager */}
+        {user?.role === 'Manager' && (
           <div className="border rounded-lg p-6">
             <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
             <MonthlyFeeSettings initialFee={currentFee} />

@@ -221,7 +221,10 @@ export default function CreateMemberForm() {
           <SelectContent>
             <SelectItem value="Community Member">Community Member</SelectItem>
             <SelectItem value="Board Member">Board Member</SelectItem>
-            <SelectItem value="Head Board Member">Head Board Member</SelectItem>
+            <SelectItem value="Manager">Manager</SelectItem>
+            <SelectItem value="Public Officer">Public Officer</SelectItem>
+            <SelectItem value="Finance Officer">Finance Officer</SelectItem>
+            <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
           </SelectContent>
         </Select>
       </div>

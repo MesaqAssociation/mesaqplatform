@@ -24,7 +24,7 @@ export async function GET() {
   }
 }
 
-// POST update monthly fee (Head Board Member only)
+// POST update monthly fee (Manager only)
 export async function POST(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) {
@@ -40,15 +40,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check if user is Head Board Member
+    // Check if user is Manager
     const { rows: userRows } = await pool.query(
       'SELECT role, name FROM users WHERE id = $1',
       [userId]
     )
     
-    if (!userRows[0] || userRows[0].role !== 'Head Board Member') {
+    if (!userRows[0] || userRows[0].role !== 'Manager') {
       return NextResponse.json({ 
-        error: 'Only Head Board Member can update the monthly fee' 
+        error: 'Only Manager can update the monthly fee' 
       }, { status: 403 })
     }
 

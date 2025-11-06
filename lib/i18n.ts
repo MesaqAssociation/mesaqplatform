@@ -79,7 +79,10 @@ export const dicts: Record<Locale, Record<string, string>> = {
     // Roles
     communityMember: "Community Member",
     boardMember: "Board Member",
-    headBoardMember: "Head Board Member",
+    manager: "Manager",
+    publicOfficer: "Public Officer",
+    financeOfficer: "Finance Officer",
+    logisticsOfficer: "Logistics Officer",
     
     // Events
     eventsList: "Events List",
@@ -214,7 +217,10 @@ export const dicts: Record<Locale, Record<string, string>> = {
     // Roles
     communityMember: "عضو مجتمع",
     boardMember: "عضو مجلس",
-    headBoardMember: "رئيس المجلس",
+    manager: "مدير",
+    publicOfficer: "ضابط عام",
+    financeOfficer: "ضابط مالي",
+    logisticsOfficer: "ضابط لوجستي",
     
     // Events
     eventsList: "قائمة الأحداث",
@@ -349,7 +355,10 @@ export const dicts: Record<Locale, Record<string, string>> = {
     // Roles
     communityMember: "عضو جامعه",
     boardMember: "عضو هیئت",
-    headBoardMember: "رئیس هیئت",
+    manager: "مدیر",
+    publicOfficer: "افسر عمومی",
+    financeOfficer: "افسر مالی",
+    logisticsOfficer: "افسر لجستیک",
     
     // Events
     eventsList: "لیست رویدادها",
