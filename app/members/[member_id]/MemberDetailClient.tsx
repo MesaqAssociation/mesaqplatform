@@ -1,14 +1,26 @@
 "use client"
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle } from '@tabler/icons-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash } from '@tabler/icons-react'
 import PaymentStatusCard from './PaymentStatusCard'
+import { showToast } from '@/lib/toast'
 
 type Member = {
   id: string
@@ -43,8 +55,13 @@ export default function MemberDetailClient({
   attendedEvents: Event[]
   allEvents: Event[]
 }) {
+  const router = useRouter()
   const [events, setEvents] = useState<Event[]>(attendedEvents || [])
   const [loading, setLoading] = useState(false)
+  const [currentRole, setCurrentRole] = useState(member.role)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   async function addEvent(eventId: string) {
     setLoading(true)
@@ -77,6 +94,56 @@ export default function MemberDetailClient({
       setEvents(events.filter(e => e.id !== eventId))
     } catch (err) {
       console.error('Failed to remove event', err)
+    }
+  }
+
+  async function handleRoleChange(newRole: string) {
+    try {
+      const res = await fetch(`/api/members/${member.member_id}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+
+      if (res.ok) {
+        setCurrentRole(newRole)
+        showToast(`Role updated to ${newRole}`, 'success')
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Failed to update role', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to update role', err)
+      showToast('Failed to update role', 'error')
+    }
+  }
+
+  async function handleDelete() {
+    if (confirmText.toLowerCase() !== 'confirm') {
+      showToast('Please type "confirm" to delete', 'error')
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/members/${member.member_id}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        showToast('Member deleted successfully', 'success')
+        setTimeout(() => {
+          router.push('/members')
+        }, 1500)
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Failed to delete member', 'error')
+        setDeleting(false)
+      }
+    } catch (err) {
+      console.error('Failed to delete member', err)
+      showToast('Failed to delete member', 'error')
+      setDeleting(false)
     }
   }
 
@@ -128,8 +195,6 @@ export default function MemberDetailClient({
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 ${
                   member.role === 'Manager' 
                     ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                    : member.role === 'Board Member'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     : member.role === 'Public Officer' || member.role === 'Finance Officer' || member.role === 'Logistics Officer'
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                     : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
@@ -216,6 +281,43 @@ export default function MemberDetailClient({
             </CardContent>
           </Card>
 
+          {/* Role Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Role Management</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="role">Change Role</Label>
+                <Select value={currentRole} onValueChange={handleRoleChange}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Community Member">Community Member</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Public Officer">Public Officer</SelectItem>
+                    <SelectItem value="Finance Officer">Finance Officer</SelectItem>
+                    <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Separator />
+              <div>
+                <Label className="text-red-600">Danger Zone</Label>
+                <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account</p>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="w-full"
+                >
+                  <IconTrash className="mr-2 size-4" />
+                  Delete Member
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Membership Payment Status */}
           <PaymentStatusCard memberId={member.member_id} />
 
@@ -272,6 +374,50 @@ export default function MemberDetailClient({
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Member Account</DialogTitle>
+            <DialogDescription>
+              This will permanently delete {member.name}'s account and all associated data.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2">
+            <Label htmlFor="confirm">Type "confirm" to delete</Label>
+            <Input
+              id="confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="confirm"
+              autoComplete="off"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false)
+                setConfirmText('')
+              }}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={confirmText.toLowerCase() !== 'confirm' || deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete Member'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

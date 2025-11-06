@@ -217,16 +217,6 @@ export default function CreateEventForm() {
         <div className="mt-2 space-y-2">
           <div className="flex items-center space-x-2">
             <Checkbox 
-              id="board-members" 
-              checked={formData.attendees.includes('Board Members')}
-              onCheckedChange={() => toggleAttendee('Board Members')}
-            />
-            <label htmlFor="board-members" className="text-sm cursor-pointer">
-              Board Members
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
               id="manager" 
               checked={formData.attendees.includes('Manager')}
               onCheckedChange={() => toggleAttendee('Manager')}

@@ -220,7 +220,6 @@ export default function CreateMemberForm() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Community Member">Community Member</SelectItem>
-            <SelectItem value="Board Member">Board Member</SelectItem>
             <SelectItem value="Manager">Manager</SelectItem>
             <SelectItem value="Public Officer">Public Officer</SelectItem>
             <SelectItem value="Finance Officer">Finance Officer</SelectItem>
