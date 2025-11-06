@@ -12,7 +12,7 @@ const pool = new Pool({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { member_id: string } }
+  { params }: { params: Promise<{ member_id: string }> | { member_id: string } }
 ) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) {
@@ -26,7 +26,9 @@ export async function GET(
   }
 
   try {
-    const memberId = parseInt(params.member_id)
+    // Await params if it's a Promise (Next.js 15+)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const memberId = parseInt(resolvedParams.member_id)
     const monthlyFee = parseFloat(process.env.MONTHLY_FEE || '50.00')
 
     // Get member info

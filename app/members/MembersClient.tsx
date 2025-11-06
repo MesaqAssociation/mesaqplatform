@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useI18n } from '@/components/I18nProvider'
@@ -19,6 +20,7 @@ type Member = {
 
 export default function MembersClient({ initial }: { initial: Member[] }) {
   const { t } = useI18n()
+  const router = useRouter()
   
   const getRoleTranslation = (role: string | null) => {
     if (role === 'Head Board Member') return t('headBoardMember')
@@ -63,30 +65,20 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
         </thead>
         <tbody>
           {initial.map(m => (
-            <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
-                <td className="py-3 px-2">
-                  {m.member_id ? (
-                    <Link 
-                      href={`/members/${m.member_id}`} 
-                      className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-                      prefetch={true}
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
-                        <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{m.name || '-'}</span>
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
-                        <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{m.name || '-'}</span>
-                    </div>
-                  )}
-                </td>
+            <tr 
+              key={m.id} 
+              onClick={() => m.member_id && router.push(`/members/${m.member_id}`)}
+              className="border-t hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              <td className="py-3 px-2">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
+                    <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{m.name || '-'}</span>
+                </div>
+              </td>
               <td className="py-3 px-2 text-muted-foreground">{m.email || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>

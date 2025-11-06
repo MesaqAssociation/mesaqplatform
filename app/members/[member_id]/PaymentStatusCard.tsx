@@ -72,7 +72,7 @@ export default function PaymentStatusCard({ memberId }: { memberId: number }) {
     )
   }
 
-  if (error || !status) {
+  if (error || !status || !status.paymentSummary) {
     return (
       <Card>
         <CardHeader>
@@ -85,7 +85,7 @@ export default function PaymentStatusCard({ memberId }: { memberId: number }) {
     )
   }
 
-  const { paymentSummary, monthlyStatus, unpaidMonths } = status
+  const { paymentSummary, monthlyStatus = [], unpaidMonths = [] } = status
 
   return (
     <Card>
