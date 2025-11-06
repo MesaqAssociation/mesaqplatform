@@ -164,20 +164,62 @@ export default function FinanceClient({
         setTimeout(() => {
           let message = `Success! ${data.message}<br><br>Transactions imported: ${data.transactionsImported}/${data.totalFound}`
           
-          if (data.failedDetails && data.failedDetails.length > 0) {
-            message += `<br><br><strong>Failed Transactions:</strong>`
-            data.failedDetails.slice(0, 3).forEach((f: any) => {
-              message += `<br>• ${f.description?.substring(0, 40) || 'Unknown'}: ${f.error}`
+          // Show skipped transactions
+          if (data.skippedDetails && data.skippedDetails.length > 0) {
+            message += `<br><br><strong style="color: #f59e0b;">⚠️ Skipped Transactions (${data.skippedDetails.length}):</strong>`
+            data.skippedDetails.slice(0, 5).forEach((s: any) => {
+              message += `<br>• <strong>${s.date}</strong> - ${s.description?.substring(0, 50) || 'No description'}`
+              message += `<br>  <em style="color: #6b7280;">Reason: ${s.reason}</em>`
             })
-            if (data.failedDetails.length > 3) {
-              message += `<br>• ... and ${data.failedDetails.length - 3} more`
+            if (data.skippedDetails.length > 5) {
+              message += `<br>• ... and ${data.skippedDetails.length - 5} more`
             }
           }
           
-          showToast(message, data.failed > 0 ? 'error' : 'success')
+          // Show failed transactions
+          if (data.failedDetails && data.failedDetails.length > 0) {
+            message += `<br><br><strong style="color: #ef4444;">❌ Failed Transactions (${data.failedDetails.length}):</strong>`
+            data.failedDetails.slice(0, 5).forEach((f: any) => {
+              message += `<br>• <strong>${f.date}</strong> - ${f.description?.substring(0, 50) || 'Unknown'}`
+              message += `<br>  <em style="color: #6b7280;">Error: ${f.error}</em>`
+            })
+            if (data.failedDetails.length > 5) {
+              message += `<br>• ... and ${data.failedDetails.length - 5} more`
+            }
+          }
+          
+          showToast(message, data.failed > 0 || data.skipped > 0 ? 'error' : 'success')
+          
+          // Log detailed info to console for debugging
+          console.log('=== Bank Statement Upload Results ===')
+          console.log(`Total found: ${data.totalFound}`)
+          console.log(`Imported: ${data.transactionsImported}`)
+          console.log(`Skipped: ${data.skipped}`)
+          console.log(`Failed: ${data.failed}`)
+          
+          if (data.skippedDetails && data.skippedDetails.length > 0) {
+            console.log('\n📋 All Skipped Transactions:')
+            data.skippedDetails.forEach((s: any, i: number) => {
+              console.log(`${i + 1}. Date: ${s.date}`)
+              console.log(`   Description: ${s.description}`)
+              console.log(`   Reason: ${s.reason}`)
+              console.log('')
+            })
+          }
+          
+          if (data.failedDetails && data.failedDetails.length > 0) {
+            console.log('\n❌ All Failed Transactions:')
+            data.failedDetails.forEach((f: any, i: number) => {
+              console.log(`${i + 1}. Date: ${f.date}`)
+              console.log(`   Description: ${f.description}`)
+              console.log(`   Error: ${f.error}`)
+              console.log('')
+            })
+          }
+          
           setTimeout(() => {
             window.location.reload()
-          }, data.failed > 0 ? 5000 : 2000)
+          }, data.failed > 0 || data.skipped > 0 ? 8000 : 2000)
         }, 500)
       } else {
         setUploadProgress(null)

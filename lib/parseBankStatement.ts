@@ -113,6 +113,12 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         amounts.push({ value, isNegative })
       }
       
+      // Log raw transaction for debugging
+      console.log(`\n--- Raw Transaction ---`)
+      console.log(`Date: ${dateStr}`)
+      console.log(`Full text: ${fullTransaction}`)
+      console.log(`Amounts found: ${amounts.length}`, amounts)
+      
       // Only proceed if we found amounts
       if (amounts.length > 0) {
         // Extract description (remove all amounts and clean up)
@@ -174,14 +180,21 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         
         // Add all transactions (even if debit/credit is undefined, as long as we have amounts)
         const parsedDate = parseAUDate(dateStr)
+        const cleanedDesc = cleanDescription(description)
         
-        transactions.push({
+        const transaction = {
           date: parsedDate,
-          description: cleanDescription(description),
+          description: cleanedDesc,
           debit,
           credit,
           balance,
-        })
+        }
+        
+        console.log(`✅ Parsed transaction:`, transaction)
+        
+        transactions.push(transaction)
+      } else {
+        console.log(`⚠️ Skipped - no amounts found`)
       }
       
       // Move to next potential transaction

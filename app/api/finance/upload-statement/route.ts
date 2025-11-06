@@ -250,10 +250,12 @@ export async function POST(req: NextRequest) {
       success: true,
       transactionsImported: insertedCount.length,
       totalFound: parsed.transactions.length,
+      skipped: skippedTransactions.length,
+      skippedDetails: skippedTransactions,
       failed: failedTransactions.length,
-      failedDetails: failedTransactions.length > 0 ? failedTransactions : undefined,
+      failedDetails: failedTransactions,
       newBalance: runningBalance,
-      message: `Successfully imported ${insertedCount.length} of ${parsed.transactions.length} transactions.${failedTransactions.length > 0 ? ` ${failedTransactions.length} failed.` : ''}`
+      message: `Successfully imported ${insertedCount.length} of ${parsed.transactions.length} transactions.${skippedTransactions.length > 0 ? ` ${skippedTransactions.length} skipped (no amount).` : ''}${failedTransactions.length > 0 ? ` ${failedTransactions.length} failed.` : ''}`
     })
   } catch (err: any) {
     console.error('Upload statement error:', err)
