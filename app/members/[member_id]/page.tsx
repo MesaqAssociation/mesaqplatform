@@ -62,12 +62,29 @@ export default async function MemberDetailPage({
       'SELECT id, title, event_date, event_type FROM events ORDER BY event_date DESC'
     )
 
+    // Format dates to strings for client component
+    const formattedMember = {
+      ...member,
+      created_at: member.created_at ? new Date(member.created_at).toISOString() : null,
+      date_joined: member.date_joined ? new Date(member.date_joined).toISOString().split('T')[0] : null,
+    }
+
+    const formattedAttendedEvents = attendedEvents.map(event => ({
+      ...event,
+      event_date: event.event_date ? new Date(event.event_date).toISOString().split('T')[0] : null,
+    }))
+
+    const formattedAllEvents = allEvents.map(event => ({
+      ...event,
+      event_date: event.event_date ? new Date(event.event_date).toISOString().split('T')[0] : null,
+    }))
+
     return (
       <MainLayout user={user}>
         <MemberDetailClient 
-          member={member} 
-          attendedEvents={attendedEvents}
-          allEvents={allEvents}
+          member={formattedMember} 
+          attendedEvents={formattedAttendedEvents}
+          allEvents={formattedAllEvents}
         />
       </MainLayout>
     )

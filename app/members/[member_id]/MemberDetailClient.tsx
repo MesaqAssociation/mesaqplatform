@@ -22,7 +22,7 @@ type Member = {
   banking_name: string | null
   date_joined: string | null
   household_members: number
-  created_at: string
+  created_at: string | null
 }
 
 type Event = {
