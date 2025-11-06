@@ -128,7 +128,7 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
             <DialogTitle>Confirm Fee Change</DialogTitle>
             <DialogDescription>
               You are about to change the monthly membership fee from ${initialFee} to ${fee}.
-              This will affect all community members. This action cannot be undone.
+              This will affect all members. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           

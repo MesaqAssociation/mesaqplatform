@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export default function LoginPage() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), password }),
+        body: JSON.stringify({ identifier: identifier.trim(), password }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -47,8 +47,8 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone (e.g. 0456789012)</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0456789012" required autoComplete="off" />
+              <Label htmlFor="identifier">Phone or Name</Label>
+              <Input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="0456789012 or John Smith" required autoComplete="off" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

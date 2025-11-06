@@ -36,13 +36,11 @@ export async function POST(req: NextRequest) {
     const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
     console.log(`💰 Monthly fee: $${monthlyFee}`)
     
-    // Get all community members (exclude board members and head board member)
+    // Get all members who need to pay (everyone with a join date)
     const { rows: allMembers } = await pool.query(`
       SELECT id, member_id, name, phone, email, banking_name, address, date_joined, role
       FROM users
-      WHERE 
-        date_joined IS NOT NULL
-        AND role NOT IN ('Board Member', 'Head Board Member')
+      WHERE date_joined IS NOT NULL
     `)
     console.log(`👥 Total community members: ${allMembers.length}`)
 

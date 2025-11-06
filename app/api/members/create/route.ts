@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { name, email, phone, password, address, image, role, banking_name, date_joined, household_members } = body
-    if (!phone || !password || !name) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!name || !phone || !password) {
+      return NextResponse.json({ error: 'Name, phone number, and password are required' }, { status: 400 })
     }
 
     const hashed = await bcrypt.hash(password, 10)

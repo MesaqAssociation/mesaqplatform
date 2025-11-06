@@ -12,7 +12,7 @@ const pool = new Pool({
 })
 
 const schema = z.object({
-  phone: z.string().regex(/^0\d{9}$/),
+  identifier: z.string().min(1), // Can be phone or name
   password: z.string().min(8).max(128),
 })
 
@@ -23,11 +23,12 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { phone, password } = schema.parse(body)
+    const { identifier, password } = schema.parse(body)
 
+    // Try to find user by phone or name
     const { rows } = await pool.query(
-      'select id, password_hash, name, image from "users" where phone = $1 limit 1',
-      [phone]
+      'select id, password_hash, name, image from "users" where phone = $1 OR LOWER(name) = LOWER($1) limit 1',
+      [identifier]
     )
     const user = rows[0]
     if (!user?.password_hash) {

@@ -168,13 +168,12 @@ export default function CreateMemberForm() {
       <Separator />
 
       <div>
-        <Label htmlFor="email">Email *</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
           className="mt-1"
           autoComplete="off"
         />
@@ -230,7 +229,7 @@ export default function CreateMemberForm() {
       <Separator />
 
       <div>
-        <Label htmlFor="household_members">Household Members *</Label>
+        <Label htmlFor="household_members">Household Members</Label>
         <Select value={formData.household_members} onValueChange={(value) => setFormData({ ...formData, household_members: value })}>
           <SelectTrigger className="mt-1">
             <SelectValue />
@@ -262,7 +261,7 @@ export default function CreateMemberForm() {
       <Separator />
 
       <div>
-        <Label htmlFor="date_joined">Date Joined *</Label>
+        <Label htmlFor="date_joined">Date Joined</Label>
         <div className="flex gap-2 mt-1">
           <Select 
             value={formData.date_joined.split('-')[2]} 
