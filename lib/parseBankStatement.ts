@@ -62,151 +62,162 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
   }
 
   // Parse transaction lines
-  // CommBank format: Date Transaction details (can be multi-line) Amount Balance
-  // Multi-line transactions continue until we find amounts
+  // CommBank format: 
+  // Line 1: Date TransactionName
+  // Line 2+: Description details $amount$balanceCR
   
-  const lines = text.split('\n')
+  const lines = text.split('\n').map(l => l.trim())
   let i = 0
   
+  // Skip to transaction section (after "Date" and "TransactionDebitCreditBalance" headers)
   while (i < lines.length) {
-    const line = lines[i].trim()
+    if (lines[i] === 'Date' && i + 1 < lines.length && lines[i + 1].match(/^Transaction.*Debit.*Credit.*Balance/i)) {
+      i += 2 // Skip both header lines
+      break
+    }
+    i++
+  }
+  
+  while (i < lines.length) {
+    const line = lines[i]
     
-    // Check if this line starts with a date
-    const dateMatch = line.match(/^(\d{1,2}\s+\w{3}\s+\d{2,4})\s+(.+)/)
+    // Skip empty lines, page markers, and closing balance
+    if (!line || 
+        line.startsWith('Statement ') || 
+        line.startsWith('Account Number') ||
+        line.startsWith('4326.') ||
+        line.match(/^Page \d+ of \d+/) ||
+        line.match(/CLOSING BALANCE/i) ||
+        line.match(/Opening balance.*Total/i) ||
+        line.match(/Important Information/i)) {
+      i++
+      continue
+    }
+    
+    // Check if this line starts with a date (DD Mon or DD Mon YYYY)
+    // Note: There may be no space between month and transaction name
+    const dateMatch = line.match(/^(\d{1,2}\s+\w{3})(?:\s+\d{4})?\s*(.+)/)
     
     if (dateMatch) {
       const dateStr = dateMatch[1]
-      let fullTransaction = dateMatch[2]
+      const transactionName = dateMatch[2].trim()
       
-      // Look ahead to collect multi-line transaction details
-      // Continue until we find a line with amounts ($ symbols) or another date
+      // Look ahead for description lines (until we find amounts or next date)
+      let descriptionLines: string[] = []
       let j = i + 1
+      let amounts: { value: number; isNegative: boolean }[] = []
+      
       while (j < lines.length) {
         const nextLine = lines[j].trim()
         
-        // Stop if we hit another date line
-        if (/^\d{1,2}\s+\w{3}\s+\d{2,4}\s+/.test(nextLine)) {
+        // Stop if empty or next transaction
+        if (!nextLine || /^\d{1,2}\s+\w{3}/.test(nextLine)) {
           break
         }
         
-        // Stop if this line has amounts (means current transaction is complete)
-        if (/(?:-?\$)[\d,]+\.\d{2}/.test(fullTransaction)) {
+        // Stop if we hit page markers
+        if (nextLine.startsWith('Statement ') || 
+            nextLine.startsWith('Account Number') ||
+            nextLine.startsWith('4326.') ||
+            nextLine.match(/^Page \d+ of \d+/)) {
           break
         }
         
-        // Add this line to the transaction
-        if (nextLine && !nextLine.startsWith('Page ') && !nextLine.startsWith('Account ')) {
-          fullTransaction += ' ' + nextLine
+        // Check if this line has amounts (transaction complete)
+        const amountPattern = /\$?([\d,]+\.\d{2})/g
+        const lineAmounts: { value: number; isNegative: boolean }[] = []
+        let match
+        
+        while ((match = amountPattern.exec(nextLine)) !== null) {
+          const value = parseFloat(match[1].replace(/,/g, ''))
+          const isNegative = match[0].startsWith('-')
+          lineAmounts.push({ value, isNegative })
         }
         
-        j++
-      }
-      
-      // Now parse the complete transaction
-      const amountPattern = /(?:-?\$)([\d,]+\.\d{2})/g
-      const amounts: { value: number; isNegative: boolean }[] = []
-      let amountMatch
-      
-      while ((amountMatch = amountPattern.exec(fullTransaction)) !== null) {
-        const fullMatch = amountMatch[0]
-        const value = parseFloat(amountMatch[1].replace(/,/g, ''))
-        const isNegative = fullMatch.startsWith('-')
-        amounts.push({ value, isNegative })
-      }
-      
-      // Log raw transaction for debugging
-      console.log(`\n--- Raw Transaction ---`)
-      console.log(`Date: ${dateStr}`)
-      console.log(`Full text: ${fullTransaction}`)
-      console.log(`Amounts found: ${amounts.length}`, amounts)
-      
-      // Only proceed if we found amounts
-      if (amounts.length > 0) {
-        // Split transaction into lines to separate name from description
-        const transactionLines = fullTransaction
-          .replace(/(?:-?\$)[\d,]+\.\d{2}/g, '') // Remove all amounts with $
-          .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
-          .replace(/Value Date:[^\n]*/gi, '') // Remove value date
-          .replace(/Card xx\d+[^\n]*/gi, '') // Remove card references
-          .replace(/USD\s+[\d.]+/gi, '') // Remove USD amounts
-          .replace(/EUR\s+[\d.]+/gi, '') // Remove EUR amounts
-          .replace(/GBP\s+[\d.]+/gi, '') // Remove GBP amounts
-          .replace(/AUD\s+[\d.]+/gi, '') // Remove AUD amounts
-          .replace(/PayID Phone from CommBank App/gi, '') // Remove common phrases
-          .replace(/CommBank [Aa]pp/gi, '') // Remove app references
-          .replace(/to PayID Phone/gi, '')
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0)
-        
-        // First line is the transaction name
-        let name = transactionLines[0] || ''
-        if (name.length > 200) {
-          name = name.substring(0, 200)
-        }
-        
-        // Subsequent lines are the description
-        let description = transactionLines.slice(1).join(' ').trim()
-        if (description.length > 500) {
-          description = description.substring(0, 500)
-        }
-        
-        let debit: number | undefined
-        let credit: number | undefined
-        let balance: number | undefined
-        
-        if (amounts.length === 1) {
-          // Only one amount - could be transaction or balance
-          // If we only have one amount, assume it's both transaction and balance
-          if (amounts[0].isNegative) {
-            debit = amounts[0].value
-            balance = amounts[0].value // Use the amount as running balance
-          } else {
-            credit = amounts[0].value
-            balance = amounts[0].value
-          }
-        } else if (amounts.length === 2) {
-          // Two amounts - transaction + balance
-          const txnAmount = amounts[0]
-          balance = amounts[1].value
+        if (lineAmounts.length > 0) {
+          // This line has amounts - it's the last line of this transaction
+          amounts = lineAmounts
           
-          if (txnAmount.isNegative) {
-            debit = txnAmount.value
-          } else {
-            credit = txnAmount.value
-          }
-        } else if (amounts.length >= 3) {
-          // Multiple amounts - last is balance, second-to-last is transaction
-          balance = amounts[amounts.length - 1].value
-          const txnAmount = amounts[amounts.length - 2]
+          // Extract description text (remove amounts and CR/DR)
+          let descText = nextLine
+            .replace(/\$?[\d,]+\.\d{2}/g, '') // Remove amounts
+            .replace(/\bCR\b|\bDR\b/gi, '') // Remove CR/DR
+            .trim()
           
-          if (txnAmount.isNegative) {
-            debit = txnAmount.value
-          } else {
-            credit = txnAmount.value
+          if (descText) {
+            descriptionLines.push(descText)
           }
+          
+          j++
+          break
+        } else {
+          // No amounts yet, this is a description line
+          descriptionLines.push(nextLine)
+          j++
         }
-        
-        // Add all transactions (even if debit/credit is undefined, as long as we have amounts)
-        const parsedDate = parseAUDate(dateStr)
-        
-        const transaction = {
-          date: parsedDate,
-          name: name,
-          description: description,
-          debit,
-          credit,
-          balance,
-        }
-        
-        console.log(`✅ Parsed transaction:`, transaction)
-        
-        transactions.push(transaction)
-      } else {
-        console.log(`⚠️ Skipped - no amounts found`)
       }
       
-      // Move to next potential transaction
+      // Skip transactions with no amounts (like headers or opening balance)
+      if (amounts.length === 0 || transactionName.match(/OPENING BALANCE/i)) {
+        i = j
+        continue
+      }
+      
+      // Parse amounts: typically [transaction_amount, balance]
+      let debit: number | undefined
+      let credit: number | undefined
+      let balance: number | undefined
+      
+      if (amounts.length === 1) {
+        // Only balance (unusual, but handle it)
+        balance = amounts[0].value
+        credit = amounts[0].value // Assume credit if only one amount
+      } else if (amounts.length >= 2) {
+        // Standard format: transaction amount + balance
+        const txnAmount = amounts[0]
+        balance = amounts[amounts.length - 1].value
+        
+        // Determine if debit or credit based on context
+        // In CommBank statements, credits are positive, debits would be negative
+        if (txnAmount.isNegative) {
+          debit = txnAmount.value
+        } else {
+          credit = txnAmount.value
+        }
+      }
+      
+      // Build name and description
+      const name = transactionName.substring(0, 200)
+      let description = descriptionLines.join(' ')
+        .replace(/CR$/g, '') // Remove CR at end
+        .replace(/DR$/g, '') // Remove DR at end
+        .replace(/\bCR\b/g, '') // Remove CR markers
+        .replace(/\bDR\b/g, '') // Remove DR markers
+        .trim()
+        .substring(0, 500)
+      
+      const parsedDate = parseAUDate(dateStr, statementPeriod)
+      
+      const transaction = {
+        date: parsedDate,
+        name,
+        description,
+        debit,
+        credit,
+        balance,
+      }
+      
+      console.log(`\n✅ Parsed transaction:`)
+      console.log(`   Date: ${parsedDate}`)
+      console.log(`   Name: "${name}"`)
+      console.log(`   Description: "${description}"`)
+      console.log(`   Credit: ${credit ? `$${credit}` : '-'}`)
+      console.log(`   Debit: ${debit ? `$${debit}` : '-'}`)
+      console.log(`   Balance: ${balance ? `$${balance}` : '-'}`)
+      
+      transactions.push(transaction)
+      
+      // Move to next transaction
       i = j
     } else {
       i++
@@ -228,7 +239,7 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
 /**
  * Parse Australian date formats to YYYY-MM-DD
  */
-function parseAUDate(dateStr: string): string {
+function parseAUDate(dateStr: string, statementPeriod?: { from: string; to: string }): string {
   // Handle formats: DD/MM/YYYY, DD/MM/YY, DD MMM YYYY, DD-MM-YYYY, etc.
   const cleaned = dateStr.trim().replace(/\s+/g, ' ')
   
@@ -248,17 +259,25 @@ function parseAUDate(dateStr: string): string {
     dec: '12', december: '12',
   }
 
-  const monthMatch = cleaned.match(/(\d{1,2})[\s\/-](\w{3,9})[\s\/-](\d{2,4})/i)
+  const monthMatch = cleaned.match(/(\d{1,2})[\s\/-](\w{3,9})(?:[\s\/-](\d{2,4}))?/i)
   if (monthMatch) {
     const day = monthMatch[1].padStart(2, '0')
     const monthStr = monthMatch[2].toLowerCase()
     let year = monthMatch[3]
-    // Convert 2-digit year to 4-digit
-    if (year.length === 2) {
+    
+    // If no year provided, infer from statement period
+    if (!year && statementPeriod) {
+      const toYear = statementPeriod.to.split('-')[0]
+      year = toYear
+    } else if (!year) {
+      // Fallback to current year
+      year = new Date().getFullYear().toString()
+    } else if (year.length === 2) {
+      // Convert 2-digit year to 4-digit
       const yearNum = parseInt(year)
-      // If year is 00-50, assume 2000-2050, if 51-99, assume 1951-1999
       year = yearNum <= 50 ? `20${year}` : `19${year}`
     }
+    
     const month = monthNames[monthStr]
     if (month) {
       return `${year}-${month}-${day}`
