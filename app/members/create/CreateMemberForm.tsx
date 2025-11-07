@@ -46,6 +46,7 @@ export default function CreateMemberForm() {
     password: '',
     role: 'Community Member',
     banking_name: '',
+    member_id: '',
     date_joined: new Date().toISOString().split('T')[0], // Default to today
     household_members: '1',
   })
@@ -254,10 +255,31 @@ export default function CreateMemberForm() {
           id="banking_name"
           value={formData.banking_name}
           onChange={(e) => setFormData({ ...formData, banking_name: e.target.value })}
-          placeholder="Name as it appears on bank account"
+          placeholder="e.g., JOHN SMITH or ALI, MAX (comma-separated for multiple)"
           className="mt-1"
           autoComplete="off"
         />
+        <p className="text-xs text-muted-foreground mt-1">
+          💡 Separate multiple banking names with commas (e.g., "ALI, MAX")
+        </p>
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="member_id">Member ID (Number)</Label>
+        <Input
+          id="member_id"
+          type="number"
+          value={formData.member_id}
+          onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
+          placeholder="e.g., 1, 2, 3..."
+          className="mt-1"
+          autoComplete="off"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          💡 Unique number for this member. Used to match payments in bank statements.
+        </p>
       </div>
 
       <Separator />

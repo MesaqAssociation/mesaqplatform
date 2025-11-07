@@ -19,19 +19,18 @@ SELECT
       AND mp.payment_month = DATE_TRUNC('month', CURRENT_DATE)::DATE
       AND mp.status = 'review'
     ) THEN 'REVIEW'
-    -- Check if payment exists for current month with PAID status - show amount
+    -- Check if payment exists for current month with PAID status - show TOTAL amount
     WHEN EXISTS (
       SELECT 1 FROM membership_payments mp
       WHERE mp.user_id = u.id 
       AND mp.payment_month = DATE_TRUNC('month', CURRENT_DATE)::DATE
       AND mp.status = 'paid'
     ) THEN (
-      SELECT '$' || CAST(mp.amount AS TEXT)
+      SELECT '$' || CAST(SUM(mp.amount) AS TEXT)
       FROM membership_payments mp
       WHERE mp.user_id = u.id 
       AND mp.payment_month = DATE_TRUNC('month', CURRENT_DATE)::DATE
       AND mp.status = 'paid'
-      LIMIT 1
     )
     -- Everyone else is UNPAID
     ELSE 'UNPAID'
@@ -47,7 +46,7 @@ SELECT
 FROM users u;
 
 COMMENT ON VIEW current_month_payment_status IS 
-'Shows payment status for current month. Status values: $XX.XX (amount paid), UNPAID, REVIEW (ambiguous match). All members must pay by last day of month.';
+'Shows payment status for current month. Status values: $XX.XX (TOTAL amount paid for the month), UNPAID, REVIEW (ambiguous match). All members must pay by last day of month.';
 
 -- Verify the changes
 SELECT 

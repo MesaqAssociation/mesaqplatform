@@ -28,6 +28,21 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { accountId } = body
 
+    // Get transaction IDs that will be deleted
+    const { rows: transactionIds } = await pool.query(
+      'SELECT id FROM transactions WHERE account_id = $1 OR account_id IS NULL',
+      [accountId]
+    )
+
+    // Delete associated membership_payments (to update payment status)
+    if (transactionIds.length > 0) {
+      const txnIds = transactionIds.map(t => t.id)
+      await pool.query(
+        'DELETE FROM membership_payments WHERE transaction_id = ANY($1)',
+        [txnIds]
+      )
+    }
+
     // Delete all transactions for this account
     const { rowCount } = await pool.query(
       'DELETE FROM transactions WHERE account_id = $1 OR account_id IS NULL',

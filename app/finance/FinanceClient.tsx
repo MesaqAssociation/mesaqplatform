@@ -45,6 +45,8 @@ export default function FinanceClient({
   const [accounts, setAccounts] = useState<Account[]>(allAccounts)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(account.id)
   const [showAddAccountDialog, setShowAddAccountDialog] = useState(false)
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [newAccountName, setNewAccountName] = useState('')
   const [newAccountNumber, setNewAccountNumber] = useState('')
   
@@ -148,6 +150,45 @@ export default function FinanceClient({
   
   const formatMonthYear = (date: Date) => {
     return date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+  }
+  
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'confirm') {
+      showToast('Please type "confirm" to delete', 'error')
+      return
+    }
+    
+    if (accounts.length <= 1) {
+      showToast('Cannot delete the last account', 'error')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/finance/accounts?id=${selectedAccountId}`, {
+        method: 'DELETE',
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        showToast('Bank account deleted successfully!', 'success')
+        // Remove from accounts list
+        const updatedAccounts = accounts.filter(a => a.id !== selectedAccountId)
+        setAccounts(updatedAccounts)
+        // Switch to first remaining account
+        setSelectedAccountId(updatedAccounts[0].id)
+        setShowDeleteAccountDialog(false)
+        setDeleteConfirmText('')
+      } else {
+        showToast(data.error || 'Failed to delete account', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to delete account', err)
+      showToast('Failed to delete account. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleBalanceClick = () => {
@@ -419,26 +460,37 @@ export default function FinanceClient({
 
   return (
     <div className="space-y-6">
-      {/* Account Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {accounts.map((acc) => (
-          <button
-            key={acc.id}
-            onClick={() => setSelectedAccountId(acc.id)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-              selectedAccountId === acc.id
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80'
-            }`}
-          >
-            {acc.account_name}
-            {acc.account_number && (
-              <span className="ml-2 text-xs opacity-70">
-                •••{acc.account_number.slice(-4)}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Account Tabs with Delete Button */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 flex-1">
+          {accounts.map((acc) => (
+            <button
+              key={acc.id}
+              onClick={() => setSelectedAccountId(acc.id)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                selectedAccountId === acc.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              {acc.account_name}
+              {acc.account_number && (
+                <span className="ml-2 text-xs opacity-70">
+                  •••{acc.account_number.slice(-4)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setShowDeleteAccountDialog(true)}
+          disabled={accounts.length <= 1}
+        >
+          <IconTrash className="mr-2 size-4" />
+          Delete Account
+        </Button>
       </div>
 
       {/* Bank Balance */}
@@ -832,6 +884,48 @@ export default function FinanceClient({
                 disabled={!newAccountName.trim() || newAccountNumber.length !== 14 || loading}
               >
                 {loading ? 'Adding...' : 'Add Account'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Bank Account</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the account "{currentAccount.account_name}". This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="delete-confirm">Type "confirm" to delete</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="confirm"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteAccountDialog(false)
+                  setDeleteConfirmText('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteAccount} 
+                disabled={deleteConfirmText !== 'confirm' || loading}
+              >
+                {loading ? 'Deleting...' : 'Delete Account'}
               </Button>
             </div>
           </div>

@@ -3,7 +3,7 @@ import { Pool } from 'pg'
 export type MemberMatch = {
   memberId: string
   memberName: string
-  matchType: 'phone' | 'banking_name' | 'none'
+  matchType: 'phone' | 'banking_name' | 'member_id' | 'none'
   confidence: 'high' | 'low'
 }
 
@@ -21,13 +21,32 @@ export async function matchTransactionToMember(
   description: string
 ): Promise<MemberMatch | null> {
   
-  // Step 1: Check description for phone identifier
-  // Get all members with phone identifiers
-  const { rows: membersWithPhone } = await pool.query(
-    `SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''`
+  // Step 1: Check description for member_id (integer only, not part of phone numbers)
+  const { rows: membersWithId } = await pool.query(
+    `SELECT id, name, member_id FROM users WHERE member_id IS NOT NULL`
   )
   
   const descriptionLower = description.toLowerCase()
+  
+  // Check for member_id as a standalone number (not part of longer numbers like phone numbers)
+  for (const member of membersWithId) {
+    const memberId = String(member.member_id)
+    // Use word boundaries to avoid matching member_id 23 in phone number 1234
+    const regex = new RegExp(`\\b${memberId}\\b`, 'i')
+    if (regex.test(description)) {
+      return {
+        memberId: member.id,
+        memberName: member.name,
+        matchType: 'member_id',
+        confidence: 'high'
+      }
+    }
+  }
+  
+  // Step 2: Check description for phone identifier
+  const { rows: membersWithPhone } = await pool.query(
+    `SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''`
+  )
   
   // Check if any member's phone identifier appears in the description
   for (const member of membersWithPhone) {
@@ -42,7 +61,7 @@ export async function matchTransactionToMember(
     }
   }
   
-  // Step 2: Check transaction name against banking names
+  // Step 2: Check transaction name against banking names (supports multiple names separated by comma)
   // Get all members with banking names
   const { rows: members } = await pool.query(
     `SELECT id, name, banking_name FROM users WHERE banking_name IS NOT NULL AND banking_name != ''`
@@ -50,33 +69,41 @@ export async function matchTransactionToMember(
   
   const transactionNameLower = transactionName.toLowerCase()
   
-  // Try exact match first
+  // Try exact match first - check each banking name if multiple
   for (const member of members) {
-    const bankingNameLower = member.banking_name.toLowerCase()
-    if (transactionNameLower.includes(bankingNameLower)) {
-      return {
-        memberId: member.id,
-        memberName: member.name,
-        matchType: 'banking_name',
-        confidence: 'high'
+    // Split by comma to support multiple banking names
+    const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
+    
+    for (const bankingName of bankingNames) {
+      if (bankingName && transactionNameLower.includes(bankingName)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'banking_name',
+          confidence: 'high'
+        }
       }
     }
   }
   
   // Try fuzzy match (split banking name into words)
   for (const member of members) {
-    const bankingNameWords = member.banking_name.toLowerCase().split(/\s+/)
-    // If all words from banking name appear in transaction name, it's a match
-    const allWordsMatch = bankingNameWords.every(word => 
-      word.length > 2 && transactionNameLower.includes(word)
-    )
+    const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
     
-    if (allWordsMatch && bankingNameWords.length >= 2) {
-      return {
-        memberId: member.id,
-        memberName: member.name,
-        matchType: 'banking_name',
-        confidence: 'low'
+    for (const bankingName of bankingNames) {
+      const bankingNameWords = bankingName.split(/\s+/)
+      // If all words from banking name appear in transaction name, it's a match
+      const allWordsMatch = bankingNameWords.every(word => 
+        word.length > 2 && transactionNameLower.includes(word)
+      )
+      
+      if (allWordsMatch && bankingNameWords.length >= 2) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'banking_name',
+          confidence: 'low'
+        }
       }
     }
   }
@@ -94,27 +121,50 @@ export async function batchMatchTransactions(
   transactions: Array<{ name: string; description: string }>
 ): Promise<Array<MemberMatch | null>> {
   
-  // Get all members with phone numbers and banking names
+  // Get all members with member_id, phone numbers and banking names
   const { rows: members } = await pool.query(
-    `SELECT id, name, phone, banking_name FROM users WHERE phone IS NOT NULL OR banking_name IS NOT NULL`
+    `SELECT id, name, member_id, phone, banking_name FROM users WHERE member_id IS NOT NULL OR phone IS NOT NULL OR banking_name IS NOT NULL`
   )
   
   // Create lookup maps
+  const memberIdMap = new Map<number, { id: string; name: string }>()
   const phoneMap = new Map<string, { id: string; name: string }>()
   const bankingNameMap = new Map<string, { id: string; name: string }>()
   
   members.forEach(member => {
+    if (member.member_id) {
+      memberIdMap.set(member.member_id, { id: member.id, name: member.name })
+    }
     if (member.phone) {
       phoneMap.set(member.phone, { id: member.id, name: member.name })
     }
     if (member.banking_name) {
-      bankingNameMap.set(member.banking_name.toLowerCase(), { id: member.id, name: member.name })
+      // Support multiple banking names separated by comma
+      const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
+      bankingNames.forEach(name => {
+        if (name) {
+          bankingNameMap.set(name, { id: member.id, name: member.name })
+        }
+      })
     }
   })
   
   // Match each transaction
   return transactions.map(txn => {
-    // Step 1: Check for phone identifier in description
+    // Step 1: Check for member_id in description (with word boundaries)
+    for (const [memberId, member] of memberIdMap.entries()) {
+      const regex = new RegExp(`\\b${memberId}\\b`, 'i')
+      if (regex.test(txn.description)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'member_id' as const,
+          confidence: 'high' as const
+        }
+      }
+    }
+    
+    // Step 2: Check for phone identifier in description
     const descriptionLower = txn.description.toLowerCase()
     
     // Check if any member's phone identifier appears in the description

@@ -82,14 +82,17 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     const line = lines[i]
     
     // Skip empty lines, page markers, and closing balance
+    // Also skip technical markers like "#* 17181.39879.1.3 ZZ258R3 0303 SL.R3.S951.D308.O V06.00.37"
     if (!line || 
         line.startsWith('Statement ') || 
         line.startsWith('Account Number') ||
         line.startsWith('4326.') ||
+        line.startsWith('#*') ||
         line.match(/^Page \d+ of \d+/) ||
         line.match(/CLOSING BALANCE/i) ||
         line.match(/Opening balance.*Total/i) ||
-        line.match(/Important Information/i)) {
+        line.match(/Important Information/i) ||
+        line.match(/^\d+\.\d+\.\d+\.\d+\s+[A-Z0-9]+\s+\d+\s+[A-Z0-9.]+/)) {
       i++
       continue
     }
@@ -115,11 +118,13 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
           break
         }
         
-        // Stop if we hit page markers
+        // Stop if we hit page markers or technical codes
         if (nextLine.startsWith('Statement ') || 
             nextLine.startsWith('Account Number') ||
             nextLine.startsWith('4326.') ||
-            nextLine.match(/^Page \d+ of \d+/)) {
+            nextLine.startsWith('#*') ||
+            nextLine.match(/^Page \d+ of \d+/) ||
+            nextLine.match(/^\d+\.\d+\.\d+\.\d+\s+[A-Z0-9]+\s+\d+\s+[A-Z0-9.]+/)) {
           break
         }
         
