@@ -19,6 +19,7 @@ type Account = {
 type Transaction = {
   id: string
   transaction_date: string
+  transaction_name: string
   description: string
   amount: number
   transaction_type: string
@@ -168,7 +169,7 @@ export default function FinanceClient({
           if (data.skippedDetails && data.skippedDetails.length > 0) {
             message += `<br><br><strong style="color: #f59e0b;">⚠️ Skipped Transactions (${data.skippedDetails.length}):</strong>`
             data.skippedDetails.slice(0, 5).forEach((s: any) => {
-              message += `<br>• <strong>${s.date}</strong> - ${s.description?.substring(0, 50) || 'No description'}`
+              message += `<br>• <strong>${s.date}</strong> - ${s.name?.substring(0, 50) || 'No name'}`
               message += `<br>  <em style="color: #6b7280;">Reason: ${s.reason}</em>`
             })
             if (data.skippedDetails.length > 5) {
@@ -180,7 +181,7 @@ export default function FinanceClient({
           if (data.failedDetails && data.failedDetails.length > 0) {
             message += `<br><br><strong style="color: #ef4444;">❌ Failed Transactions (${data.failedDetails.length}):</strong>`
             data.failedDetails.slice(0, 5).forEach((f: any) => {
-              message += `<br>• <strong>${f.date}</strong> - ${f.description?.substring(0, 50) || 'Unknown'}`
+              message += `<br>• <strong>${f.date}</strong> - ${f.name?.substring(0, 50) || 'Unknown'}`
               message += `<br>  <em style="color: #6b7280;">Error: ${f.error}</em>`
             })
             if (data.failedDetails.length > 5) {
@@ -201,7 +202,8 @@ export default function FinanceClient({
             console.log('\n📋 All Skipped Transactions:')
             data.skippedDetails.forEach((s: any, i: number) => {
               console.log(`${i + 1}. Date: ${s.date}`)
-              console.log(`   Description: ${s.description}`)
+              console.log(`   Name: ${s.name}`)
+              console.log(`   Description: ${s.description || '-'}`)
               console.log(`   Reason: ${s.reason}`)
               console.log('')
             })
@@ -211,7 +213,8 @@ export default function FinanceClient({
             console.log('\n❌ All Failed Transactions:')
             data.failedDetails.forEach((f: any, i: number) => {
               console.log(`${i + 1}. Date: ${f.date}`)
-              console.log(`   Description: ${f.description}`)
+              console.log(`   Name: ${f.name}`)
+              console.log(`   Description: ${f.description || '-'}`)
               console.log(`   Error: ${f.error}`)
               console.log('')
             })
@@ -403,6 +406,7 @@ export default function FinanceClient({
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-2">Date</th>
+                  <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
                   <th className="text-right py-3 px-2">Amount</th>
                 </tr>
@@ -410,7 +414,7 @@ export default function FinanceClient({
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={4} className="text-center py-8 text-muted-foreground">
                       No transactions yet
                     </td>
                   </tr>
@@ -424,11 +428,16 @@ export default function FinanceClient({
                       <td className="py-3 px-2">{formatDate(txn.transaction_date)}</td>
                       <td className="py-3 px-2">
                         <div>
-                          <p className="font-medium">{txn.description}</p>
+                          <p className="font-medium">{txn.transaction_name}</p>
                           {txn.reference && (
                             <p className="text-xs text-muted-foreground">Ref: {txn.reference}</p>
                           )}
                         </div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <p className="text-sm text-muted-foreground truncate max-w-xs">
+                          {txn.description || '-'}
+                        </p>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         txn.transaction_type === 'credit' 
@@ -504,9 +513,16 @@ export default function FinanceClient({
               </div>
 
               <div>
-                <Label className="text-muted-foreground text-xs">Description</Label>
-                <p className="font-medium text-lg">{selectedTransaction.description}</p>
+                <Label className="text-muted-foreground text-xs">Name</Label>
+                <p className="font-medium text-lg">{selectedTransaction.transaction_name}</p>
               </div>
+
+              {selectedTransaction.description && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Description</Label>
+                  <p className="font-medium">{selectedTransaction.description}</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

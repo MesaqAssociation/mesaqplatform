@@ -7,10 +7,10 @@ import Link from 'next/link'
 type Transaction = {
   id: number
   transaction_date: string
+  transaction_name: string
   description: string
-  debit: string | null
-  credit: string | null
-  balance: string | null
+  amount: number
+  transaction_type: string
 }
 
 type Event = {
@@ -84,22 +84,22 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
               recentTransactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {tx.debit ? (
+                    {tx.transaction_type === 'debit' || tx.amount < 0 ? (
                       <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
                     ) : (
                       <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{tx.description}</p>
+                      <p className="text-sm font-medium truncate">{tx.transaction_name}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
                     </div>
                   </div>
                   <div className="text-sm font-semibold ml-2 flex-shrink-0">
-                    {tx.debit ? (
-                      <span className="text-red-500">-${parseFloat(tx.debit).toFixed(2)}</span>
-                    ) : tx.credit ? (
-                      <span className="text-green-500">+${parseFloat(tx.credit).toFixed(2)}</span>
-                    ) : null}
+                    {tx.transaction_type === 'debit' || tx.amount < 0 ? (
+                      <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
+                    )}
                   </div>
                 </div>
               ))

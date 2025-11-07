@@ -32,6 +32,7 @@ export default async function FinancePage() {
       t.id,
       t.account_id,
       to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
+      t.transaction_name,
       t.description,
       t.amount,
       t.transaction_type,

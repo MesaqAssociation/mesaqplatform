@@ -114,7 +114,8 @@ export async function POST(req: NextRequest) {
           if (amount === 0) {
             skippedTransactions.push({
               date: txn.date,
-              description: txn.description?.substring(0, 50) || 'No description',
+              name: txn.name?.substring(0, 50) || 'No name',
+              description: txn.description?.substring(0, 50) || '',
               reason: 'No transaction amount found'
             })
             continue
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
             if (!/^\d{4}-\d{2}-\d{2}$/.test(txn.date)) {
               failedTransactions.push({
                 date: txn.date,
+                name: txn.name,
                 description: txn.description,
                 error: `Invalid date format: "${txn.date}"`
               })
@@ -133,13 +135,14 @@ export async function POST(req: NextRequest) {
 
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
-               (account_id, transaction_date, description, amount, transaction_type, balance_after, source, reference) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, 'telegram_bot', $7)
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8)
                ON CONFLICT DO NOTHING
-               RETURNING id, transaction_date, description`,
+               RETURNING id, transaction_date, transaction_name, description`,
               [
                 accountId,
                 txn.date,
+                txn.name,
                 txn.description,
                 amount,
                 txnType,
@@ -153,6 +156,7 @@ export async function POST(req: NextRequest) {
           } catch (err: any) {
             failedTransactions.push({
               date: txn.date,
+              name: txn.name,
               description: txn.description,
               error: err.message || 'Unknown error'
             })

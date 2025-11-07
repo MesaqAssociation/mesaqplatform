@@ -2,7 +2,8 @@ import pdf from 'pdf-parse'
 
 export type ParsedTransaction = {
   date: string // YYYY-MM-DD format
-  description: string
+  name: string // First line - transaction name
+  description: string // Subsequent lines - detailed description
   debit?: number
   credit?: number
   balance?: number
@@ -121,8 +122,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
       
       // Only proceed if we found amounts
       if (amounts.length > 0) {
-        // Extract description (remove all amounts and clean up)
-        let description = fullTransaction
+        // Split transaction into lines to separate name from description
+        const transactionLines = fullTransaction
           .replace(/(?:-?\$)[\d,]+\.\d{2}/g, '') // Remove all amounts with $
           .replace(/\bDR\b|\bCR\b/gi, '') // Remove DR/CR markers
           .replace(/Value Date:[^\n]*/gi, '') // Remove value date
@@ -134,12 +135,20 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
           .replace(/PayID Phone from CommBank App/gi, '') // Remove common phrases
           .replace(/CommBank [Aa]pp/gi, '') // Remove app references
           .replace(/to PayID Phone/gi, '')
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .trim()
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0)
         
-        // Limit description length
-        if (description.length > 200) {
-          description = description.substring(0, 200)
+        // First line is the transaction name
+        let name = transactionLines[0] || ''
+        if (name.length > 200) {
+          name = name.substring(0, 200)
+        }
+        
+        // Subsequent lines are the description
+        let description = transactionLines.slice(1).join(' ').trim()
+        if (description.length > 500) {
+          description = description.substring(0, 500)
         }
         
         let debit: number | undefined
@@ -180,11 +189,11 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         
         // Add all transactions (even if debit/credit is undefined, as long as we have amounts)
         const parsedDate = parseAUDate(dateStr)
-        const cleanedDesc = cleanDescription(description)
         
         const transaction = {
           date: parsedDate,
-          description: cleanedDesc,
+          name: name,
+          description: description,
           debit,
           credit,
           balance,

@@ -47,10 +47,10 @@ export default async function DashboardPage() {
       SELECT 
         id,
         transaction_date,
+        transaction_name,
         description,
-        debit,
-        credit,
-        balance
+        amount,
+        transaction_type
       FROM transactions
       ORDER BY transaction_date DESC, created_at DESC
       LIMIT 5
