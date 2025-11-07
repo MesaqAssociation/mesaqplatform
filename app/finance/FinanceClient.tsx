@@ -59,6 +59,7 @@ export default function FinanceClient({
   const [showReasonDialog, setShowReasonDialog] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
   const [loading, setLoading] = useState(false)
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
@@ -81,7 +82,7 @@ export default function FinanceClient({
   }, [selectedAccountId, currentMonth])
   
   const loadTransactions = async () => {
-    setLoading(true)
+    setLoadingTransactions(true)
     try {
       const year = currentMonth.getFullYear()
       const month = currentMonth.getMonth() + 1
@@ -96,7 +97,7 @@ export default function FinanceClient({
     } catch (err) {
       console.error('Failed to load transactions', err)
     } finally {
-      setLoading(false)
+      setLoadingTransactions(false)
     }
   }
   

@@ -37,16 +37,21 @@ export async function autoDetectMembershipPayment(
     const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
     const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
 
-    // Insert membership payment
+    // Check if this transaction already has a payment record
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM membership_payments WHERE transaction_id = $1`,
+      [transactionId]
+    )
+    
+    if (existing.length > 0) {
+      console.log(`⏭️ Payment already exists for transaction ${transactionId}`)
+      return false
+    }
+
+    // Insert membership payment (allow multiple payments per month)
     const { rowCount } = await pool.query(
       `INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
-       VALUES ($1, $2, $3, $4, $5, 'paid')
-       ON CONFLICT (user_id, payment_month) 
-       DO UPDATE SET 
-         amount = EXCLUDED.amount,
-         transaction_id = EXCLUDED.transaction_id,
-         payment_date = EXCLUDED.payment_date,
-         status = EXCLUDED.status`,
+       VALUES ($1, $2, $3, $4, $5, 'paid')`,
       [memberId, paymentMonthStr, Math.abs(amount), transactionId, transactionDate]
     )
 
