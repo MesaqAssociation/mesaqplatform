@@ -22,30 +22,56 @@ export default async function DashboardPage() {
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
-  let totalMembers = 0
+  let memberStats = { paying_members: 0, total_members: 0 }
   let recentTransactions: any[] = []
   let upcomingEvents: any[] = []
+  let accounts: any[] = []
 
   try {
-    // Get total members (count members + sum of household members)
-    const { rows: memberStats } = await pool.query(`
+    // Get member stats: paying members vs total members (with household)
+    const { rows: stats } = await pool.query(`
       SELECT 
-        COUNT(*)::int as member_count,
-        COALESCE(SUM(household_members), 0)::int as household_sum
-      FROM users
-      WHERE role IN ('Community Member', 'Board Member', 'Head Board Member')
+        COUNT(DISTINCT u.id) as paying_members,
+        COUNT(DISTINCT u.id) + COALESCE(SUM(u.household_members), 0) as total_members
+      FROM users u
+      LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
+      WHERE cps.payment_status IS NOT NULL 
+        AND cps.payment_status != 'UNPAID'
+        AND cps.payment_status != 'N/A'
     `)
     
-    totalMembers = (memberStats[0]?.member_count || 0) + (memberStats[0]?.household_sum || 0)
+    const { rows: allMembers } = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT id) + COALESCE(SUM(household_members), 0) as total
+      FROM users
+    `)
+    
+    memberStats = {
+      paying_members: stats[0]?.paying_members || 0,
+      total_members: allMembers[0]?.total || 0
+    }
   } catch (error) {
     console.error('Error fetching member stats:', error)
   }
 
   try {
-    // Get recent transactions (last 5)
+    // Get all financial accounts
+    const { rows } = await pool.query(`
+      SELECT id, account_name, account_number
+      FROM financial_accounts
+      ORDER BY created_at ASC
+    `)
+    accounts = rows
+  } catch (error) {
+    console.error('Error fetching accounts:', error)
+  }
+
+  try {
+    // Get recent transactions (last 5 per account)
     const { rows } = await pool.query(`
       SELECT 
         id,
+        account_id,
         transaction_date,
         transaction_name,
         description,
@@ -53,7 +79,7 @@ export default async function DashboardPage() {
         transaction_type
       FROM transactions
       ORDER BY transaction_date DESC, created_at DESC
-      LIMIT 5
+      LIMIT 20
     `)
     recentTransactions = rows
   } catch (error) {
@@ -82,9 +108,10 @@ export default async function DashboardPage() {
   return (
     <MainLayout user={user}>
       <DashboardClient 
-        totalMembers={totalMembers}
+        memberStats={memberStats}
         recentTransactions={recentTransactions}
         upcomingEvents={upcomingEvents}
+        accounts={accounts}
       />
     </MainLayout>
   )

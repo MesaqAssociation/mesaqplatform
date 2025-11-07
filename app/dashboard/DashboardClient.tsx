@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from 'react'
 import { useI18n } from '@/components/I18nProvider'
 import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown } from '@tabler/icons-react'
 import Link from 'next/link'
@@ -11,6 +12,7 @@ type Transaction = {
   description: string
   amount: number
   transaction_type: string
+  account_id: string
 }
 
 type Event = {
@@ -21,14 +23,38 @@ type Event = {
   event_type: 'meeting' | 'event'
 }
 
-type Props = {
-  totalMembers: number
-  recentTransactions: Transaction[]
-  upcomingEvents: Event[]
+type Account = {
+  id: string
+  account_name: string
+  account_number: string | null
 }
 
-export default function DashboardClient({ totalMembers, recentTransactions, upcomingEvents }: Props) {
+type MemberStats = {
+  paying_members: number
+  total_members: number
+}
+
+type Props = {
+  memberStats: MemberStats
+  recentTransactions: Transaction[]
+  upcomingEvents: Event[]
+  accounts: Account[]
+}
+
+export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts }: Props) {
   const { t } = useI18n()
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
+  const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
+
+  useEffect(() => {
+    // Filter transactions by selected account
+    if (selectedAccountId) {
+      const filtered = recentTransactions.filter(tx => tx.account_id === selectedAccountId)
+      setAccountTransactions(filtered)
+    } else {
+      setAccountTransactions(recentTransactions)
+    }
+  }, [selectedAccountId, recentTransactions])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -44,6 +70,12 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  // Calculate pie chart percentages
+  const payingPercentage = memberStats.total_members > 0 
+    ? Math.round((memberStats.paying_members / memberStats.total_members) * 100)
+    : 0
+  const nonPayingPercentage = 100 - payingPercentage
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">{t("dashboard")}</h1>
@@ -51,20 +83,73 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Total Members Card */}
+        {/* Members Pie Chart Card */}
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconUsers className="size-6 text-primary" />
               </div>
-              <h2 className="text-lg font-semibold">{t("totalMembers")}</h2>
+              <h2 className="text-lg font-semibold">Members</h2>
             </div>
           </div>
-          <div className="text-4xl font-bold text-primary">{totalMembers}</div>
+          
+          {/* Pie Chart */}
+          <div className="flex items-center justify-center mb-4">
+            <div className="relative size-40">
+              <svg className="size-full -rotate-90" viewBox="0 0 36 36">
+                {/* Background circle */}
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="16"
+                  fill="none"
+                  className="stroke-muted"
+                  strokeWidth="3"
+                />
+                {/* Paying members segment (green) */}
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="16"
+                  fill="none"
+                  className="stroke-green-500"
+                  strokeWidth="3"
+                  strokeDasharray={`${payingPercentage} ${nonPayingPercentage}`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              {/* Center text */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="text-2xl font-bold">{memberStats.total_members}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-green-500"></div>
+                <span>Paying Members</span>
+              </div>
+              <span className="font-semibold">{memberStats.paying_members}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-muted"></div>
+                <span>Total Members</span>
+              </div>
+              <span className="font-semibold">{memberStats.total_members}</span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              {payingPercentage}% paying (including household members)
+            </div>
+          </div>
         </div>
 
-        {/* Recent Transactions Card */}
+        {/* Recent Transactions Card with Account Switcher */}
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -77,11 +162,31 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
               {t("viewAll")}
             </Link>
           </div>
+
+          {/* Account Tabs */}
+          {accounts.length > 0 && (
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
+              {accounts.map((acc) => (
+                <button
+                  key={acc.id}
+                  onClick={() => setSelectedAccountId(acc.id)}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                    selectedAccountId === acc.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  {acc.account_name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-3">
-            {recentTransactions.length === 0 ? (
+            {accountTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noTransactions")}</p>
             ) : (
-              recentTransactions.map((tx) => (
+              accountTransactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {tx.transaction_type === 'debit' || tx.amount < 0 ? (
@@ -157,4 +262,3 @@ export default function DashboardClient({ totalMembers, recentTransactions, upco
     </div>
   )
 }
-
