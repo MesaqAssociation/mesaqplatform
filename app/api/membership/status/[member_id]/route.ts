@@ -29,7 +29,12 @@ export async function GET(
     // Await params if it's a Promise (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params
     const memberId = parseInt(resolvedParams.member_id)
-    const monthlyFee = parseFloat(process.env.MONTHLY_FEE || '50.00')
+    
+    // Get monthly fee from system settings
+    const { rows: settingsRows } = await pool.query(`
+      SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'
+    `)
+    const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
 
     // Get member info
     const { rows: memberRows } = await pool.query(
@@ -64,17 +69,18 @@ export async function GET(
       currentMonth.setMonth(currentMonth.getMonth() + 1)
     }
 
-    // Get actual payments
+    // Get actual payments - SUM all payments per month
     const { rows: payments } = await pool.query(`
       SELECT 
         mp.payment_month,
-        mp.amount,
-        mp.payment_date,
+        SUM(mp.amount) as total_amount,
+        MAX(mp.payment_date) as latest_payment_date,
         mp.status,
-        t.description as transaction_description
+        STRING_AGG(t.description, ', ') as transaction_descriptions
       FROM membership_payments mp
       LEFT JOIN transactions t ON mp.transaction_id = t.id
       WHERE mp.user_id = $1
+      GROUP BY mp.payment_month, mp.status
       ORDER BY mp.payment_month DESC
     `, [member.id])
 
@@ -84,9 +90,9 @@ export async function GET(
       const monthKey = new Date(p.payment_month).toISOString().split('T')[0]
       paymentMap.set(monthKey, {
         paid: true,
-        amount: parseFloat(p.amount),
-        paymentDate: p.payment_date,
-        transactionDescription: p.transaction_description,
+        amount: parseFloat(p.total_amount),
+        paymentDate: p.latest_payment_date,
+        transactionDescription: p.transaction_descriptions,
         status: p.status
       })
     })
