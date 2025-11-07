@@ -40,15 +40,21 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
     
     // Check if status is an amount (starts with $)
     if (payment_status && payment_status.startsWith('$')) {
-      // Check if total paid is less than monthly fee (partial payment = yellow)
-      const isPartialPayment = total_paid && monthly_fee && total_paid < monthly_fee
+      // Determine badge color based on payment amount
+      let badgeColor = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' // Default: fully paid
+      
+      if (total_paid && monthly_fee) {
+        if (total_paid < monthly_fee) {
+          // Partial payment = yellow
+          badgeColor = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+        } else if (total_paid > monthly_fee) {
+          // Overpayment = purple
+          badgeColor = 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+        }
+      }
       
       return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          isPartialPayment
-            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-        }`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
           {payment_status}
         </span>
       )
