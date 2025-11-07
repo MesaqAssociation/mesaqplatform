@@ -8,11 +8,17 @@ Automatic categorization of transactions by matching them to members using phone
 ### Matching Priority
 
 1. **Phone Number Matching (Highest Priority)**
-   - Searches transaction description for 10-digit phone numbers starting with `04`
-   - Pattern: `/\b(04\d{8})\b/g`
+   - Searches transaction description for any 10-digit phone numbers
+   - Supports multiple formats:
+     - No spaces: `0412345678`
+     - With spaces: `04 1234 5678`
+     - With dashes: `04-1234-5678`
+     - Any format: `1234567890`
+   - Pattern: `/\b(\d[\d\s\-]{8,}\d)\b/g`
+   - Cleans phone number (removes spaces/dashes) before matching
    - Matches against `users.phone` field
    - Confidence: **High**
-   - Example: "Payment from 0412345678" → Matches member with phone 0412345678
+   - Example: "Payment from 04 1234 5678" → Matches member with phone 0412345678
 
 2. **Banking Name Matching (Second Priority)**
    - **Exact Match**: Banking name appears in transaction name
@@ -107,7 +113,7 @@ Category is displayed with the same badge styling:
 
 ## Matching Examples
 
-### Example 1: Phone Number Match
+### Example 1: Phone Number Match (No Spaces)
 ```
 Transaction Name: "Fast Transfer From Unknown"
 Description: "Payment 0412345678"
@@ -115,6 +121,28 @@ Result: ✅ Matched to member with phone 0412345678
 Category: "John Smith"
 Match Type: phone
 Confidence: high
+```
+
+### Example 1b: Phone Number Match (With Spaces)
+```
+Transaction Name: "Fast Transfer From Unknown"
+Description: "Payment 04 1234 5678"
+Result: ✅ Matched to member with phone 0412345678
+Category: "John Smith"
+Match Type: phone
+Confidence: high
+Note: Spaces are automatically removed before matching
+```
+
+### Example 1c: Phone Number Match (With Dashes)
+```
+Transaction Name: "Fast Transfer From Unknown"
+Description: "Payment 04-1234-5678"
+Result: ✅ Matched to member with phone 0412345678
+Category: "John Smith"
+Match Type: phone
+Confidence: high
+Note: Dashes are automatically removed before matching
 ```
 
 ### Example 2: Banking Name Match (Exact)

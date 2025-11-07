@@ -21,24 +21,32 @@ export async function matchTransactionToMember(
   description: string
 ): Promise<MemberMatch | null> {
   
-  // Step 1: Check description for phone number (10 digits starting with 04)
-  const phonePattern = /\b(04\d{8})\b/g
+  // Step 1: Check description for phone number
+  // Look for any sequence of 10 digits (with or without spaces/dashes)
+  // Examples: 0412345678, 04 1234 5678, 04-1234-5678, 1234567890
+  const phonePattern = /\b(\d[\d\s\-]{8,}\d)\b/g
   const phoneMatches = description.match(phonePattern)
   
   if (phoneMatches && phoneMatches.length > 0) {
     // Try each phone number found
-    for (const phone of phoneMatches) {
-      const { rows } = await pool.query(
-        `SELECT id, name FROM users WHERE phone = $1 LIMIT 1`,
-        [phone]
-      )
+    for (const rawPhone of phoneMatches) {
+      // Clean the phone number (remove spaces and dashes)
+      const cleanPhone = rawPhone.replace(/[\s\-]/g, '')
       
-      if (rows.length > 0) {
-        return {
-          memberId: rows[0].id,
-          memberName: rows[0].name,
-          matchType: 'phone',
-          confidence: 'high'
+      // Only consider if it's 10 digits
+      if (cleanPhone.length === 10) {
+        const { rows } = await pool.query(
+          `SELECT id, name FROM users WHERE phone = $1 LIMIT 1`,
+          [cleanPhone]
+        )
+        
+        if (rows.length > 0) {
+          return {
+            memberId: rows[0].id,
+            memberName: rows[0].name,
+            matchType: 'phone',
+            confidence: 'high'
+          }
         }
       }
     }
@@ -117,18 +125,25 @@ export async function batchMatchTransactions(
   // Match each transaction
   return transactions.map(txn => {
     // Step 1: Check for phone number
-    const phonePattern = /\b(04\d{8})\b/g
+    // Look for any sequence of 10 digits (with or without spaces/dashes)
+    const phonePattern = /\b(\d[\d\s\-]{8,}\d)\b/g
     const phoneMatches = txn.description.match(phonePattern)
     
     if (phoneMatches) {
-      for (const phone of phoneMatches) {
-        const member = phoneMap.get(phone)
-        if (member) {
-          return {
-            memberId: member.id,
-            memberName: member.name,
-            matchType: 'phone' as const,
-            confidence: 'high' as const
+      for (const rawPhone of phoneMatches) {
+        // Clean the phone number (remove spaces and dashes)
+        const cleanPhone = rawPhone.replace(/[\s\-]/g, '')
+        
+        // Only consider if it's 10 digits
+        if (cleanPhone.length === 10) {
+          const member = phoneMap.get(cleanPhone)
+          if (member) {
+            return {
+              memberId: member.id,
+              memberName: member.name,
+              matchType: 'phone' as const,
+              confidence: 'high' as const
+            }
           }
         }
       }
