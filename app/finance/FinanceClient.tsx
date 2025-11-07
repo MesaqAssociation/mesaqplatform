@@ -21,6 +21,7 @@ type Transaction = {
   transaction_date: string
   transaction_name: string
   description: string
+  category: string
   amount: number
   transaction_type: string
   reference: string | null
@@ -408,13 +409,14 @@ export default function FinanceClient({
                   <th className="text-left py-3 px-2">Date</th>
                   <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
+                  <th className="text-left py-3 px-2">Category</th>
                   <th className="text-right py-3 px-2">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
                       No transactions yet
                     </td>
                   </tr>
@@ -438,6 +440,15 @@ export default function FinanceClient({
                         <p className="text-sm text-muted-foreground truncate max-w-xs">
                           {txn.description || '-'}
                         </p>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          txn.category === 'Misc' 
+                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' 
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                        }`}>
+                          {txn.category}
+                        </span>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         txn.transaction_type === 'credit' 
@@ -523,6 +534,17 @@ export default function FinanceClient({
                   <p className="font-medium">{selectedTransaction.description}</p>
                 </div>
               )}
+
+              <div>
+                <Label className="text-muted-foreground text-xs">Category</Label>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  selectedTransaction.category === 'Misc' 
+                    ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' 
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                }`}>
+                  {selectedTransaction.category}
+                </span>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

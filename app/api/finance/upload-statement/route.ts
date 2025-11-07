@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { parseBankStatementPDF } from '@/lib/parseBankStatement'
+import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 
 export const runtime = 'nodejs'
 
@@ -61,14 +62,28 @@ export async function POST(req: NextRequest) {
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
+    // Match transactions to members for categorization
+    console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
+    const memberMatches = await batchMatchTransactions(
+      pool,
+      parsed.transactions.map(txn => ({
+        name: txn.name,
+        description: txn.description
+      }))
+    )
+    
+    console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
+    
     // Insert transactions
     const insertedCount = []
     const failedTransactions: any[] = []
     const skippedTransactions: any[] = []
     
-    console.log(`\n=== Parsed ${parsed.transactions.length} transactions from PDF ===`)
+    console.log(`\n=== Inserting ${parsed.transactions.length} transactions ===`)
     
-    for (const txn of parsed.transactions) {
+    for (let idx = 0; idx < parsed.transactions.length; idx++) {
+      const txn = parsed.transactions[idx]
+      const match = memberMatches[idx]
       // Determine amount and type
       let amount = 0
       let txnType = 'debit'
@@ -126,12 +141,15 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        // Determine category based on member match
+        const category = match ? match.memberName : 'Misc'
+        
         const { rows: inserted } = await pool.query(
           `INSERT INTO transactions 
-           (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference) 
-           VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9)
+           (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category) 
+           VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10)
            ON CONFLICT DO NOTHING
-           RETURNING id, transaction_date, transaction_name, description`,
+           RETURNING id, transaction_date, transaction_name, description, category`,
           [
             accountId,
             txn.date,
@@ -142,6 +160,7 @@ export async function POST(req: NextRequest) {
             txn.balance || runningBalance,
             userId,
             txn.reference,
+            category,
           ]
         )
         if (inserted.length > 0) {

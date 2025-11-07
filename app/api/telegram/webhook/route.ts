@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { parseBankStatementPDF } from '@/lib/parseBankStatement'
+import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 
 export const runtime = 'nodejs'
 
@@ -82,12 +83,23 @@ export async function POST(req: NextRequest) {
         )
         let runningBalance = accountData[0]?.current_balance || 0
 
+        // Match transactions to members for categorization
+        const memberMatches = await batchMatchTransactions(
+          pool,
+          parsed.transactions.map(txn => ({
+            name: txn.name,
+            description: txn.description
+          }))
+        )
+
         // Insert transactions
         const insertedCount = []
         const failedTransactions: any[] = []
         const skippedTransactions: any[] = []
 
-        for (const txn of parsed.transactions) {
+        for (let idx = 0; idx < parsed.transactions.length; idx++) {
+          const txn = parsed.transactions[idx]
+          const match = memberMatches[idx]
           // Determine amount and type
           let amount = 0
           let txnType = 'debit'
@@ -133,12 +145,15 @@ export async function POST(req: NextRequest) {
               continue
             }
 
+            // Determine category based on member match
+            const category = match ? match.memberName : 'Misc'
+            
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
-               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8)
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference, category) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8, $9)
                ON CONFLICT DO NOTHING
-               RETURNING id, transaction_date, transaction_name, description`,
+               RETURNING id, transaction_date, transaction_name, description, category`,
               [
                 accountId,
                 txn.date,
@@ -148,6 +163,7 @@ export async function POST(req: NextRequest) {
                 txnType,
                 txn.balance || runningBalance,
                 txn.reference,
+                category,
               ]
             )
             if (inserted.length > 0) {
