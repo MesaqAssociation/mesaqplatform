@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { matchTransactionsWithAI } from '@/lib/aiPaymentMatcher'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300 // 5 minutes for AI processing
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -210,64 +208,11 @@ export async function POST(req: NextRequest) {
     console.log(`💰 Unmatched transactions (current month): ${unmatchedTransactions.length}`)
 
     // ========================================================================
-    // STEP 5: Use AI to match remaining transactions
+    // STEP 5: AI matching removed (OpenAI API removed)
     // ========================================================================
-    console.log('\n🤖 STEP 5: Using AI to match remaining transactions...')
-    let step5Matches = 0
-    
-    if (unpaidMembers.length > 0 && unmatchedTransactions.length > 0) {
-      console.log('🧠 Calling OpenAI for intelligent matching...')
-      const aiMatches = await matchTransactionsWithAI(
-        unmatchedTransactions,
-        unpaidMembers,
-        monthlyFee
-      )
-      console.log(`🎯 AI found ${aiMatches.length} potential matches`)
-
-      for (const match of aiMatches) {
-        const txn = unmatchedTransactions.find(t => t.id === match.transaction_id)
-        const member = unpaidMembers.find(m => m.id === match.user_id)
-        
-        if (!txn || !member || matchedMemberIds.has(member.id) || matchedTransactionIds.has(txn.id)) {
-          continue
-        }
-
-        const txnDate = new Date(txn.date + 'T00:00:00')
-        const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
-        const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
-
-        try {
-          const { rowCount } = await pool.query(`
-            INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
-            VALUES ($1, $2, $3, $4, $5, 'paid')
-            ON CONFLICT (user_id, payment_month) DO NOTHING
-          `, [member.id, paymentMonthStr, txn.amount, txn.id, txn.date])
-          
-          if (rowCount && rowCount > 0) {
-            matchedMemberIds.add(member.id)
-            matchedTransactionIds.add(txn.id)
-            step5Matches++
-            totalAdded++
-            detectionLog.push({
-              step: 5,
-              method: 'ai',
-              member: member.name,
-              transaction: txn.description,
-              amount: txn.amount,
-              month: paymentMonthStr,
-              confidence: match.confidence,
-              reasoning: match.reasoning,
-              status: 'matched'
-            })
-          }
-        } catch (err) {
-          console.error(`Failed to insert AI match for ${member.name}:`, err)
-        }
-      }
-    } else {
-      console.log('⏭️  Skipping AI matching (no unpaid members or unmatched transactions)')
-    }
-    console.log(`✅ Step 5 complete: ${step5Matches} matches by AI`)
+    console.log('\n⚠️ STEP 5: AI matching disabled (OpenAI removed)')
+    const step5Matches = 0
+    console.log(`✅ Step 5 complete: ${step5Matches} matches by AI (disabled)`)
 
     // ========================================================================
     // STEP 6: Report remaining unpaid members
