@@ -34,8 +34,16 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
     // Don't show badge for N/A (not joined yet)
     if (status === 'N/A') return null
     
+    // Check if status is an amount (starts with $)
+    if (status && status.startsWith('$')) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          {status}
+        </span>
+      )
+    }
+    
     const configs = {
-      'PAID': { bg: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', label: 'PAID' },
       'UNPAID': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'UNPAID' },
       'OVERDUE': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'OVERDUE' },
       'REVIEW': { bg: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', label: 'REVIEW' },

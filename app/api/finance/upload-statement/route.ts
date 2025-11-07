@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { parseBankStatementPDF } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
+import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 
 export const runtime = 'nodejs'
 
@@ -165,6 +166,17 @@ export async function POST(req: NextRequest) {
         )
         if (inserted.length > 0) {
           insertedCount.push(inserted[0])
+          
+          // Auto-detect membership payment if categorized to a member
+          if (category !== 'Misc' && txnType === 'credit') {
+            await autoDetectMembershipPayment(
+              pool,
+              inserted[0].id,
+              category,
+              amount,
+              txn.date
+            )
+          }
         }
       } catch (err: any) {
         const error = err.message || 'Unknown error'

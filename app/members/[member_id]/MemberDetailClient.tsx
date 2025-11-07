@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash } from '@tabler/icons-react'
+import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt } from '@tabler/icons-react'
 import PaymentStatusCard from './PaymentStatusCard'
 import { showToast } from '@/lib/toast'
 
@@ -46,14 +46,28 @@ type Event = {
   address?: string | null
 }
 
+type Transaction = {
+  id: string
+  transaction_date: string
+  transaction_name: string
+  description: string
+  amount: number
+  transaction_type: string
+  category: string
+  balance_after: number | null
+  source: string | null
+}
+
 export default function MemberDetailClient({ 
   member, 
   attendedEvents, 
-  allEvents 
+  allEvents,
+  transactions 
 }: { 
   member: Member
   attendedEvents: Event[]
   allEvents: Event[]
+  transactions: Transaction[]
 }) {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>(attendedEvents || [])
@@ -159,6 +173,13 @@ export default function MemberDetailClient({
       console.error('Date formatting error:', error, date)
       return '-'
     }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+    }).format(Math.abs(amount))
   }
 
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
@@ -281,45 +302,50 @@ export default function MemberDetailClient({
             </CardContent>
           </Card>
 
-          {/* Role Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Role Management</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="role">Change Role</Label>
-                <Select value={currentRole} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Community Member">Community Member</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
-                    <SelectItem value="Public Officer">Public Officer</SelectItem>
-                    <SelectItem value="Finance Officer">Finance Officer</SelectItem>
-                    <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Separator />
-              <div>
-                <Label className="text-red-600">Danger Zone</Label>
-                <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account</p>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="w-full"
-                >
-                  <IconTrash className="mr-2 size-4" />
-                  Delete Member
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Membership Payment Status */}
           <PaymentStatusCard memberId={member.member_id} />
+
+          {/* Member Transactions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconReceipt className="size-5" />
+                Transactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {transactions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No transactions found for this member</p>
+              ) : (
+                <div className="space-y-2">
+                  {transactions.map(txn => (
+                    <div key={txn.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {txn.transaction_type === 'credit' || txn.amount > 0 ? (
+                          <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{txn.transaction_name}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(txn.transaction_date)}</p>
+                          {txn.description && (
+                            <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold ml-2 flex-shrink-0">
+                        <span className={txn.transaction_type === 'credit' || txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                          {txn.transaction_type === 'credit' || txn.amount > 0 ? '+' : '-'}
+                          {formatCurrency(txn.amount)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Events Attended */}
           <Card>
@@ -369,6 +395,50 @@ export default function MemberDetailClient({
                     </div>
                   ))
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Role Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Role Management</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="role">Change Role</Label>
+                <Select value={currentRole} onValueChange={handleRoleChange}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Community Member">Community Member</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Public Officer">Public Officer</SelectItem>
+                    <SelectItem value="Finance Officer">Finance Officer</SelectItem>
+                    <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Danger Zone */}
+          <Card className="border-red-200 dark:border-red-900">
+            <CardHeader>
+              <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account. This action cannot be undone.</p>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="w-full"
+                >
+                  <IconTrash className="mr-2 size-4" />
+                  Delete Member
+                </Button>
               </div>
             </CardContent>
           </Card>

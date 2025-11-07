@@ -62,6 +62,25 @@ export default async function MemberDetailPage({
       'SELECT id, title, event_date, event_type FROM events ORDER BY event_date DESC'
     )
 
+    // Fetch member's transactions (where they are the category)
+    const { rows: transactions } = await pool.query(
+      `SELECT 
+        t.id,
+        to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
+        t.transaction_name,
+        t.description,
+        t.amount,
+        t.transaction_type,
+        t.category,
+        t.balance_after,
+        t.source
+      FROM transactions t
+      WHERE t.category = $1
+      ORDER BY t.transaction_date DESC
+      LIMIT 50`,
+      [member.name]
+    )
+
     // Format dates to strings for client component
     const formattedMember = {
       ...member,
@@ -85,6 +104,7 @@ export default async function MemberDetailPage({
           member={formattedMember} 
           attendedEvents={formattedAttendedEvents}
           allEvents={formattedAllEvents}
+          transactions={transactions}
         />
       </MainLayout>
     )
