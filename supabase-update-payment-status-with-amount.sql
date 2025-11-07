@@ -11,6 +11,16 @@ SELECT
   u.phone as phone_number,
   u.role,
   u.date_joined,
+  -- Get total amount paid
+  COALESCE((
+    SELECT SUM(mp.amount)
+    FROM membership_payments mp
+    WHERE mp.user_id = u.id 
+    AND mp.payment_month = DATE_TRUNC('month', CURRENT_DATE)::DATE
+    AND mp.status = 'paid'
+  ), 0) as total_paid,
+  -- Get monthly fee from settings
+  (SELECT CAST(value AS DECIMAL) FROM system_settings WHERE key = 'monthly_membership_fee') as monthly_fee,
   CASE
     -- Check if payment exists for current month with REVIEW status
     WHEN EXISTS (

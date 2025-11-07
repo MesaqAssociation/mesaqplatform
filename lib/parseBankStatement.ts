@@ -83,6 +83,7 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     
     // Skip empty lines, page markers, and closing balance
     // Also skip technical markers like "#* 17181.39879.1.3 ZZ258R3 0303 SL.R3.S951.D308.O V06.00.37"
+    // Pattern: starts with digits, has multiple dots, contains uppercase letters and numbers
     if (!line || 
         line.startsWith('Statement ') || 
         line.startsWith('Account Number') ||
@@ -92,7 +93,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         line.match(/CLOSING BALANCE/i) ||
         line.match(/Opening balance.*Total/i) ||
         line.match(/Important Information/i) ||
-        line.match(/^\d+\.\d+\.\d+\.\d+\s+[A-Z0-9]+\s+\d+\s+[A-Z0-9.]+/)) {
+        line.match(/^\d+\.\d+\.\d+\.\d+/) ||  // Matches "17181.39880.2.3..."
+        line.match(/^[A-Z0-9]{2,}\s+\d{4}\s+[A-Z]/)) {  // Matches "ZZ258R3 0303 SL..."
       i++
       continue
     }
@@ -124,7 +126,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
             nextLine.startsWith('4326.') ||
             nextLine.startsWith('#*') ||
             nextLine.match(/^Page \d+ of \d+/) ||
-            nextLine.match(/^\d+\.\d+\.\d+\.\d+\s+[A-Z0-9]+\s+\d+\s+[A-Z0-9.]+/)) {
+            nextLine.match(/^\d+\.\d+\.\d+\.\d+/) ||  // Matches "17181.39880.2.3..."
+            nextLine.match(/^[A-Z0-9]{2,}\s+\d{4}\s+[A-Z]/)) {  // Matches "ZZ258R3 0303 SL..."
           break
         }
         

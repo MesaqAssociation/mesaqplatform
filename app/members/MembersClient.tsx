@@ -16,6 +16,8 @@ type Member = {
   role: string | null
   household_members: number | null
   payment_status: string | null
+  total_paid: number | null
+  monthly_fee: number | null
 }
 
 export default function MembersClient({ initial }: { initial: Member[] }) {
@@ -30,15 +32,24 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
     return t('communityMember')
   }
 
-  const getPaymentStatusBadge = (status: string | null) => {
+  const getPaymentStatusBadge = (member: Member) => {
+    const { payment_status, total_paid, monthly_fee } = member
+    
     // Don't show badge for N/A (not joined yet)
-    if (status === 'N/A') return null
+    if (payment_status === 'N/A') return null
     
     // Check if status is an amount (starts with $)
-    if (status && status.startsWith('$')) {
+    if (payment_status && payment_status.startsWith('$')) {
+      // Check if total paid is less than monthly fee (partial payment = yellow)
+      const isPartialPayment = total_paid && monthly_fee && total_paid < monthly_fee
+      
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-          {status}
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          isPartialPayment
+            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+        }`}>
+          {payment_status}
         </span>
       )
     }
@@ -50,7 +61,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
     }
     
     // Default to UNPAID if status is null, empty, or unknown
-    const config = configs[status as keyof typeof configs] || configs.UNPAID
+    const config = configs[payment_status as keyof typeof configs] || configs.UNPAID
     
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg}`}>
@@ -103,7 +114,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 </span>
               </td>
               <td className="py-3 px-2">
-                {getPaymentStatusBadge(m.payment_status)}
+                {getPaymentStatusBadge(m)}
               </td>
             </tr>
           ))}
