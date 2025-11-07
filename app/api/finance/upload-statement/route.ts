@@ -56,10 +56,29 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Determine which account to use
+    let finalAccountId = accountId
+    
+    // If PDF has account number, try to match it to an existing account
+    if (parsed.accountNumber) {
+      console.log(`📋 PDF contains account number: ${parsed.accountNumber}`)
+      const { rows: matchedAccounts } = await pool.query(
+        'SELECT id FROM financial_accounts WHERE account_number = $1',
+        [parsed.accountNumber]
+      )
+      
+      if (matchedAccounts.length > 0) {
+        finalAccountId = matchedAccounts[0].id
+        console.log(`✅ Matched to existing account: ${finalAccountId}`)
+      } else {
+        console.log(`⚠️ No account found with number ${parsed.accountNumber}, using provided account`)
+      }
+    }
+
     // Get current account balance
     const { rows: accounts } = await pool.query(
       'SELECT current_balance FROM financial_accounts WHERE id = $1',
-      [accountId]
+      [finalAccountId]
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
@@ -145,14 +164,14 @@ export async function POST(req: NextRequest) {
         // Determine category based on member match
         const category = match ? match.memberName : 'Misc'
         
-        const { rows: inserted } = await pool.query(
-          `INSERT INTO transactions 
-           (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category) 
-           VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10)
-           ON CONFLICT DO NOTHING
-           RETURNING id, transaction_date, transaction_name, description, category`,
-          [
-            accountId,
+            const { rows: inserted } = await pool.query(
+              `INSERT INTO transactions 
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10)
+               ON CONFLICT DO NOTHING
+               RETURNING id, transaction_date, transaction_name, description, category`,
+              [
+                finalAccountId,
             txn.date,
             txn.name,
             txn.description,
@@ -206,13 +225,13 @@ export async function POST(req: NextRequest) {
     if (parsed.closingBalance !== undefined) {
       await pool.query(
         'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-        [parsed.closingBalance, accountId]
+        [parsed.closingBalance, finalAccountId]
       )
       runningBalance = parsed.closingBalance
     } else {
       await pool.query(
         'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-        [runningBalance, accountId]
+        [runningBalance, finalAccountId]
       )
     }
 

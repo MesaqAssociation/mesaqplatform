@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,12 +8,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash } from '@tabler/icons-react'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
   current_balance: number
   account_name?: string
+  account_number?: string
 }
 
 type Transaction = {
@@ -33,12 +34,23 @@ type Transaction = {
 
 export default function FinanceClient({ 
   account, 
-  initialTransactions 
+  initialTransactions,
+  allAccounts
 }: { 
   account: Account
   initialTransactions: Transaction[]
+  allAccounts: Account[]
 }) {
-  const [balance, setBalance] = useState(account.current_balance)
+  // Account management
+  const [accounts, setAccounts] = useState<Account[]>(allAccounts)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(account.id)
+  const [showAddAccountDialog, setShowAddAccountDialog] = useState(false)
+  const [newAccountName, setNewAccountName] = useState('')
+  const [newAccountNumber, setNewAccountNumber] = useState('')
+  
+  // Current account data
+  const currentAccount = accounts.find(a => a.id === selectedAccountId) || account
+  const [balance, setBalance] = useState(currentAccount.current_balance)
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(balance.toString())
   const [adjustmentReason, setAdjustmentReason] = useState('')
@@ -49,6 +61,94 @@ export default function FinanceClient({
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [showTransactionDialog, setShowTransactionDialog] = useState(false)
+  
+  // Month pagination
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+  
+  // Update balance when account changes
+  useEffect(() => {
+    setBalance(currentAccount.current_balance)
+    setEditValue(currentAccount.current_balance.toString())
+  }, [currentAccount])
+  
+  // Load transactions when account or month changes
+  useEffect(() => {
+    if (selectedAccountId) {
+      loadTransactions()
+    }
+  }, [selectedAccountId, currentMonth])
+  
+  const loadTransactions = async () => {
+    setLoading(true)
+    try {
+      const year = currentMonth.getFullYear()
+      const month = currentMonth.getMonth() + 1
+      const res = await fetch(`/api/finance/transactions?accountId=${selectedAccountId}&year=${year}&month=${month}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTransactions(data.transactions)
+        if (data.balance !== undefined) {
+          setBalance(data.balance)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load transactions', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleAddAccount = async () => {
+    if (!newAccountName.trim() || !newAccountNumber.trim()) {
+      showToast('Please fill in all fields', 'error')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_name: newAccountName,
+          account_number: newAccountNumber,
+        }),
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        showToast('Bank account added successfully!', 'success')
+        setAccounts([...accounts, data.account])
+        setShowAddAccountDialog(false)
+        setNewAccountName('')
+        setNewAccountNumber('')
+      } else {
+        showToast(data.error || 'Failed to add account', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to add account', err)
+      showToast('Failed to add account. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev)
+      if (direction === 'prev') {
+        newDate.setMonth(newDate.getMonth() - 1)
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1)
+      }
+      return newDate
+    })
+  }
+  
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+  }
 
   const handleBalanceClick = () => {
     setIsEditing(true)
@@ -77,11 +177,11 @@ export default function FinanceClient({
     setLoading(true)
     try {
       const newBalance = parseFloat(editValue) || 0
-      const res = await fetch('/api/finance/adjust-balance', {
+        const res = await fetch('/api/finance/adjust-balance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: account.id,
+          accountId: selectedAccountId,
           newBalance,
           reason: adjustmentReason,
         }),
@@ -129,7 +229,7 @@ export default function FinanceClient({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('accountId', account.id || '')
+      formData.append('accountId', selectedAccountId || '')
 
       // Simulate upload progress with detailed steps
       const progressSteps = [
@@ -221,8 +321,9 @@ export default function FinanceClient({
             })
           }
           
+          // Reload transactions instead of page
           setTimeout(() => {
-            window.location.reload()
+            loadTransactions()
           }, data.failed > 0 || data.skipped > 0 ? 8000 : 2000)
         }, 500)
       } else {
@@ -251,14 +352,14 @@ export default function FinanceClient({
       const res = await fetch('/api/finance/clear-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId: account.id }),
+        body: JSON.stringify({ accountId: selectedAccountId }),
       })
 
       if (res.ok) {
         showToast('All transactions cleared successfully!', 'success')
-        setTimeout(() => {
-          window.location.reload()
-        }, 1500)
+        // Instead of reloading, just update state
+        setTransactions([])
+        setBalance(0)
       } else {
         const data = await res.json()
         showToast(`Error: ${data.error}`, 'error')
@@ -318,6 +419,28 @@ export default function FinanceClient({
 
   return (
     <div className="space-y-6">
+      {/* Account Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        {accounts.map((acc) => (
+          <button
+            key={acc.id}
+            onClick={() => setSelectedAccountId(acc.id)}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              selectedAccountId === acc.id
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80'
+            }`}
+          >
+            {acc.account_name}
+            {acc.account_number && (
+              <span className="ml-2 text-xs opacity-70">
+                •••{acc.account_number.slice(-4)}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Bank Balance */}
       <Card>
         <CardContent className="pt-6">
@@ -371,6 +494,28 @@ export default function FinanceClient({
         </Card>
       )}
 
+      {/* Month Pagination */}
+      <div className="flex items-center justify-center gap-4">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => handleMonthChange('prev')}
+        >
+          <IconChevronLeft className="size-4" />
+        </Button>
+        <div className="text-lg font-semibold min-w-[200px] text-center">
+          {formatMonthYear(currentMonth)}
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => handleMonthChange('next')}
+          disabled={currentMonth >= new Date()}
+        >
+          <IconChevronRight className="size-4" />
+        </Button>
+      </div>
+
       {/* Upload Bank Statement */}
       <div className="flex justify-between items-center">
         <Button 
@@ -381,14 +526,24 @@ export default function FinanceClient({
           <IconTrash className="mr-2 size-4" />
           Clear All Transactions
         </Button>
-        <label htmlFor="statement-upload">
-          <Button asChild disabled={loading}>
-            <span>
-              <IconUpload className="mr-2 size-4" />
-              {loading ? 'Uploading...' : 'Upload Bank Statement'}
-            </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowAddAccountDialog(true)}
+            disabled={loading}
+          >
+            <IconPlus className="mr-2 size-4" />
+            Add Bank Account
           </Button>
-        </label>
+          <label htmlFor="statement-upload">
+            <Button asChild disabled={loading}>
+              <span>
+                <IconUpload className="mr-2 size-4" />
+                {loading ? 'Uploading...' : 'Upload Bank Statement'}
+              </span>
+            </Button>
+          </label>
+        </div>
         <input
           id="statement-upload"
           type="file"
@@ -619,6 +774,67 @@ export default function FinanceClient({
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Account Dialog */}
+      <Dialog open={showAddAccountDialog} onOpenChange={setShowAddAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Bank Account</DialogTitle>
+            <DialogDescription>
+              Add a new bank account to track transactions separately
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="account-name">Account Name *</Label>
+              <Input
+                id="account-name"
+                value={newAccountName}
+                onChange={(e) => setNewAccountName(e.target.value)}
+                placeholder="e.g., Main Account, Savings, Business"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="account-number">Account Number (14 digits) *</Label>
+              <Input
+                id="account-number"
+                value={newAccountNumber}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  if (value.length <= 14) {
+                    setNewAccountNumber(value)
+                  }
+                }}
+                placeholder="12345678901234"
+                className="mt-1"
+                maxLength={14}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {newAccountNumber.length}/14 digits
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddAccountDialog(false)
+                  setNewAccountName('')
+                  setNewAccountNumber('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddAccount} 
+                disabled={!newAccountName.trim() || newAccountNumber.length !== 14 || loading}
+              >
+                {loading ? 'Adding...' : 'Add Account'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

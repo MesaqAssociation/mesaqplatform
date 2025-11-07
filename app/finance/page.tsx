@@ -22,11 +22,36 @@ export default async function FinancePage() {
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
-  // Get main account
-  const { rows: accounts } = await pool.query('SELECT * FROM financial_accounts LIMIT 1')
-  const account = accounts[0] || { id: null, current_balance: 0 }
+  // Get all accounts
+  const { rows: accounts } = await pool.query(`
+    SELECT 
+      id,
+      account_name,
+      account_number,
+      current_balance,
+      currency,
+      created_at
+    FROM financial_accounts 
+    ORDER BY created_at ASC
+  `)
 
-  // Get recent transactions with explicit date formatting
+  // If no accounts exist, create a default one
+  if (accounts.length === 0) {
+    const { rows: newAccount } = await pool.query(`
+      INSERT INTO financial_accounts (account_name, current_balance)
+      VALUES ('Main Account', 0.00)
+      RETURNING id, account_name, account_number, current_balance, currency, created_at
+    `)
+    accounts.push(newAccount[0])
+  }
+
+  const firstAccount = accounts[0]
+
+  // Get current month transactions for first account
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  
   const { rows: transactions } = await pool.query(`
     SELECT 
       t.id,
@@ -45,15 +70,20 @@ export default async function FinancePage() {
       u.name as creator_name 
     FROM transactions t 
     LEFT JOIN users u ON t.created_by = u.id 
-    WHERE t.account_id = $1 OR t.account_id IS NULL
-    ORDER BY t.transaction_date DESC, t.created_at DESC 
-    LIMIT 200
-  `, [account.id])
+    WHERE t.account_id = $1 
+      AND EXTRACT(YEAR FROM t.transaction_date) = $2
+      AND EXTRACT(MONTH FROM t.transaction_date) = $3
+    ORDER BY t.transaction_date DESC, t.created_at DESC
+  `, [firstAccount.id, year, month])
 
   return (
     <MainLayout user={user}>
       <div className="p-6">
-        <FinanceClient account={account} initialTransactions={transactions} />
+        <FinanceClient 
+          account={firstAccount} 
+          initialTransactions={transactions}
+          allAccounts={accounts}
+        />
       </div>
     </MainLayout>
   )
