@@ -38,20 +38,16 @@ async function testCategorization() {
         description: 'Random payment'
       },
       {
-        name: 'Transfer with phone (no spaces)',
+        name: 'Transfer with custom identifier',
+        description: 'Payment from hdj3'
+      },
+      {
+        name: 'Transfer with another identifier',
+        description: 'Membership fee A01'
+      },
+      {
+        name: 'Transfer with phone number',
         description: 'Payment from 0412345678'
-      },
-      {
-        name: 'Transfer with phone (spaces)',
-        description: 'Payment from 04 1234 5678'
-      },
-      {
-        name: 'Transfer with phone (dashes)',
-        description: 'Payment from 04-1234-5678'
-      },
-      {
-        name: 'Transfer with non-04 phone',
-        description: 'Payment from 1234567890'
       },
     ]
     

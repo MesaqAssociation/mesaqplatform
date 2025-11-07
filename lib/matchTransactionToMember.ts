@@ -21,33 +21,23 @@ export async function matchTransactionToMember(
   description: string
 ): Promise<MemberMatch | null> {
   
-  // Step 1: Check description for phone number
-  // Look for any sequence of 10 digits (with or without spaces/dashes)
-  // Examples: 0412345678, 04 1234 5678, 04-1234-5678, 1234567890
-  const phonePattern = /\b(\d[\d\s\-]{8,}\d)\b/g
-  const phoneMatches = description.match(phonePattern)
+  // Step 1: Check description for phone identifier
+  // Get all members with phone identifiers
+  const { rows: membersWithPhone } = await pool.query(
+    `SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''`
+  )
   
-  if (phoneMatches && phoneMatches.length > 0) {
-    // Try each phone number found
-    for (const rawPhone of phoneMatches) {
-      // Clean the phone number (remove spaces and dashes)
-      const cleanPhone = rawPhone.replace(/[\s\-]/g, '')
-      
-      // Only consider if it's 10 digits
-      if (cleanPhone.length === 10) {
-        const { rows } = await pool.query(
-          `SELECT id, name FROM users WHERE phone = $1 LIMIT 1`,
-          [cleanPhone]
-        )
-        
-        if (rows.length > 0) {
-          return {
-            memberId: rows[0].id,
-            memberName: rows[0].name,
-            matchType: 'phone',
-            confidence: 'high'
-          }
-        }
+  const descriptionLower = description.toLowerCase()
+  
+  // Check if any member's phone identifier appears in the description
+  for (const member of membersWithPhone) {
+    const phoneIdentifier = member.phone.toLowerCase()
+    if (descriptionLower.includes(phoneIdentifier)) {
+      return {
+        memberId: member.id,
+        memberName: member.name,
+        matchType: 'phone',
+        confidence: 'high'
       }
     }
   }
@@ -124,27 +114,18 @@ export async function batchMatchTransactions(
   
   // Match each transaction
   return transactions.map(txn => {
-    // Step 1: Check for phone number
-    // Look for any sequence of 10 digits (with or without spaces/dashes)
-    const phonePattern = /\b(\d[\d\s\-]{8,}\d)\b/g
-    const phoneMatches = txn.description.match(phonePattern)
+    // Step 1: Check for phone identifier in description
+    const descriptionLower = txn.description.toLowerCase()
     
-    if (phoneMatches) {
-      for (const rawPhone of phoneMatches) {
-        // Clean the phone number (remove spaces and dashes)
-        const cleanPhone = rawPhone.replace(/[\s\-]/g, '')
-        
-        // Only consider if it's 10 digits
-        if (cleanPhone.length === 10) {
-          const member = phoneMap.get(cleanPhone)
-          if (member) {
-            return {
-              memberId: member.id,
-              memberName: member.name,
-              matchType: 'phone' as const,
-              confidence: 'high' as const
-            }
-          }
+    // Check if any member's phone identifier appears in the description
+    for (const [phone, member] of phoneMap.entries()) {
+      const phoneIdentifier = phone.toLowerCase()
+      if (descriptionLower.includes(phoneIdentifier)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'phone' as const,
+          confidence: 'high' as const
         }
       }
     }

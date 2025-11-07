@@ -7,18 +7,20 @@ Automatic categorization of transactions by matching them to members using phone
 
 ### Matching Priority
 
-1. **Phone Number Matching (Highest Priority)**
-   - Searches transaction description for any 10-digit phone numbers
-   - Supports multiple formats:
-     - No spaces: `0412345678`
-     - With spaces: `04 1234 5678`
-     - With dashes: `04-1234-5678`
-     - Any format: `1234567890`
-   - Pattern: `/\b(\d[\d\s\-]{8,}\d)\b/g`
-   - Cleans phone number (removes spaces/dashes) before matching
-   - Matches against `users.phone` field
+1. **Phone Identifier Matching (Highest Priority)**
+   - Searches transaction description for ANY string stored in `users.phone` field
+   - The phone field can contain:
+     - Phone numbers: `0412345678`
+     - Custom identifiers: `hdj3`, `A01`, `member123`
+     - Any unique string: `john_smith`, `payment_id_456`
+   - Case-insensitive matching
+   - Simple substring search in description
+   - Matches against `users.phone` field (any value)
    - Confidence: **High**
-   - Example: "Payment from 04 1234 5678" → Matches member with phone 0412345678
+   - Examples:
+     - Phone in DB: `hdj3` → Description: "Payment from hdj3" ✅
+     - Phone in DB: `A01` → Description: "Membership fee A01" ✅
+     - Phone in DB: `0412345678` → Description: "Transfer 0412345678" ✅
 
 2. **Banking Name Matching (Second Priority)**
    - **Exact Match**: Banking name appears in transaction name
@@ -113,36 +115,37 @@ Category is displayed with the same badge styling:
 
 ## Matching Examples
 
-### Example 1: Phone Number Match (No Spaces)
+### Example 1: Custom Identifier Match
 ```
+Member in DB: phone = "hdj3"
 Transaction Name: "Fast Transfer From Unknown"
+Description: "Payment from hdj3"
+Result: ✅ Matched to member with phone identifier "hdj3"
+Category: "John Smith"
+Match Type: phone
+Confidence: high
+```
+
+### Example 1b: Membership Code Match
+```
+Member in DB: phone = "A01"
+Transaction Name: "Transfer"
+Description: "Membership fee A01"
+Result: ✅ Matched to member with phone identifier "A01"
+Category: "Jane Doe"
+Match Type: phone
+Confidence: high
+```
+
+### Example 1c: Phone Number Match
+```
+Member in DB: phone = "0412345678"
+Transaction Name: "Fast Transfer"
 Description: "Payment 0412345678"
-Result: ✅ Matched to member with phone 0412345678
-Category: "John Smith"
+Result: ✅ Matched to member with phone identifier "0412345678"
+Category: "Bob Wilson"
 Match Type: phone
 Confidence: high
-```
-
-### Example 1b: Phone Number Match (With Spaces)
-```
-Transaction Name: "Fast Transfer From Unknown"
-Description: "Payment 04 1234 5678"
-Result: ✅ Matched to member with phone 0412345678
-Category: "John Smith"
-Match Type: phone
-Confidence: high
-Note: Spaces are automatically removed before matching
-```
-
-### Example 1c: Phone Number Match (With Dashes)
-```
-Transaction Name: "Fast Transfer From Unknown"
-Description: "Payment 04-1234-5678"
-Result: ✅ Matched to member with phone 0412345678
-Category: "John Smith"
-Match Type: phone
-Confidence: high
-Note: Dashes are automatically removed before matching
 ```
 
 ### Example 2: Banking Name Match (Exact)
@@ -307,11 +310,11 @@ This will:
 
 ### Transaction Not Matching
 
-**Check Phone Number:**
-- Must be exactly 10 digits
-- Must start with 04
-- Must be in description field
-- Member must have phone number set
+**Check Phone Identifier:**
+- Can be ANY string value (not just numbers)
+- Must appear in description field (case-insensitive)
+- Member must have phone field set in database
+- Examples: "hdj3", "A01", "0412345678", "member_123"
 
 **Check Banking Name:**
 - Must be set in member profile
