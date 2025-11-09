@@ -1,8 +1,10 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function CreateMemberLoading() {
   return (
-    <div className="p-6">
+    <MainLayout user={null}>
+      <div className="p-6">
       <Skeleton className="h-8 w-48 mb-6" />
       
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl">
@@ -20,6 +22,7 @@ export default function CreateMemberLoading() {
         </div>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

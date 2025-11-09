@@ -1,9 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconUsers, IconCash, IconCalendarEvent } from '@tabler/icons-react'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function DashboardLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Dashboard</h1>
       
       {/* Statistics Cards */}
@@ -87,6 +89,7 @@ export default function DashboardLoading() {
 
       </div>
     </div>
+    </MainLayout>
   )
 }
 

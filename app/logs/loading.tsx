@@ -1,9 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function LogsLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold mb-4">Activity Logs</h1>
       
       {/* Logs List */}
@@ -25,6 +27,7 @@ export default function LogsLoading() {
         </div>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

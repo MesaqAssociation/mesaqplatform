@@ -1,8 +1,10 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function EventDetailLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <Skeleton className="h-8 w-64 mb-4" />
       
       {/* Event Info Card */}
@@ -32,6 +34,7 @@ export default function EventDetailLoading() {
         </div>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

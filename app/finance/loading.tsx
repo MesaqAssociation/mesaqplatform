@@ -1,10 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { IconArrowUp, IconArrowDown } from '@tabler/icons-react'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function FinanceLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Finance</h1>
         <Button disabled>Upload Statement</Button>
@@ -46,6 +48,7 @@ export default function FinanceLoading() {
         </div>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

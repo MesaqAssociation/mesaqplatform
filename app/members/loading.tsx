@@ -1,9 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function MembersLoading() {
   return (
-    <div className="p-6">
+    <MainLayout user={null}>
+      <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Members</h1>
         <Button disabled>Create New</Button>
@@ -41,6 +43,7 @@ export default function MembersLoading() {
         </table>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

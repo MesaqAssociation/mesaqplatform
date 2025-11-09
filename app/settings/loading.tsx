@@ -1,9 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function SettingsLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold mb-4">Settings</h1>
       
       {/* Settings Sections */}
@@ -20,6 +22,7 @@ export default function SettingsLoading() {
         ))}
       </div>
     </div>
+    </MainLayout>
   )
 }
 

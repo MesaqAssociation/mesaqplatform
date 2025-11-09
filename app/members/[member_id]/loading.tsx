@@ -1,9 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { MainLayout } from '@/components/Sidebar'
 
 export default function MemberDetailLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <MainLayout user={null}>
+      <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold mb-4">Member Details</h1>
       
       {/* Member Info Card */}
@@ -33,6 +35,7 @@ export default function MemberDetailLoading() {
         </div>
       </div>
     </div>
+    </MainLayout>
   )
 }
 

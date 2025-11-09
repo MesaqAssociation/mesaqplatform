@@ -83,14 +83,17 @@ export async function GET(
     })
 
     // Calculate monthly balances
+    // Balance represents credit (+) or debt (-)
+    // Each month: new_balance = old_balance + payment - monthly_fee
     let runningBalance = 0
     const monthlyBalances = months.map(({ month, monthName }) => {
       const startBalance = runningBalance
       const payment = paymentMap.get(month) || 0
       const expected = monthlyFee
       
-      // Balance calculation: start - expected + paid
-      runningBalance = startBalance - expected + payment
+      // Balance calculation: start + payment - expected
+      // Example: start=0, expected=40, paid=90 → end = 0 + 90 - 40 = +50 (credit)
+      runningBalance = startBalance + payment - expected
       
       return {
         month,
