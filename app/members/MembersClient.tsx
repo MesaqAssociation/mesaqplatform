@@ -43,11 +43,14 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
       // Determine badge color based on payment amount
       let badgeColor = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' // Default: fully paid
       
-      if (total_paid && monthly_fee) {
-        if (total_paid < monthly_fee) {
+      if (total_paid != null && monthly_fee != null) {
+        const paidAmount = Number(total_paid)
+        const feeAmount = Number(monthly_fee)
+        
+        if (paidAmount < feeAmount) {
           // Partial payment = yellow
           badgeColor = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-        } else if (total_paid > monthly_fee) {
+        } else if (paidAmount > feeAmount) {
           // Overpayment = purple
           badgeColor = 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
         }

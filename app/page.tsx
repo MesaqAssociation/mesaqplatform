@@ -1,17 +1,38 @@
 "use client"
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  // Check if user is already logged in
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/check', { method: 'GET' })
+        if (res.ok) {
+          // User is already logged in, redirect to dashboard
+          router.push('/dashboard')
+        }
+      } catch (err) {
+        // User is not logged in, proceed with login page
+      } finally {
+        setChecking(false)
+      }
+    }
+    checkAuth()
+  }, [router])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -27,12 +48,23 @@ export default function LoginPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Invalid credentials')
       }
-      window.location.href = '/dashboard'
+      router.push('/dashboard')
     } catch (err) {
       setError('Something went wrong')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading while checking authentication
+  if (checking) {
+    return (
+      <main className="min-h-dvh grid place-items-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </div>
+      </main>
+    )
   }
 
   return (

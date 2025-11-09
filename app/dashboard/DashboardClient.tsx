@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useI18n } from '@/components/I18nProvider'
-import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown } from '@tabler/icons-react'
+import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight } from '@tabler/icons-react'
 import Link from 'next/link'
 
 type Transaction = {
@@ -30,7 +30,7 @@ type Account = {
 }
 
 type MemberStats = {
-  paying_members: number
+  families: number
   total_members: number
 }
 
@@ -47,12 +47,12 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
 
   useEffect(() => {
-    // Filter transactions by selected account
+    // Filter transactions by selected account and limit to 3
     if (selectedAccountId) {
-      const filtered = recentTransactions.filter(tx => tx.account_id === selectedAccountId)
+      const filtered = recentTransactions.filter(tx => tx.account_id === selectedAccountId).slice(0, 3)
       setAccountTransactions(filtered)
     } else {
-      setAccountTransactions(recentTransactions)
+      setAccountTransactions(recentTransactions.slice(0, 3))
     }
   }, [selectedAccountId, recentTransactions])
 
@@ -70,11 +70,11 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  // Calculate pie chart percentages
-  const payingPercentage = memberStats.total_members > 0 
-    ? Math.round((memberStats.paying_members / memberStats.total_members) * 100)
+  // Calculate pie chart percentages (families vs total members)
+  const familiesPercentage = memberStats.total_members > 0 
+    ? Math.round((memberStats.families / memberStats.total_members) * 100)
     : 0
-  const nonPayingPercentage = 100 - payingPercentage
+  const householdPercentage = 100 - familiesPercentage
 
   return (
     <div className="p-6 space-y-6">
@@ -84,8 +84,8 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Members Pie Chart Card */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconUsers className="size-6 text-primary" />
@@ -95,7 +95,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           </div>
           
           {/* Pie Chart */}
-          <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center justify-center mb-4 flex-shrink-0">
             <div className="relative size-40">
               <svg className="size-full -rotate-90" viewBox="0 0 36 36">
                 {/* Background circle */}
@@ -107,15 +107,15 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                   className="stroke-muted"
                   strokeWidth="3"
                 />
-                {/* Paying members segment (green) */}
+                {/* Families segment (primary color) */}
                 <circle
                   cx="18"
                   cy="18"
                   r="16"
                   fill="none"
-                  className="stroke-green-500"
+                  className="stroke-primary"
                   strokeWidth="3"
-                  strokeDasharray={`${payingPercentage} ${nonPayingPercentage}`}
+                  strokeDasharray={`${familiesPercentage} ${householdPercentage}`}
                   strokeLinecap="round"
                 />
               </svg>
@@ -128,13 +128,13 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           </div>
 
           {/* Legend */}
-          <div className="space-y-2">
+          <div className="space-y-2 flex-shrink-0">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <div className="size-3 rounded-full bg-green-500"></div>
-                <span>Paying Members</span>
+                <div className="size-3 rounded-full bg-primary"></div>
+                <span>Families</span>
               </div>
-              <span className="font-semibold">{memberStats.paying_members}</span>
+              <span className="font-semibold">{memberStats.families}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
@@ -143,29 +143,23 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
               </div>
               <span className="font-semibold">{memberStats.total_members}</span>
             </div>
-            <div className="text-xs text-muted-foreground mt-2">
-              {payingPercentage}% paying (including household members)
-            </div>
           </div>
         </div>
 
         {/* Recent Transactions Card with Account Switcher */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconCash className="size-6 text-primary" />
               </div>
               <h2 className="text-lg font-semibold">{t("recentTransactions")}</h2>
             </div>
-            <Link href="/finance" className="text-sm text-primary hover:underline">
-              {t("viewAll")}
-            </Link>
           </div>
 
           {/* Account Tabs */}
           {accounts.length > 0 && (
-            <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-2 flex-shrink-0">
               {accounts.map((acc) => (
                 <button
                   key={acc.id}
@@ -182,38 +176,47 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 overflow-y-auto">
             {accountTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noTransactions")}</p>
             ) : (
-              accountTransactions.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {tx.transaction_type === 'debit' || tx.amount < 0 ? (
-                      <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
-                    ) : (
-                      <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{tx.transaction_name}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
+              <>
+                {accountTransactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {tx.transaction_type === 'debit' || tx.amount < 0 ? (
+                        <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
+                      ) : (
+                        <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{tx.transaction_name}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold ml-2 flex-shrink-0">
+                      {tx.transaction_type === 'debit' || tx.amount < 0 ? (
+                        <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
+                      ) : (
+                        <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
+                      )}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold ml-2 flex-shrink-0">
-                    {tx.transaction_type === 'debit' || tx.amount < 0 ? (
-                      <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
-              ))
+                ))}
+                <Link 
+                  href="/finance" 
+                  className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <span>See all</span>
+                  <IconArrowRight className="size-3" />
+                </Link>
+              </>
             )}
           </div>
         </div>
 
         {/* Upcoming Events Card */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
@@ -225,7 +228,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
               {t("viewAll")}
             </Link>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 overflow-y-auto">
             {upcomingEvents.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noUpcomingEvents")}</p>
             ) : (

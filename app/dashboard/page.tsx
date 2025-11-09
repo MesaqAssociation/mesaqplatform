@@ -22,33 +22,23 @@ export default async function DashboardPage() {
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
-  let memberStats = { paying_members: 0, total_members: 0 }
+  let memberStats = { families: 0, total_members: 0 }
   let recentTransactions: any[] = []
   let upcomingEvents: any[] = []
   let accounts: any[] = []
 
   try {
-    // Get member stats: paying members vs total members (with household)
+    // Get member stats: families (total member count) and total members (including household)
     const { rows: stats } = await pool.query(`
       SELECT 
-        COUNT(DISTINCT u.id) as paying_members,
-        COUNT(DISTINCT u.id) + COALESCE(SUM(u.household_members), 0) as total_members
-      FROM users u
-      LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
-      WHERE cps.payment_status IS NOT NULL 
-        AND cps.payment_status != 'UNPAID'
-        AND cps.payment_status != 'N/A'
-    `)
-    
-    const { rows: allMembers } = await pool.query(`
-      SELECT 
-        COUNT(DISTINCT id) + COALESCE(SUM(household_members), 0) as total
+        COUNT(DISTINCT id) as families,
+        COUNT(DISTINCT id) + COALESCE(SUM(household_members), 0) as total_members
       FROM users
     `)
     
     memberStats = {
-      paying_members: stats[0]?.paying_members || 0,
-      total_members: allMembers[0]?.total || 0
+      families: stats[0]?.families || 0,
+      total_members: stats[0]?.total_members || 0
     }
   } catch (error) {
     console.error('Error fetching member stats:', error)
