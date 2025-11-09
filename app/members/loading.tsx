@@ -1,23 +1,24 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 
 export default function MembersLoading() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-10 w-32" />
+        <h1 className="text-2xl font-semibold">Members</h1>
+        <Button disabled>Create New</Button>
       </div>
       
       <div className="overflow-auto">
         <table className="min-w-[800px] w-full text-sm">
           <thead>
             <tr className="text-left">
-              <th className="py-3 px-2"><Skeleton className="h-4 w-16" /></th>
-              <th className="py-3 px-2"><Skeleton className="h-4 w-16" /></th>
-              <th className="py-3 px-2"><Skeleton className="h-4 w-16" /></th>
-              <th className="py-3 px-2"><Skeleton className="h-4 w-24" /></th>
-              <th className="py-3 px-2"><Skeleton className="h-4 w-16" /></th>
-              <th className="py-3 px-2"><Skeleton className="h-4 w-24" /></th>
+              <th className="py-3 px-2">Name</th>
+              <th className="py-3 px-2">Email</th>
+              <th className="py-3 px-2">Phone</th>
+              <th className="py-3 px-2">Household Members</th>
+              <th className="py-3 px-2">Role</th>
+              <th className="py-3 px-2">Payment Status</th>
             </tr>
           </thead>
           <tbody>

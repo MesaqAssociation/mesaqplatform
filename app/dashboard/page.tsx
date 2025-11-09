@@ -28,17 +28,17 @@ export default async function DashboardPage() {
   let accounts: any[] = []
 
   try {
-    // Get member stats: families (total member count) and total members (including household)
+    // Get member stats: families (total member count) and total members (sum of each member + their household)
     const { rows: stats } = await pool.query(`
       SELECT 
-        COUNT(DISTINCT id) as families,
-        COUNT(DISTINCT id) + COALESCE(SUM(household_members), 0) as total_members
+        COUNT(*) as families,
+        SUM(1 + COALESCE(household_members, 0)) as total_members
       FROM users
     `)
     
     memberStats = {
-      families: stats[0]?.families || 0,
-      total_members: stats[0]?.total_members || 0
+      families: parseInt(stats[0]?.families) || 0,
+      total_members: parseInt(stats[0]?.total_members) || 0
     }
   } catch (error) {
     console.error('Error fetching member stats:', error)

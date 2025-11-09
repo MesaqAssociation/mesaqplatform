@@ -84,8 +84,8 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Members Pie Chart Card */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconUsers className="size-6 text-primary" />
@@ -95,7 +95,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           </div>
           
           {/* Pie Chart */}
-          <div className="flex items-center justify-center mb-4 flex-shrink-0">
+          <div className="flex items-center justify-center mb-4">
             <div className="relative size-40">
               <svg className="size-full -rotate-90" viewBox="0 0 36 36">
                 {/* Background circle */}
@@ -119,16 +119,11 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                   strokeLinecap="round"
                 />
               </svg>
-              {/* Center text */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-2xl font-bold">{memberStats.total_members}</div>
-                <div className="text-xs text-muted-foreground">Total</div>
-              </div>
             </div>
           </div>
 
           {/* Legend */}
-          <div className="space-y-2 flex-shrink-0">
+          <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <div className="size-3 rounded-full bg-primary"></div>
@@ -147,8 +142,8 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
 
         {/* Recent Transactions Card with Account Switcher */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconCash className="size-6 text-primary" />
@@ -159,7 +154,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
 
           {/* Account Tabs */}
           {accounts.length > 0 && (
-            <div className="flex gap-1 mb-4 overflow-x-auto pb-2 flex-shrink-0">
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
               {accounts.map((acc) => (
                 <button
                   key={acc.id}
@@ -176,7 +171,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
             </div>
           )}
 
-          <div className="space-y-3 flex-1 overflow-y-auto">
+          <div className="space-y-3">
             {accountTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noTransactions")}</p>
             ) : (
@@ -216,7 +211,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
 
         {/* Upcoming Events Card */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm flex flex-col h-[480px]">
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
@@ -228,7 +223,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
               {t("viewAll")}
             </Link>
           </div>
-          <div className="space-y-3 flex-1 overflow-y-auto">
+          <div className="space-y-3">
             {upcomingEvents.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noUpcomingEvents")}</p>
             ) : (

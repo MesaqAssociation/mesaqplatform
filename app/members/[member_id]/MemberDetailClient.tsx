@@ -18,9 +18,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt } from '@tabler/icons-react'
-import PaymentStatusCard from './PaymentStatusCard'
+import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown } from '@tabler/icons-react'
+import BalanceCard from './BalanceCard'
 import { showToast } from '@/lib/toast'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 type Member = {
   id: string
@@ -76,6 +77,26 @@ export default function MemberDetailClient({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [openTransactionMonth, setOpenTransactionMonth] = useState<string | null>(null)
+
+  // Group transactions by month
+  const transactionsByMonth = transactions.reduce((acc, txn) => {
+    const date = new Date(txn.transaction_date + 'T00:00:00')
+    const monthKey = date.toISOString().slice(0, 7) // YYYY-MM format
+    const monthName = date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = {
+        monthName,
+        transactions: []
+      }
+    }
+    acc[monthKey].transactions.push(txn)
+    return acc
+  }, {} as Record<string, { monthName: string, transactions: Transaction[] }>)
+
+  // Sort months in descending order (most recent first)
+  const sortedMonths = Object.keys(transactionsByMonth).sort((a, b) => b.localeCompare(a))
 
   async function addEvent(eventId: string) {
     setLoading(true)
@@ -310,8 +331,8 @@ export default function MemberDetailClient({
             </CardContent>
           </Card>
 
-          {/* Membership Payment Status */}
-          <PaymentStatusCard memberId={member.member_id} />
+          {/* Balance */}
+          <BalanceCard memberId={member.member_id} />
 
           {/* Member Transactions */}
           <Card>
@@ -326,30 +347,56 @@ export default function MemberDetailClient({
                 <p className="text-sm text-muted-foreground text-center py-8">No transactions found for this member</p>
               ) : (
                 <div className="space-y-2">
-                  {transactions.map(txn => (
-                    <div key={txn.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {txn.transaction_type === 'credit' || txn.amount > 0 ? (
-                          <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{txn.transaction_name}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(txn.transaction_date)}</p>
-                          {txn.description && (
-                            <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-sm font-semibold ml-2 flex-shrink-0">
-                        <span className={txn.transaction_type === 'credit' || txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                          {txn.transaction_type === 'credit' || txn.amount > 0 ? '+' : '-'}
-                          {formatCurrency(txn.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                  {sortedMonths.map(monthKey => {
+                    const monthData = transactionsByMonth[monthKey]
+                    return (
+                      <Collapsible
+                        key={monthKey}
+                        open={openTransactionMonth === monthKey}
+                        onOpenChange={(open) => setOpenTransactionMonth(open ? monthKey : null)}
+                      >
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between p-3 rounded-md border hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <IconChevronDown className={`size-4 transition-transform ${openTransactionMonth === monthKey ? 'rotate-180' : ''}`} />
+                              <span className="font-medium">{monthData.monthName}</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {monthData.transactions.length} transaction{monthData.transactions.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="mt-2 space-y-2">
+                            {monthData.transactions.map(txn => (
+                              <div key={txn.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors ml-6">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  {txn.transaction_type === 'credit' || txn.amount > 0 ? (
+                                    <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
+                                  ) : (
+                                    <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium truncate">{txn.transaction_name}</p>
+                                    <p className="text-xs text-muted-foreground">{formatDate(txn.transaction_date)}</p>
+                                    {txn.description && (
+                                      <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-sm font-semibold ml-2 flex-shrink-0">
+                                  <span className={txn.transaction_type === 'credit' || txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                    {txn.transaction_type === 'credit' || txn.amount > 0 ? '+' : '-'}
+                                    {formatCurrency(txn.amount)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

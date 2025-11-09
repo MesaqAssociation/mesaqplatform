@@ -1,14 +1,15 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
 
 export default function LogsLoading() {
   return (
     <div className="p-6 space-y-6">
-      <Skeleton className="h-8 w-32 mb-4" />
+      <h1 className="text-2xl font-semibold mb-4">Activity Logs</h1>
       
       {/* Logs List */}
       <div className="bg-card border border-border rounded-lg">
         <div className="p-4 border-b">
-          <Skeleton className="h-10 w-full" />
+          <Input placeholder="Search logs..." disabled className="opacity-50" />
         </div>
         <div className="divide-y">
           {[...Array(12)].map((_, i) => (
