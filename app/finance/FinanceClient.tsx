@@ -577,7 +577,11 @@ export default function FinanceClient({
         setMemberSearchQuery('')
         setMemberSearchResults([])
       } else {
-        showToast(data.error || 'Failed to match member', 'error')
+        const errorMessage = data.details 
+          ? `${data.error}: ${data.details}` 
+          : data.error || 'Failed to match member'
+        showToast(errorMessage, 'error')
+        console.error('API Error:', data)
       }
     } catch (err) {
       console.error('Failed to match member', err)
@@ -825,7 +829,7 @@ export default function FinanceClient({
                         </p>
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
-                        {txn.category === 'Misc' ? (
+                        {txn.category === 'Misc' || txn.matched_member_id ? (
                           <Popover 
                             open={openPopoverId === txn.id} 
                             onOpenChange={(open) => {
@@ -842,14 +846,14 @@ export default function FinanceClient({
                           >
                             <PopoverTrigger asChild>
                               <button
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 ${
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 cursor-pointer ${
                                   txn.matched_member_id
                                     ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 cursor-pointer'
+                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                                 }`}
                               >
                                 {txn.matched_member_name || 'Misc'}
-                                {!txn.matched_member_id && <IconChevronDown className="ml-1 size-3" />}
+                                <IconChevronDown className="ml-1 size-3" />
                               </button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 p-0" align="start">

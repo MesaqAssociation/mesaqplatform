@@ -221,8 +221,21 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const { transactionId, memberId } = body
 
+    console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId)
+
     if (!transactionId) {
       return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400 })
+    }
+
+    // First check if the column exists
+    try {
+      await pool.query('SELECT matched_member_id FROM transactions LIMIT 1')
+    } catch (colErr: any) {
+      console.error('Column check error:', colErr.message)
+      return NextResponse.json({ 
+        error: 'Database schema not updated. Please run the migration: supabase-add-matched-member.sql',
+        details: colErr.message 
+      }, { status: 500 })
     }
 
     // Update transaction with member match
@@ -272,6 +285,8 @@ export async function PATCH(req: NextRequest) {
       [updatedTransaction[0].created_by]
     )
 
+    console.log('Successfully matched transaction:', transactionId, 'to member:', matchedMemberName)
+
     return NextResponse.json({ 
       transaction: {
         ...updatedTransaction[0],
@@ -281,7 +296,11 @@ export async function PATCH(req: NextRequest) {
     })
   } catch (err: any) {
     console.error('Match transaction error:', err)
-    return NextResponse.json({ error: 'Failed to match transaction' }, { status: 500 })
+    console.error('Error details:', err.message, err.code)
+    return NextResponse.json({ 
+      error: 'Failed to match transaction',
+      details: err.message 
+    }, { status: 500 })
   }
 }
 
