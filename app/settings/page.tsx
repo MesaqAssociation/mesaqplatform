@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 import MonthlyFeeSettings from './MonthlyFeeSettings'
+import FineSettings from './FineSettings'
 import { Pool } from 'pg'
 
 export default async function SettingsPage() {
@@ -18,42 +19,81 @@ export default async function SettingsPage() {
   
   const user = await getUserFromToken()
 
-  // Get current monthly fee
+  // Get current settings
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
   let currentFee = '50.00'
+  let finesEnabled = false
+  let fineAmount = '10.00'
+  
   try {
     const { rows } = await pool.query(`
-      SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'
+      SELECT key, value FROM system_settings 
+      WHERE key IN ('monthly_membership_fee', 'late_payment_fines_enabled', 'late_payment_fine_amount')
     `)
-    if (rows[0]) {
-      currentFee = rows[0].value
-    }
+    
+    rows.forEach(row => {
+      if (row.key === 'monthly_membership_fee') {
+        currentFee = row.value
+      } else if (row.key === 'late_payment_fines_enabled') {
+        finesEnabled = row.value === 'true'
+      } else if (row.key === 'late_payment_fine_amount') {
+        fineAmount = row.value
+      }
+    })
   } catch (error) {
-    console.error('Error fetching monthly fee:', error)
+    console.error('Error fetching settings:', error)
   }
   
   return (
     <MainLayout user={user}>
-      <SettingsClient user={user} currentFee={currentFee} />
+      <SettingsClient 
+        user={user} 
+        currentFee={currentFee}
+        finesEnabled={finesEnabled}
+        fineAmount={fineAmount}
+      />
     </MainLayout>
   )
 }
 
-function SettingsClient({ user, currentFee }: { user: any, currentFee: string }) {
+function SettingsClient({ 
+  user, 
+  currentFee,
+  finesEnabled,
+  fineAmount
+}: { 
+  user: any
+  currentFee: string
+  finesEnabled: boolean
+  fineAmount: string
+}) {
+  const isBoard = user?.role === 'board'
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
       
       <div className="max-w-2xl space-y-6">
-        {/* Monthly Fee Settings - Only for Manager */}
-        {user?.role === 'Manager' && (
+        {/* Monthly Fee Settings - Only for Board */}
+        {isBoard && (
           <div className="border rounded-lg p-6">
             <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
             <MonthlyFeeSettings initialFee={currentFee} />
+          </div>
+        )}
+
+        {/* Fine Settings - Only for Board */}
+        {isBoard && (
+          <div className="border rounded-lg p-6">
+            <h2 className="text-lg font-medium mb-4">Late Payment Fines</h2>
+            <FineSettings 
+              initialEnabled={finesEnabled}
+              initialAmount={fineAmount}
+            />
           </div>
         )}
       </div>

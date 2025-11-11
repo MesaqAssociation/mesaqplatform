@@ -10,6 +10,9 @@ export type MemberMatch = {
 /**
  * Match a transaction to a member based on phone number or banking name
  * 
+ * IMPORTANT: This should ONLY be called for CREDIT transactions (money coming in)
+ * Debit transactions (money going out) should NOT be matched to members
+ * 
  * Priority:
  * 1. Phone number in description (10 digits starting with 04)
  * 2. Banking name in transaction name
@@ -18,8 +21,14 @@ export type MemberMatch = {
 export async function matchTransactionToMember(
   pool: Pool,
   transactionName: string,
-  description: string
+  description: string,
+  transactionType?: string // Optional: for validation
 ): Promise<MemberMatch | null> {
+  
+  // Safety check: Don't match debit transactions
+  if (transactionType === 'debit') {
+    return null
+  }
   
   // Step 1: Check description for member_id (integer only, not part of phone numbers)
   const { rows: membersWithId } = await pool.query(
@@ -115,10 +124,12 @@ export async function matchTransactionToMember(
 /**
  * Batch match multiple transactions to members
  * More efficient than calling matchTransactionToMember multiple times
+ * 
+ * IMPORTANT: Only matches CREDIT transactions. Pass transactionType to filter.
  */
 export async function batchMatchTransactions(
   pool: Pool,
-  transactions: Array<{ name: string; description: string }>
+  transactions: Array<{ name: string; description: string; type?: string }>
 ): Promise<Array<MemberMatch | null>> {
   
   // Get all members with member_id, phone numbers and banking names
@@ -151,6 +162,11 @@ export async function batchMatchTransactions(
   
   // Match each transaction
   return transactions.map(txn => {
+    // Safety check: Don't match debit transactions
+    if (txn.type === 'debit') {
+      return null
+    }
+    
     // Step 1: Check for member_id in description (with word boundaries)
     for (const [memberId, member] of memberIdMap.entries()) {
       const regex = new RegExp(`\\b${memberId}\\b`, 'i')

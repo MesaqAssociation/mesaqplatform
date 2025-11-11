@@ -82,13 +82,14 @@ export async function POST(req: NextRequest) {
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
-    // Match transactions to members for categorization
+    // Match transactions to members for categorization (CREDIT ONLY)
     console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
     const memberMatches = await batchMatchTransactions(
       pool,
       parsed.transactions.map(txn => ({
         name: txn.name,
-        description: txn.description
+        description: txn.description,
+        type: txn.type // Pass type to filter out debits
       }))
     )
     
