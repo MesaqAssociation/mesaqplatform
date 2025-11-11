@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
@@ -30,6 +33,17 @@ type Transaction = {
   creator_name: string | null
   created_at: string
   source?: string | null
+  matched_member_id?: string | null
+  matched_member_name?: string | null
+}
+
+type Member = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  member_id?: number
+  banking_name?: string
 }
 
 export default function FinanceClient({ 
@@ -67,6 +81,23 @@ export default function FinanceClient({
   
   // Month pagination
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+  
+  // Add Transaction Dialog
+  const [showAddTransactionDialog, setShowAddTransactionDialog] = useState(false)
+  const [newTransactionDate, setNewTransactionDate] = useState(new Date().toISOString().split('T')[0])
+  const [newTransactionName, setNewTransactionName] = useState('')
+  const [newTransactionDescription, setNewTransactionDescription] = useState('')
+  const [newTransactionAmount, setNewTransactionAmount] = useState('')
+  const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
+  const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
+  const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
+  
+  // Member Search for matching
+  const [matchingTransactionId, setMatchingTransactionId] = useState<string | null>(null)
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [memberSearchResults, setMemberSearchResults] = useState<Member[]>([])
+  const [showMemberSearch, setShowMemberSearch] = useState(false)
+  const [searchingMembers, setSearchingMembers] = useState(false)
   
   // Update balance when account changes
   useEffect(() => {
@@ -419,6 +450,154 @@ export default function FinanceClient({
     setShowTransactionDialog(true)
   }
 
+  // Search members by name, email, or phone
+  const searchMembers = async (query: string) => {
+    if (!query.trim()) {
+      setMemberSearchResults([])
+      return
+    }
+
+    setSearchingMembers(true)
+    try {
+      const res = await fetch(`/api/members?search=${encodeURIComponent(query)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMemberSearchResults(data.members || [])
+      }
+    } catch (err) {
+      console.error('Failed to search members', err)
+    } finally {
+      setSearchingMembers(false)
+    }
+  }
+
+  // Handle member search input change with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (memberSearchQuery) {
+        searchMembers(memberSearchQuery)
+      } else {
+        setMemberSearchResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [memberSearchQuery])
+
+  // Add new transaction
+  const handleAddTransaction = async () => {
+    if (!newTransactionName.trim() || !newTransactionAmount.trim()) {
+      showToast('Please fill in required fields', 'error')
+      return
+    }
+
+    const amount = parseFloat(newTransactionAmount)
+    if (isNaN(amount) || amount <= 0) {
+      showToast('Please enter a valid amount', 'error')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: selectedAccountId,
+          transactionDate: newTransactionDate,
+          transactionName: newTransactionName,
+          description: newTransactionDescription,
+          amount,
+          transactionType: newTransactionType,
+          matchedMemberId: newTransactionMemberId,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast('Transaction added successfully!', 'success')
+        
+        // Add transaction to list if it's in the current month
+        const txnDate = new Date(newTransactionDate)
+        const currentMonthYear = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}`
+        const txnMonthYear = `${txnDate.getFullYear()}-${(txnDate.getMonth() + 1).toString().padStart(2, '0')}`
+        
+        if (currentMonthYear === txnMonthYear) {
+          setTransactions([data.transaction, ...transactions])
+        }
+        
+        // Update balance
+        setBalance(data.transaction.balance_after)
+        
+        // Reset form
+        setShowAddTransactionDialog(false)
+        setNewTransactionDate(new Date().toISOString().split('T')[0])
+        setNewTransactionName('')
+        setNewTransactionDescription('')
+        setNewTransactionAmount('')
+        setNewTransactionType('credit')
+        setNewTransactionMemberId(null)
+        setNewTransactionMemberName('')
+      } else {
+        showToast(data.error || 'Failed to add transaction', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to add transaction', err)
+      showToast('Failed to add transaction. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Match transaction to member
+  const handleMatchMember = async (transactionId: string, memberId: string | null) => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          memberId,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(memberId ? 'Transaction matched to member!' : 'Member match removed', 'success')
+        
+        // Update transaction in list
+        setTransactions(transactions.map(t => 
+          t.id === transactionId ? data.transaction : t
+        ))
+        
+        // Close member search
+        setShowMemberSearch(false)
+        setMatchingTransactionId(null)
+        setMemberSearchQuery('')
+        setMemberSearchResults([])
+      } else {
+        showToast(data.error || 'Failed to match member', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to match member', err)
+      showToast('Failed to match member. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle clicking on Misc category badge
+  const handleMiscClick = (e: React.MouseEvent, transaction: Transaction) => {
+    e.stopPropagation() // Prevent opening transaction details
+    setMatchingTransactionId(transaction.id)
+    setShowMemberSearch(true)
+    setMemberSearchQuery('')
+    setMemberSearchResults([])
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AU', {
       style: 'currency',
@@ -581,6 +760,13 @@ export default function FinanceClient({
         </Button>
         <div className="flex gap-2">
           <Button
+            onClick={() => setShowAddTransactionDialog(true)}
+            disabled={loading}
+          >
+            <IconPlus className="mr-2 size-4" />
+            Add Transaction
+          </Button>
+          <Button
             variant="outline"
             onClick={() => setShowAddAccountDialog(true)}
             disabled={loading}
@@ -650,13 +836,79 @@ export default function FinanceClient({
                         </p>
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          txn.category === 'Misc' 
-                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' 
-                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        }`}>
-                          {txn.category}
-                        </span>
+                        {txn.category === 'Misc' ? (
+                          <Popover open={showMemberSearch && matchingTransactionId === txn.id} onOpenChange={(open) => {
+                            if (!open) {
+                              setShowMemberSearch(false)
+                              setMatchingTransactionId(null)
+                              setMemberSearchQuery('')
+                              setMemberSearchResults([])
+                            }
+                          }}>
+                            <PopoverTrigger asChild>
+                              <button
+                                onClick={(e) => handleMiscClick(e, txn)}
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 ${
+                                  txn.matched_member_id
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 cursor-pointer'
+                                }`}
+                              >
+                                {txn.matched_member_name || 'Misc'}
+                                {!txn.matched_member_id && <IconSearch className="ml-1 size-3" />}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-0" align="start">
+                              <Command>
+                                <CommandInput 
+                                  placeholder="Search member by name, email, or phone..." 
+                                  value={memberSearchQuery}
+                                  onValueChange={setMemberSearchQuery}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    {searchingMembers ? 'Searching...' : 'No members found'}
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {memberSearchResults.map((member) => (
+                                      <CommandItem
+                                        key={member.id}
+                                        onSelect={() => handleMatchMember(txn.id, member.id)}
+                                        className="cursor-pointer"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{member.name}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {member.email} • {member.phone}
+                                          </span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                  {txn.matched_member_id && (
+                                    <CommandGroup>
+                                      <CommandItem
+                                        onSelect={() => handleMatchMember(txn.id, null)}
+                                        className="cursor-pointer text-red-600"
+                                      >
+                                        <IconX className="mr-2 size-4" />
+                                        Remove member match
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  )}
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            txn.matched_member_id
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                          }`}>
+                            {txn.matched_member_name || txn.category}
+                          </span>
+                        )}
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         txn.transaction_type === 'credit' 
@@ -927,6 +1179,175 @@ export default function FinanceClient({
                 disabled={deleteConfirmText !== 'confirm' || loading}
               >
                 {loading ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Transaction Dialog */}
+      <Dialog open={showAddTransactionDialog} onOpenChange={setShowAddTransactionDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogDescription>
+              Manually add a transaction to the account. This is useful for payments not in bank statements.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="txn-date">Date *</Label>
+                <Input
+                  id="txn-date"
+                  type="date"
+                  value={newTransactionDate}
+                  onChange={(e) => setNewTransactionDate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="txn-type">Type *</Label>
+                <Select value={newTransactionType} onValueChange={(value: 'credit' | 'debit') => setNewTransactionType(value)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="credit">Credit (Money In)</SelectItem>
+                    <SelectItem value="debit">Debit (Money Out)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="txn-name">Transaction Name *</Label>
+              <Input
+                id="txn-name"
+                value={newTransactionName}
+                onChange={(e) => setNewTransactionName(e.target.value)}
+                placeholder="e.g., Cash Payment from John"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="txn-description">Description</Label>
+              <Textarea
+                id="txn-description"
+                value={newTransactionDescription}
+                onChange={(e) => setNewTransactionDescription(e.target.value)}
+                placeholder="Optional details about the transaction..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="txn-amount">Amount *</Label>
+              <Input
+                id="txn-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={newTransactionAmount}
+                onChange={(e) => setNewTransactionAmount(e.target.value)}
+                placeholder="0.00"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="txn-member">Match to Member (Optional)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between mt-1"
+                  >
+                    {newTransactionMemberName || "Select member..."}
+                    <IconSearch className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search member..." 
+                      value={memberSearchQuery}
+                      onValueChange={setMemberSearchQuery}
+                    />
+                    <CommandList>
+                      <CommandEmpty>
+                        {searchingMembers ? 'Searching...' : 'No members found'}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {memberSearchResults.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            onSelect={() => {
+                              setNewTransactionMemberId(member.id)
+                              setNewTransactionMemberName(member.name)
+                              setMemberSearchQuery('')
+                              setMemberSearchResults([])
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{member.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {member.email} • {member.phone}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      {newTransactionMemberId && (
+                        <CommandGroup>
+                          <CommandItem
+                            onSelect={() => {
+                              setNewTransactionMemberId(null)
+                              setNewTransactionMemberName('')
+                            }}
+                            className="cursor-pointer text-red-600"
+                          >
+                            <IconX className="mr-2 size-4" />
+                            Clear selection
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {newTransactionMemberName && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {newTransactionMemberName}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddTransactionDialog(false)
+                  setNewTransactionDate(new Date().toISOString().split('T')[0])
+                  setNewTransactionName('')
+                  setNewTransactionDescription('')
+                  setNewTransactionAmount('')
+                  setNewTransactionType('credit')
+                  setNewTransactionMemberId(null)
+                  setNewTransactionMemberName('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddTransaction} 
+                disabled={!newTransactionName.trim() || !newTransactionAmount.trim() || loading}
+              >
+                {loading ? 'Adding...' : 'Add Transaction'}
               </Button>
             </div>
           </div>
