@@ -80,12 +80,24 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
 }
 
 /**
- * Send message to board group chat
+ * Send message to board group chat (or test number in test mode)
  */
 export async function sendBoardNotification(message: string): Promise<boolean> {
+  const testMode = process.env.WHATSAPP_TEST_MODE === 'true'
+  const testNumber = process.env.WHATSAPP_TEST_NUMBER
   const boardGroupId = process.env.WHATSAPP_BOARD_GROUP_ID
 
-  if (!boardGroupId) {
+  // In test mode, send board notifications to test number
+  if (testMode && testNumber) {
+    console.log('🧪 TEST MODE: Sending board notification to test number')
+    return await sendWhatsAppMessage({
+      to: testNumber,
+      body: `[BOARD NOTIFICATION]\n\n${message}`
+    })
+  }
+
+  // Production mode - check if board group exists
+  if (!boardGroupId || boardGroupId.trim() === '') {
     console.warn('Board group ID not configured, skipping board notification')
     return false
   }
