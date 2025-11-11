@@ -11,7 +11,8 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown } from '@tabler/icons-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
@@ -63,6 +64,7 @@ export default function FinanceClient({
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [newAccountName, setNewAccountName] = useState('')
   const [newAccountNumber, setNewAccountNumber] = useState('')
+  const [newAccountIsDonation, setNewAccountIsDonation] = useState(false)
   
   // Current account data
   const currentAccount = accounts.find(a => a.id === selectedAccountId) || account
@@ -150,6 +152,7 @@ export default function FinanceClient({
         body: JSON.stringify({
           account_name: newAccountName,
           account_number: newAccountNumber,
+          is_donation_account: newAccountIsDonation,
         }),
       })
       
@@ -161,6 +164,7 @@ export default function FinanceClient({
         setShowAddAccountDialog(false)
         setNewAccountName('')
         setNewAccountNumber('')
+        setNewAccountIsDonation(false)
       } else {
         showToast(data.error || 'Failed to add account', 'error')
       }
@@ -1134,6 +1138,20 @@ export default function FinanceClient({
                 {newAccountNumber.length}/14 digits
               </p>
             </div>
+            <div className="flex items-center space-x-2 py-2">
+              <Checkbox 
+                id="donation-account"
+                checked={newAccountIsDonation}
+                onCheckedChange={(checked) => setNewAccountIsDonation(checked === true)}
+              />
+              <Label 
+                htmlFor="donation-account" 
+                className="text-sm font-normal cursor-pointer flex items-center gap-2"
+              >
+                <IconGift className="size-4" />
+                This is a donation account (view only, no member matching)
+              </Label>
+            </div>
             <div className="flex gap-2 justify-end">
               <Button 
                 variant="outline" 
@@ -1141,6 +1159,7 @@ export default function FinanceClient({
                   setShowAddAccountDialog(false)
                   setNewAccountName('')
                   setNewAccountNumber('')
+                  setNewAccountIsDonation(false)
                 }}
               >
                 Cancel

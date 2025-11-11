@@ -58,20 +58,31 @@ export async function POST(req: NextRequest) {
 
     // Determine which account to use
     let finalAccountId = accountId
+    let isDonationAccount = false
     
     // If PDF has account number, try to match it to an existing account
     if (parsed.accountNumber) {
       console.log(`📋 PDF contains account number: ${parsed.accountNumber}`)
       const { rows: matchedAccounts } = await pool.query(
-        'SELECT id FROM financial_accounts WHERE account_number = $1',
+        'SELECT id, is_donation_account FROM financial_accounts WHERE account_number = $1',
         [parsed.accountNumber]
       )
       
       if (matchedAccounts.length > 0) {
         finalAccountId = matchedAccounts[0].id
-        console.log(`✅ Matched to existing account: ${finalAccountId}`)
+        isDonationAccount = matchedAccounts[0].is_donation_account || false
+        console.log(`✅ Matched to existing account: ${finalAccountId} (donation: ${isDonationAccount})`)
       } else {
         console.log(`⚠️ No account found with number ${parsed.accountNumber}, using provided account`)
+      }
+    } else {
+      // Check if the provided account is a donation account
+      const { rows: accountCheck } = await pool.query(
+        'SELECT is_donation_account FROM financial_accounts WHERE id = $1',
+        [finalAccountId]
+      )
+      if (accountCheck.length > 0) {
+        isDonationAccount = accountCheck[0].is_donation_account || false
       }
     }
 
@@ -82,18 +93,25 @@ export async function POST(req: NextRequest) {
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
-    // Match transactions to members for categorization (CREDIT ONLY)
-    console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
-    const memberMatches = await batchMatchTransactions(
-      pool,
-      parsed.transactions.map(txn => ({
-        name: txn.name,
-        description: txn.description,
-        type: txn.type // Pass type to filter out debits
-      }))
-    )
+    // Match transactions to members for categorization (CREDIT ONLY) - SKIP FOR DONATION ACCOUNTS
+    let memberMatches: Array<{ memberId: string; memberName: string } | null> = []
     
-    console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
+    if (isDonationAccount) {
+      console.log(`\n⚠️ Donation account detected - skipping member matching`)
+      memberMatches = new Array(parsed.transactions.length).fill(null)
+    } else {
+      console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
+      memberMatches = await batchMatchTransactions(
+        pool,
+        parsed.transactions.map(txn => ({
+          name: txn.name,
+          description: txn.description,
+          type: txn.type // Pass type to filter out debits
+        }))
+      )
+      
+      console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
+    }
     
     // Insert transactions
     const insertedCount = []

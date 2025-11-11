@@ -10,6 +10,13 @@ import {
   generateContinuedReminderMessage,
   generateBoardNotification
 } from '@/lib/whatsapp'
+import { 
+  getAcceleratedDate, 
+  getAcceleratedDayOfMonth,
+  getAcceleratedMonthStart,
+  getAcceleratedPreviousMonthStart,
+  getTestInfo
+} from '@/lib/testTimeAcceleration'
 
 export const runtime = 'nodejs'
 
@@ -42,10 +49,17 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const today = new Date()
-    const dayOfMonth = today.getDate()
+    // Use accelerated time if enabled
+    const today = getAcceleratedDate()
+    const dayOfMonth = getAcceleratedDayOfMonth()
 
-    console.log(`🔔 Running payment reminders check for ${today.toISOString().split('T')[0]}`)
+    // Log test mode info if active
+    const testInfo = getTestInfo()
+    if (testInfo) {
+      console.log(testInfo)
+    }
+
+    console.log(`🔔 Running payment reminders check for ${today.toISOString().split('T')[0]} (Day ${dayOfMonth})`)
 
     let remindersSent = 0
     let errors = 0
@@ -70,11 +84,16 @@ export async function POST(req: NextRequest) {
     } else if (dayOfMonth === 14) {
       // Second reminder
       await handleDayFourteenReminders(today, monthlyFee)
+    } else {
+      console.log(`ℹ️ Not a reminder day (day ${dayOfMonth}). Reminders sent on days 7 and 14.`)
     }
 
     return NextResponse.json({
       success: true,
       date: today.toISOString().split('T')[0],
+      dayOfMonth,
+      testMode: process.env.WHATSAPP_TEST_ACCELERATION === 'true',
+      testInfo: getTestInfo(),
       remindersSent,
       errors
     })

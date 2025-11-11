@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
         account_number,
         current_balance,
         currency,
+        is_donation_account,
         created_at
       FROM financial_accounts
       ORDER BY created_at ASC
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { account_name, account_number } = body
+    const { account_name, account_number, is_donation_account } = body
 
     if (!account_name || !account_number) {
       return NextResponse.json({ error: 'Account name and number are required' }, { status: 400 })
@@ -82,10 +83,10 @@ export async function POST(req: NextRequest) {
 
     // Create new account
     const { rows: newAccount } = await pool.query(
-      `INSERT INTO financial_accounts (account_name, account_number, current_balance)
-       VALUES ($1, $2, 0.00)
-       RETURNING id, account_name, account_number, current_balance, currency, created_at`,
-      [account_name, cleanNumber]
+      `INSERT INTO financial_accounts (account_name, account_number, current_balance, is_donation_account)
+       VALUES ($1, $2, 0.00, $3)
+       RETURNING id, account_name, account_number, current_balance, currency, is_donation_account, created_at`,
+      [account_name, cleanNumber, is_donation_account || false]
     )
 
     return NextResponse.json({ 
