@@ -242,9 +242,9 @@ export async function PATCH(req: NextRequest) {
     const { rows: updatedTransaction } = await pool.query(`
       UPDATE transactions 
       SET 
-        matched_member_id = $1,
+        matched_member_id = $1::text,
         category = CASE 
-          WHEN $1 IS NOT NULL THEN 'Member Payment'
+          WHEN $1::text IS NOT NULL THEN 'Member Payment'
           ELSE 'Misc'
         END
       WHERE id = $2
