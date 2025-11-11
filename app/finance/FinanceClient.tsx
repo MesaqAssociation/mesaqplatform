@@ -105,6 +105,9 @@ export default function FinanceClient({
   const [addTxnMemberResults, setAddTxnMemberResults] = useState<Member[]>([])
   const [addTxnSearching, setAddTxnSearching] = useState(false)
   
+  // Test send messages
+  const [sendingTestMessages, setSendingTestMessages] = useState(false)
+  
   // Update balance when account changes
   useEffect(() => {
     setBalance(currentAccount.current_balance)
@@ -665,6 +668,44 @@ export default function FinanceClient({
     }
   }
 
+  const handleTestSendMessages = async () => {
+    const confirm = window.confirm(
+      `🧪 TEST MODE\n\n` +
+      `This will send WhatsApp reminders as if it's the 7th of next month.\n\n` +
+      `• Messages will be sent to unpaid members\n` +
+      `• In test mode: all go to WHATSAPP_TEST_NUMBER\n` +
+      `• NO DATA will be stored\n` +
+      `• Resets on page refresh\n\n` +
+      `Continue?`
+    )
+
+    if (!confirm) return
+
+    setSendingTestMessages(true)
+    try {
+      const res = await fetch('/api/payment-reminders/test-send', {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(
+          `Test complete! ${data.messagesSent} message(s) sent. No data stored.`,
+          'success'
+        )
+        console.log('Test results:', data)
+      } else {
+        showToast(data.error || 'Failed to send test messages', 'error')
+      }
+    } catch (err) {
+      console.error('Test send error:', err)
+      showToast('Failed to send test messages', 'error')
+    } finally {
+      setSendingTestMessages(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AU', {
       style: 'currency',
@@ -817,14 +858,33 @@ export default function FinanceClient({
 
       {/* Upload Bank Statement */}
       <div className="flex justify-between items-center">
-        <Button 
-          variant="destructive" 
-          onClick={handleClearAll} 
-          disabled={loading || transactions.length === 0}
-        >
-          <IconTrash className="mr-2 size-4" />
-          Clear All Transactions
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="destructive" 
+            onClick={handleClearAll} 
+            disabled={loading || transactions.length === 0}
+          >
+            <IconTrash className="mr-2 size-4" />
+            Clear All Transactions
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleTestSendMessages}
+            disabled={sendingTestMessages}
+            className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
+          >
+            {sendingTestMessages ? (
+              <>
+                <IconUpload className="mr-2 size-4 animate-pulse" />
+                Sending...
+              </>
+            ) : (
+              <>
+                🧪 Test: Send Messages
+              </>
+            )}
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Button
             onClick={() => setShowAddTransactionDialog(true)}
