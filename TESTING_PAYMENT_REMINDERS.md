@@ -21,13 +21,40 @@ WHATSAPP_TEST_NUMBER=+1234567890  # Your test phone number
 WHATSAPP_TEST_ACCELERATION=true
 ```
 
-### 2. Disable Production Cron
+### 2. Cron Configuration
 
-In `vercel.json`, comment out or remove the production cron:
+**Important**: In test mode (1 minute = 1 day), you need the cron to run every minute, not once per day!
+
+#### Option A: Local Testing (Recommended)
+Keep production cron as-is and manually trigger for testing:
+```bash
+# Run manually at the right minutes (7, 14, 37)
+curl -X POST http://localhost:3000/api/payment-reminders/run
+```
+
+#### Option B: Automated Testing on Vercel Preview
+If testing on a Vercel preview deployment, update `vercel.json` to run every minute:
 
 ```json
 {
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/payment-reminders/run",
+      "schedule": "* * * * *"
+    }
+  ]
+}
+```
+
+⚠️ **Remember to change back to daily schedule before production deployment:**
+```json
+{
+  "crons": [
+    {
+      "path": "/api/payment-reminders/run",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }
 ```
 
@@ -65,14 +92,46 @@ In `vercel.json`, comment out or remove the production cron:
    
    Run the trigger command at these intervals to test each stage.
 
-### Option 2: Automated Testing with Local Cron
+### Option 2: Automated Local Testing
 
-Set up a local cron or use a tool like `watch` to run checks every minute:
+Set up a local scheduler to run checks every minute using `watch`:
 
 ```bash
-# Run every minute for 40 minutes
+# Run every 1 minute (60 seconds) for 40 minutes
+# This simulates 40 days in test mode
 watch -n 60 'curl -X POST http://localhost:3000/api/payment-reminders/run'
 ```
+
+Or use a simple bash loop:
+```bash
+#!/bin/bash
+# Run for 40 minutes (40 days in test mode)
+for i in {1..40}; do
+  echo "Minute $i (Day $i)"
+  curl -X POST http://localhost:3000/api/payment-reminders/run
+  sleep 60
+done
+```
+
+### Option 3: Automated Testing on Vercel
+
+If you want fully automated testing on a Vercel preview deployment:
+
+1. **Update vercel.json** for test environment:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/payment-reminders/run",
+      "schedule": "* * * * *"
+    }
+  ]
+}
+```
+
+2. **Deploy to preview** with test mode environment variables
+3. **Wait and monitor** - reminders will trigger automatically every minute
+4. **Check at minutes 7, 14, 37** to see the different reminder stages
 
 ## Test Scenarios
 
@@ -178,13 +237,14 @@ To run the test again:
 
 ⚠️ **IMPORTANT**: Before deploying to production:
 
-1. Remove or set to `false` in production environment:
+1. **Disable test modes** in production environment:
    ```env
    WHATSAPP_TEST_MODE=false
    WHATSAPP_TEST_ACCELERATION=false
+   # Remove TEST_START_TIME if set
    ```
 
-2. Re-enable the production cron in `vercel.json`:
+2. **Restore daily cron schedule** in `vercel.json`:
    ```json
    {
      "crons": [
@@ -195,8 +255,15 @@ To run the test again:
      ]
    }
    ```
+   
+   **Cron schedule explanation:**
+   - Production: `0 12 * * *` = Once daily at 12:00 PM
+   - Test mode: `* * * * *` = Every minute (only use for testing!)
 
-3. Ensure `WHATSAPP_BOARD_GROUP_ID` is set (if using board notifications)
+3. **Set production WhatsApp settings**:
+   ```env
+   WHATSAPP_BOARD_GROUP_ID=your_board_group_id
+   ```
 
 ## Troubleshooting
 

@@ -359,3 +359,71 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
+// DELETE transaction
+export async function DELETE(req: NextRequest) {
+  const auth = await verifyAuth()
+  if (!auth) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(req.url)
+    const transactionId = searchParams.get('id')
+
+    if (!transactionId) {
+      return NextResponse.json({ error: 'Transaction ID required' }, { status: 400 })
+    }
+
+    // Get transaction details before deletion (for balance recalculation)
+    const { rows: txnRows } = await pool.query(
+      'SELECT account_id, amount, transaction_type, matched_member_id FROM transactions WHERE id = $1',
+      [transactionId]
+    )
+
+    if (txnRows.length === 0) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+    }
+
+    const transaction = txnRows[0]
+
+    // Delete associated membership_payments first (if any)
+    if (transaction.matched_member_id) {
+      await pool.query(
+        'DELETE FROM membership_payments WHERE transaction_id = $1',
+        [transactionId]
+      )
+      console.log(`Deleted membership_payment records for transaction ${transactionId}`)
+    }
+
+    // Delete the transaction
+    await pool.query('DELETE FROM transactions WHERE id = $1', [transactionId])
+
+    // Update account balance
+    // Reverse the transaction's effect on balance
+    const balanceAdjustment = transaction.transaction_type === 'credit' 
+      ? -Math.abs(transaction.amount) 
+      : Math.abs(transaction.amount)
+
+    const { rows: accountRows } = await pool.query(
+      `UPDATE financial_accounts 
+       SET current_balance = current_balance + $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING current_balance`,
+      [balanceAdjustment, transaction.account_id]
+    )
+
+    console.log(`Transaction ${transactionId} deleted successfully`)
+
+    return NextResponse.json({ 
+      success: true,
+      newBalance: accountRows[0]?.current_balance
+    })
+  } catch (err: any) {
+    console.error('Delete transaction error:', err)
+    return NextResponse.json({ 
+      error: 'Failed to delete transaction',
+      details: err.message 
+    }, { status: 500 })
+  }
+}
+

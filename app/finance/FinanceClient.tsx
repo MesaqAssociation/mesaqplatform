@@ -624,6 +624,47 @@ export default function FinanceClient({
     }
   }
 
+  const handleDeleteTransaction = async () => {
+    if (!selectedTransaction) return
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete this transaction?\n\n` +
+      `"${selectedTransaction.transaction_name}"\n` +
+      `${formatCurrency(Math.abs(selectedTransaction.amount))}\n\n` +
+      `This will also remove any associated member payment records.`
+    )
+
+    if (!confirmDelete) return
+
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/finance/transactions?id=${selectedTransaction.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast('Transaction deleted successfully', 'success')
+        // Remove from list
+        setTransactions(prev => prev.filter(txn => txn.id !== selectedTransaction.id))
+        // Update balance if provided
+        if (data.newBalance !== undefined) {
+          setBalance(data.newBalance)
+        }
+        setShowTransactionDialog(false)
+        setSelectedTransaction(null)
+      } else {
+        showToast(data.error || 'Failed to delete transaction', 'error')
+      }
+    } catch (err) {
+      console.error('Delete transaction error:', err)
+      showToast('Failed to delete transaction', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AU', {
       style: 'currency',
@@ -1091,8 +1132,21 @@ export default function FinanceClient({
                 </p>
               </div>
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={() => setShowTransactionDialog(false)}>Close</Button>
+              <div className="flex justify-between pt-4 border-t">
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteTransaction}
+                  disabled={loading}
+                >
+                  <IconTrash className="mr-2 size-4" />
+                  Delete Transaction
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowTransactionDialog(false)}
+                >
+                  Close
+                </Button>
               </div>
             </div>
           )}
