@@ -18,17 +18,17 @@ CREATE INDEX IF NOT EXISTS idx_payment_reminders_month ON payment_reminders(paym
 CREATE INDEX IF NOT EXISTS idx_payment_reminders_stage ON payment_reminders(reminder_stage);
 
 -- Add fine settings to system_settings
-INSERT INTO system_settings (key, value, description)
+INSERT INTO system_settings (key, value)
 VALUES 
-  ('late_payment_fines_enabled', 'false', 'Enable fines for late payments'),
-  ('late_payment_fine_amount', '10.00', 'Fine amount for late payments (AUD)')
+  ('late_payment_fines_enabled', 'false'),
+  ('late_payment_fine_amount', '10.00')
 ON CONFLICT (key) DO NOTHING;
 
 -- Add WhatsApp settings
-INSERT INTO system_settings (key, value, description)
+INSERT INTO system_settings (key, value)
 VALUES 
-  ('whatsapp_reminders_enabled', 'true', 'Enable WhatsApp payment reminders'),
-  ('whatsapp_board_group_id', '', 'WhatsApp group ID for board notifications')
+  ('whatsapp_reminders_enabled', 'true'),
+  ('whatsapp_board_group_id', '')
 ON CONFLICT (key) DO NOTHING;
 
 COMMENT ON TABLE payment_reminders IS 'Tracks payment reminder state for members with unpaid fees';

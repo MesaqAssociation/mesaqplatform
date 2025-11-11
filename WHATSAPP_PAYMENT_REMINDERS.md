@@ -126,12 +126,12 @@ Add to `system_settings` table:
 
 ```sql
 -- Enable/disable fines
-INSERT INTO system_settings (key, value, description)
-VALUES ('late_payment_fines_enabled', 'false', 'Enable fines for late payments');
+INSERT INTO system_settings (key, value)
+VALUES ('late_payment_fines_enabled', 'false');
 
 -- Fine amount
-INSERT INTO system_settings (key, value, description)
-VALUES ('late_payment_fine_amount', '10.00', 'Fine amount for late payments (AUD)');
+INSERT INTO system_settings (key, value)
+VALUES ('late_payment_fine_amount', '10.00');
 ```
 
 ## API Endpoints

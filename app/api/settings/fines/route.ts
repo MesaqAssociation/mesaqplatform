@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
 
     // Update settings
     await pool.query(`
-      INSERT INTO system_settings (key, value, description)
+      INSERT INTO system_settings (key, value)
       VALUES 
-        ('late_payment_fines_enabled', $1, 'Enable fines for late payments'),
-        ('late_payment_fine_amount', $2, 'Fine amount for late payments (AUD)')
+        ('late_payment_fines_enabled', $1),
+        ('late_payment_fine_amount', $2)
       ON CONFLICT (key) 
-      DO UPDATE SET value = EXCLUDED.value
+      DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
     `, [enabled.toString(), amount.toFixed(2)])
 
     return NextResponse.json({ 
