@@ -848,7 +848,7 @@ export default function FinanceClient({
                               <button
                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 cursor-pointer ${
                                   txn.matched_member_id
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                                     : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                                 }`}
                               >
@@ -899,11 +899,7 @@ export default function FinanceClient({
                             </PopoverContent>
                           </Popover>
                         ) : (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            txn.matched_member_id
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300`}>
                             {txn.matched_member_name || txn.category}
                           </span>
                         )}
