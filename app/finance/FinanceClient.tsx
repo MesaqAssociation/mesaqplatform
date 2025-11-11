@@ -690,17 +690,28 @@ export default function FinanceClient({
       const data = await res.json()
 
       if (res.ok) {
+        const failedMsg = data.messagesFailed > 0 ? ` (${data.messagesFailed} failed)` : ''
         showToast(
-          `Test complete! ${data.messagesSent} message(s) sent. No data stored.`,
+          `Test complete! ${data.messagesSent} message(s) sent${failedMsg}. No data stored.`,
           'success'
         )
-        console.log('Test results:', data)
+        console.log('📊 Test results:', data)
+        
+        // Show detailed results in console
+        if (data.results && data.results.length > 0) {
+          console.table(data.results)
+        }
       } else {
-        showToast(data.error || 'Failed to send test messages', 'error')
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error
+        showToast(errorMsg || 'Failed to send test messages', 'error')
+        console.error('❌ Test error:', data)
+        if (data.stack) {
+          console.error('Stack trace:', data.stack)
+        }
       }
     } catch (err) {
       console.error('Test send error:', err)
-      showToast('Failed to send test messages', 'error')
+      showToast('Failed to send test messages. Check console for details.', 'error')
     } finally {
       setSendingTestMessages(false)
     }

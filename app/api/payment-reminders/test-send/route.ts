@@ -67,40 +67,58 @@ export async function POST(req: NextRequest) {
       WHERE u.phone IS NOT NULL AND u.phone != ''
     `)
 
+    const monthName = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    
     let messagesSent = 0
+    let messagesFailed = 0
     let memberResults: any[] = []
 
+    console.log(`📊 Found ${members.length} members with phone numbers`)
+
     for (const member of members) {
-      // Check if member has paid for last month
-      const { rows: paymentRows } = await pool.query(`
-        SELECT SUM(amount) as total_paid
-        FROM membership_payments
-        WHERE user_id = $1
-          AND payment_month = $2
-          AND status = 'paid'
-      `, [member.id, lastMonth.toISOString().split('T')[0]])
+      try {
+        // Check if member has paid for last month
+        const { rows: paymentRows } = await pool.query(`
+          SELECT SUM(amount) as total_paid
+          FROM membership_payments
+          WHERE user_id = $1
+            AND payment_month = $2
+            AND status = 'paid'
+        `, [member.id, lastMonth.toISOString().split('T')[0]])
 
-      const totalPaid = parseFloat(paymentRows[0]?.total_paid || '0')
-      const hasPaid = totalPaid >= monthlyFee
+        const totalPaid = parseFloat(paymentRows[0]?.total_paid || '0')
+        const hasPaid = totalPaid >= monthlyFee
 
-      if (!hasPaid) {
-        // Send first reminder
-        const monthName = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        const message = generateFirstReminderMessage(member.name, monthlyFee, monthName)
-        const phone = formatPhoneNumber(member.phone)
+        if (!hasPaid) {
+          // Send first reminder
+          const message = generateFirstReminderMessage(member.name, monthlyFee, monthName)
+          const phone = formatPhoneNumber(member.phone)
 
-        const sent = await sendWhatsAppMessage({ to: phone, body: message })
+          console.log(`📤 Sending test message to ${member.name} (${phone})...`)
+          const sent = await sendWhatsAppMessage({ to: phone, body: message })
 
-        if (sent) {
-          messagesSent++
-          memberResults.push({
-            name: member.name,
-            phone: member.phone,
-            amount: monthlyFee,
-            month: monthName,
-            sent: true
-          })
-          console.log(`✅ TEST: Sent reminder to ${member.name}`)
+          if (sent) {
+            messagesSent++
+            memberResults.push({
+              name: member.name,
+              phone: member.phone,
+              amount: monthlyFee,
+              month: monthName,
+              sent: true
+            })
+            console.log(`✅ TEST: Sent reminder to ${member.name}`)
+          } else {
+            messagesFailed++
+            memberResults.push({
+              name: member.name,
+              phone: member.phone,
+              amount: monthlyFee,
+              month: monthName,
+              sent: false,
+              error: 'Failed to send'
+            })
+            console.log(`❌ TEST: Failed to send to ${member.name}`)
+          }
         } else {
           memberResults.push({
             name: member.name,
@@ -108,41 +126,44 @@ export async function POST(req: NextRequest) {
             amount: monthlyFee,
             month: monthName,
             sent: false,
-            error: 'Failed to send'
+            skipped: true,
+            reason: 'Already paid'
           })
-          console.log(`❌ TEST: Failed to send to ${member.name}`)
+          console.log(`✓ ${member.name} already paid - skipped`)
         }
-      } else {
+      } catch (memberErr: any) {
+        console.error(`Error processing member ${member.name}:`, memberErr)
+        messagesFailed++
         memberResults.push({
           name: member.name,
           phone: member.phone,
-          amount: monthlyFee,
-          month: monthName,
           sent: false,
-          skipped: true,
-          reason: 'Already paid'
+          error: memberErr.message
         })
       }
     }
 
-    console.log(`🧪 TEST COMPLETE: ${messagesSent} messages sent (no data stored)`)
+    console.log(`🧪 TEST COMPLETE: ${messagesSent} messages sent, ${messagesFailed} failed (no data stored)`)
 
     return NextResponse.json({
       success: true,
       testMode: true,
       simulatedDate: nextMonth.toISOString().split('T')[0],
       simulatedDay: 7,
-      checkingMonth: lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      checkingMonth: monthName,
       totalMembers: members.length,
       messagesSent,
+      messagesFailed,
       results: memberResults,
       note: 'This was a test - no data was stored in the database'
     })
   } catch (err: any) {
     console.error('Test send error:', err)
+    console.error('Error stack:', err.stack)
     return NextResponse.json({ 
       error: 'Failed to send test messages',
-      details: err.message 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     }, { status: 500 })
   }
 }
