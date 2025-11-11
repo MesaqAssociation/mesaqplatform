@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
@@ -93,11 +93,10 @@ export default function FinanceClient({
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
   // Member Search for matching
-  const [matchingTransactionId, setMatchingTransactionId] = useState<string | null>(null)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberSearchResults, setMemberSearchResults] = useState<Member[]>([])
-  const [showMemberSearch, setShowMemberSearch] = useState(false)
   const [searchingMembers, setSearchingMembers] = useState(false)
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
   
   // Update balance when account changes
   useEffect(() => {
@@ -573,9 +572,8 @@ export default function FinanceClient({
           t.id === transactionId ? data.transaction : t
         ))
         
-        // Close member search
-        setShowMemberSearch(false)
-        setMatchingTransactionId(null)
+        // Close popover and clear search
+        setOpenPopoverId(null)
         setMemberSearchQuery('')
         setMemberSearchResults([])
       } else {
@@ -587,15 +585,6 @@ export default function FinanceClient({
     } finally {
       setLoading(false)
     }
-  }
-
-  // Handle clicking on Misc category badge
-  const handleMiscClick = (e: React.MouseEvent, transaction: Transaction) => {
-    e.stopPropagation() // Prevent opening transaction details
-    setMatchingTransactionId(transaction.id)
-    setShowMemberSearch(true)
-    setMemberSearchQuery('')
-    setMemberSearchResults([])
   }
 
   const formatCurrency = (amount: number) => {
@@ -835,19 +824,24 @@ export default function FinanceClient({
                           {txn.description || '-'}
                         </p>
                       </td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         {txn.category === 'Misc' ? (
-                          <Popover open={showMemberSearch && matchingTransactionId === txn.id} onOpenChange={(open) => {
-                            if (!open) {
-                              setShowMemberSearch(false)
-                              setMatchingTransactionId(null)
-                              setMemberSearchQuery('')
-                              setMemberSearchResults([])
-                            }
-                          }}>
+                          <Popover 
+                            open={openPopoverId === txn.id} 
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setOpenPopoverId(txn.id)
+                                setMemberSearchQuery('')
+                                setMemberSearchResults([])
+                              } else {
+                                setOpenPopoverId(null)
+                                setMemberSearchQuery('')
+                                setMemberSearchResults([])
+                              }
+                            }}
+                          >
                             <PopoverTrigger asChild>
                               <button
-                                onClick={(e) => handleMiscClick(e, txn)}
                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 ${
                                   txn.matched_member_id
                                     ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
@@ -855,11 +849,11 @@ export default function FinanceClient({
                                 }`}
                               >
                                 {txn.matched_member_name || 'Misc'}
-                                {!txn.matched_member_id && <IconSearch className="ml-1 size-3" />}
+                                {!txn.matched_member_id && <IconChevronDown className="ml-1 size-3" />}
                               </button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 p-0" align="start">
-                              <Command>
+                              <Command shouldFilter={false}>
                                 <CommandInput 
                                   placeholder="Search member by name, email, or phone..." 
                                   value={memberSearchQuery}

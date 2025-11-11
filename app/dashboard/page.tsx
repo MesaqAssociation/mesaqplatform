@@ -28,11 +28,11 @@ export default async function DashboardPage() {
   let accounts: any[] = []
 
   try {
-    // Get member stats: families (total member count) and total members (sum of each member + their household)
+    // Get member stats: families (registered members) and total members (registered + sum of household members)
     const { rows: stats } = await pool.query(`
       SELECT 
         COUNT(*) as families,
-        SUM(1 + COALESCE(household_members, 0)) as total_members
+        COUNT(*) + COALESCE(SUM(household_members), 0) as total_members
       FROM users
     `)
     
