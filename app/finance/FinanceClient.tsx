@@ -92,11 +92,16 @@ export default function FinanceClient({
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
-  // Member Search for matching
+  // Member Search for matching (in table)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberSearchResults, setMemberSearchResults] = useState<Member[]>([])
   const [searchingMembers, setSearchingMembers] = useState(false)
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
+  
+  // Member Search for add transaction dialog
+  const [addTxnMemberQuery, setAddTxnMemberQuery] = useState('')
+  const [addTxnMemberResults, setAddTxnMemberResults] = useState<Member[]>([])
+  const [addTxnSearching, setAddTxnSearching] = useState(false)
   
   // Update balance when account changes
   useEffect(() => {
@@ -470,7 +475,7 @@ export default function FinanceClient({
     }
   }
 
-  // Handle member search input change with debounce
+  // Handle member search input change with debounce (for table popover)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (memberSearchQuery) {
@@ -482,6 +487,30 @@ export default function FinanceClient({
 
     return () => clearTimeout(timer)
   }, [memberSearchQuery])
+  
+  // Handle member search for add transaction dialog
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (addTxnMemberQuery.trim()) {
+        setAddTxnSearching(true)
+        try {
+          const res = await fetch(`/api/members?search=${encodeURIComponent(addTxnMemberQuery)}`)
+          if (res.ok) {
+            const data = await res.json()
+            setAddTxnMemberResults(data.members || [])
+          }
+        } catch (err) {
+          console.error('Failed to search members', err)
+        } finally {
+          setAddTxnSearching(false)
+        }
+      } else {
+        setAddTxnMemberResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [addTxnMemberQuery])
 
   // Add new transaction
   const handleAddTransaction = async () => {
@@ -829,80 +858,70 @@ export default function FinanceClient({
                         </p>
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
-                        {txn.category === 'Misc' || txn.matched_member_id ? (
-                          <Popover 
-                            open={openPopoverId === txn.id} 
-                            onOpenChange={(open) => {
-                              if (open) {
-                                setOpenPopoverId(txn.id)
-                                setMemberSearchQuery('')
-                                setMemberSearchResults([])
-                              } else {
-                                setOpenPopoverId(null)
-                                setMemberSearchQuery('')
-                                setMemberSearchResults([])
-                              }
-                            }}
-                          >
-                            <PopoverTrigger asChild>
-                              <button
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 cursor-pointer ${
-                                  txn.matched_member_id
-                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                                }`}
-                              >
-                                {txn.matched_member_name || 'Misc'}
-                                <IconChevronDown className="ml-1 size-3" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-0" align="start">
-                              <Command shouldFilter={false}>
-                                <CommandInput 
-                                  placeholder="Search member by name, email, or phone..." 
-                                  value={memberSearchQuery}
-                                  onValueChange={setMemberSearchQuery}
-                                />
-                                <CommandList>
-                                  <CommandEmpty>
-                                    {searchingMembers ? 'Searching...' : 'No members found'}
-                                  </CommandEmpty>
+                        <Popover 
+                          open={openPopoverId === txn.id} 
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setOpenPopoverId(txn.id)
+                              setMemberSearchQuery('')
+                              setMemberSearchResults([])
+                            } else {
+                              setOpenPopoverId(null)
+                              setMemberSearchQuery('')
+                              setMemberSearchResults([])
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 cursor-pointer bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                            >
+                              {txn.matched_member_name || txn.category}
+                              <IconChevronDown className="ml-1 size-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-0" align="start">
+                            <Command shouldFilter={false}>
+                              <CommandInput 
+                                placeholder="Search member by name, email, or phone..." 
+                                value={memberSearchQuery}
+                                onValueChange={setMemberSearchQuery}
+                              />
+                              <CommandList>
+                                <CommandEmpty>
+                                  {searchingMembers ? 'Searching...' : 'No members found'}
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {memberSearchResults.map((member) => (
+                                    <CommandItem
+                                      key={member.id}
+                                      onSelect={() => handleMatchMember(txn.id, member.id)}
+                                      className="cursor-pointer"
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{member.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {member.email} • {member.phone}
+                                        </span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                                {txn.matched_member_id && (
                                   <CommandGroup>
-                                    {memberSearchResults.map((member) => (
-                                      <CommandItem
-                                        key={member.id}
-                                        onSelect={() => handleMatchMember(txn.id, member.id)}
-                                        className="cursor-pointer"
-                                      >
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{member.name}</span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {member.email} • {member.phone}
-                                          </span>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
+                                    <CommandItem
+                                      onSelect={() => handleMatchMember(txn.id, null)}
+                                      className="cursor-pointer text-red-600"
+                                    >
+                                      <IconX className="mr-2 size-4" />
+                                      Remove member match
+                                    </CommandItem>
                                   </CommandGroup>
-                                  {txn.matched_member_id && (
-                                    <CommandGroup>
-                                      <CommandItem
-                                        onSelect={() => handleMatchMember(txn.id, null)}
-                                        className="cursor-pointer text-red-600"
-                                      >
-                                        <IconX className="mr-2 size-4" />
-                                        Remove member match
-                                      </CommandItem>
-                                    </CommandGroup>
-                                  )}
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300`}>
-                            {txn.matched_member_name || txn.category}
-                          </span>
-                        )}
+                                )}
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         txn.transaction_type === 'credit' 
@@ -1265,25 +1284,25 @@ export default function FinanceClient({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0" align="start">
-                  <Command>
+                  <Command shouldFilter={false}>
                     <CommandInput 
                       placeholder="Search member..." 
-                      value={memberSearchQuery}
-                      onValueChange={setMemberSearchQuery}
+                      value={addTxnMemberQuery}
+                      onValueChange={setAddTxnMemberQuery}
                     />
                     <CommandList>
                       <CommandEmpty>
-                        {searchingMembers ? 'Searching...' : 'No members found'}
+                        {addTxnSearching ? 'Searching...' : 'No members found'}
                       </CommandEmpty>
                       <CommandGroup>
-                        {memberSearchResults.map((member) => (
+                        {addTxnMemberResults.map((member) => (
                           <CommandItem
                             key={member.id}
                             onSelect={() => {
                               setNewTransactionMemberId(member.id)
                               setNewTransactionMemberName(member.name)
-                              setMemberSearchQuery('')
-                              setMemberSearchResults([])
+                              setAddTxnMemberQuery('')
+                              setAddTxnMemberResults([])
                             }}
                             className="cursor-pointer"
                           >

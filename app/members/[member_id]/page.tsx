@@ -62,7 +62,7 @@ export default async function MemberDetailPage({
       'SELECT id, title, event_date, event_type FROM events ORDER BY event_date DESC'
     )
 
-    // Fetch member's transactions (where they are the category)
+    // Fetch member's transactions (where they are the category OR matched_member_id)
     const { rows: transactions } = await pool.query(
       `SELECT 
         t.id,
@@ -75,10 +75,10 @@ export default async function MemberDetailPage({
         t.balance_after,
         t.source
       FROM transactions t
-      WHERE t.category = $1
+      WHERE t.category = $1 OR t.matched_member_id = $2
       ORDER BY t.transaction_date DESC
       LIMIT 50`,
-      [member.name]
+      [member.name, member.id]
     )
 
     // Format dates to strings for client component
