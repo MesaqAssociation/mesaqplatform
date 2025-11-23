@@ -44,11 +44,18 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
 
   if (!phoneNumberId || !accessToken) {
-    console.error('WhatsApp API credentials not configured')
+    console.error('❌ WhatsApp API credentials not configured')
+    console.error('   Missing:', {
+      phoneNumberId: !phoneNumberId ? 'WHATSAPP_PHONE_NUMBER_ID' : '✓',
+      accessToken: !accessToken ? 'WHATSAPP_ACCESS_TOKEN' : '✓'
+    })
     return false
   }
 
   try {
+    const cleanPhone = to.replace(/\s+/g, '') // Remove spaces from phone number
+    console.log(`📤 Sending WhatsApp to: ${cleanPhone}`)
+    
     const response = await fetch(`${apiUrl}/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
@@ -57,7 +64,7 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
       },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
-        to: to.replace(/\s+/g, ''), // Remove spaces from phone number
+        to: cleanPhone,
         type: 'text',
         text: {
           body: body
@@ -67,14 +74,19 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
 
     if (!response.ok) {
       const error = await response.json()
-      console.error('WhatsApp API error:', error)
+      console.error('❌ WhatsApp API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: error
+      })
       return false
     }
 
-    console.log(`✅ WhatsApp message sent to ${to}`)
+    const result = await response.json()
+    console.log(`✅ WhatsApp message sent to ${to}`, result)
     return true
   } catch (error) {
-    console.error('Error calling WhatsApp API:', error)
+    console.error('❌ Error calling WhatsApp API:', error)
     return false
   }
 }
