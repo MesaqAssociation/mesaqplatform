@@ -670,14 +670,15 @@ export default function FinanceClient({
 
   const handleTestSendMessages = async () => {
     const confirm = window.confirm(
-      `⚠️ WARNING: SEND REAL WHATSAPP MESSAGES\n\n` +
-      `This will send REAL WhatsApp messages to unpaid members!\n\n` +
+      `🧪 TEST MODE: Send Payment Status\n\n` +
+      `This will send payment status for unpaid members to YOUR test number.\n\n` +
       `What happens:\n` +
       `• Checks who hasn't paid for last month\n` +
-      `• Sends payment reminder to their WhatsApp\n` +
-      `• NO DATA stored in database\n` +
-      `• This is for testing only\n\n` +
-      `Are you sure you want to send real messages?`
+      `• ALL messages go to WHATSAPP_TEST_NUMBER\n` +
+      `• Shows who would get messages in production\n` +
+      `• NO real members messaged\n` +
+      `• NO DATA stored\n\n` +
+      `Continue?`
     )
 
     if (!confirm) return
@@ -693,7 +694,7 @@ export default function FinanceClient({
       if (res.ok) {
         const failedMsg = data.messagesFailed > 0 ? ` (${data.messagesFailed} failed)` : ''
         showToast(
-          `✅ Sent ${data.messagesSent} real WhatsApp message(s)${failedMsg}`,
+          `🧪 Test: Sent ${data.messagesSent} message(s) to your test number${failedMsg}`,
           'success'
         )
         console.log('📊 Test results:', data)
@@ -892,7 +893,7 @@ export default function FinanceClient({
             </>
           ) : (
             <>
-              📱 Send Payment Reminders
+              🧪 Test Payment Reminders
             </>
           )}
         </Button>

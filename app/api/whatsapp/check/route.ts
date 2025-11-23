@@ -48,6 +48,14 @@ export async function GET(req: NextRequest) {
         required: false
       }
     },
+    testMode: {
+      testNumber: {
+        set: !!process.env.WHATSAPP_TEST_NUMBER,
+        value: process.env.WHATSAPP_TEST_NUMBER || '✗ Not set',
+        note: 'If set, ALL messages go to this number (safe testing)',
+        recommended: true
+      }
+    },
     board: {
       groupId: {
         set: !!process.env.WHATSAPP_BOARD_GROUP_ID,
@@ -62,17 +70,28 @@ export async function GET(req: NextRequest) {
   if (!config.whatsapp.phoneNumberId.set) missingRequired.push('WHATSAPP_PHONE_NUMBER_ID')
   if (!config.whatsapp.accessToken.set) missingRequired.push('WHATSAPP_ACCESS_TOKEN')
 
+  const missingRecommended = []
+  if (!config.testMode.testNumber.set) missingRecommended.push('WHATSAPP_TEST_NUMBER')
+
   const isReady = missingRequired.length === 0
+  const isTestMode = !!process.env.WHATSAPP_TEST_NUMBER
 
   return NextResponse.json({
     ready: isReady,
+    testMode: isTestMode,
     missingRequired,
+    missingRecommended,
     config,
     help: {
       message: isReady 
-        ? 'WhatsApp is configured and ready to use' 
+        ? (isTestMode 
+            ? '✅ WhatsApp configured - TEST MODE active (all messages go to test number)' 
+            : '⚠️ WhatsApp configured - PRODUCTION MODE (messages go to real members!)')
         : 'WhatsApp is not fully configured. Please set the missing environment variables in Vercel.',
-      setupGuide: 'See WHATSAPP_PAYMENT_REMINDERS.md for setup instructions',
+      recommendation: !isTestMode && isReady
+        ? '⚠️ RECOMMENDED: Set WHATSAPP_TEST_NUMBER to safely test without messaging real users'
+        : undefined,
+      setupGuide: 'See WHATSAPP_SIMPLE_SETUP.md for setup instructions',
       vercelLink: 'https://vercel.com/dashboard → Your Project → Settings → Environment Variables'
     }
   }, {

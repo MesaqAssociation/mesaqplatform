@@ -10,10 +10,22 @@ export type WhatsAppMessage = {
 
 /**
  * Send a WhatsApp message
+ * In test mode (if WHATSAPP_TEST_NUMBER is set), all messages go to that number
  */
 export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<boolean> {
   try {
     const { to, body } = message
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
+    // If test number is configured, send ALL messages there instead
+    if (testNumber) {
+      console.log(`🧪 TEST MODE: Redirecting message for ${to} to test number`)
+      const testBody = `[TEST - Would send to: ${to}]\n\n${body}`
+      return await sendActualMessage(testNumber, testBody)
+    }
+
+    // Production mode - send to actual number
+    console.log(`📤 PRODUCTION: Sending to actual number ${to}`)
     return await sendActualMessage(to, body)
   } catch (error) {
     console.error('Failed to send WhatsApp message:', error)
@@ -79,10 +91,22 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
 
 /**
  * Send message to board group chat
+ * In test mode, also goes to test number
  */
 export async function sendBoardNotification(message: string): Promise<boolean> {
+  const testNumber = process.env.WHATSAPP_TEST_NUMBER
   const boardGroupId = process.env.WHATSAPP_BOARD_GROUP_ID
 
+  // In test mode, send to test number
+  if (testNumber) {
+    console.log('🧪 TEST MODE: Sending board notification to test number')
+    return await sendWhatsAppMessage({
+      to: testNumber,
+      body: `[BOARD NOTIFICATION]\n\n${message}`
+    })
+  }
+
+  // Production mode - send to board group
   if (!boardGroupId || boardGroupId.trim() === '') {
     console.warn('Board group ID not configured, skipping board notification')
     return false
