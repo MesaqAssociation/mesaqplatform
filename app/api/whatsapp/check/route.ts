@@ -48,16 +48,6 @@ export async function GET(req: NextRequest) {
         required: false
       }
     },
-    testMode: {
-      enabled: {
-        set: !!process.env.WHATSAPP_TEST_MODE,
-        value: process.env.WHATSAPP_TEST_MODE || 'false'
-      },
-      testNumber: {
-        set: !!process.env.WHATSAPP_TEST_NUMBER,
-        value: process.env.WHATSAPP_TEST_NUMBER || '✗ Not set'
-      }
-    },
     board: {
       groupId: {
         set: !!process.env.WHATSAPP_BOARD_GROUP_ID,

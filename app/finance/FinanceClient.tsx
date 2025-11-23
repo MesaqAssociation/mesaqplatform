@@ -670,13 +670,14 @@ export default function FinanceClient({
 
   const handleTestSendMessages = async () => {
     const confirm = window.confirm(
-      `🧪 TEST MODE\n\n` +
-      `This will send WhatsApp reminders as if it's the 7th of next month.\n\n` +
-      `• Messages will be sent to unpaid members\n` +
-      `• In test mode: all go to WHATSAPP_TEST_NUMBER\n` +
-      `• NO DATA will be stored\n` +
-      `• Resets on page refresh\n\n` +
-      `Continue?`
+      `⚠️ WARNING: SEND REAL WHATSAPP MESSAGES\n\n` +
+      `This will send REAL WhatsApp messages to unpaid members!\n\n` +
+      `What happens:\n` +
+      `• Checks who hasn't paid for last month\n` +
+      `• Sends payment reminder to their WhatsApp\n` +
+      `• NO DATA stored in database\n` +
+      `• This is for testing only\n\n` +
+      `Are you sure you want to send real messages?`
     )
 
     if (!confirm) return
@@ -692,7 +693,7 @@ export default function FinanceClient({
       if (res.ok) {
         const failedMsg = data.messagesFailed > 0 ? ` (${data.messagesFailed} failed)` : ''
         showToast(
-          `Test complete! ${data.messagesSent} message(s) sent${failedMsg}. No data stored.`,
+          `✅ Sent ${data.messagesSent} real WhatsApp message(s)${failedMsg}`,
           'success'
         )
         console.log('📊 Test results:', data)
@@ -878,23 +879,23 @@ export default function FinanceClient({
             <IconTrash className="mr-2 size-4" />
             Clear All Transactions
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleTestSendMessages}
-            disabled={sendingTestMessages}
-            className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
-          >
-            {sendingTestMessages ? (
-              <>
-                <IconUpload className="mr-2 size-4 animate-pulse" />
-                Sending...
-              </>
-            ) : (
-              <>
-                🧪 Test: Send Messages
-              </>
-            )}
-          </Button>
+        <Button
+          variant="outline"
+          onClick={handleTestSendMessages}
+          disabled={sendingTestMessages}
+          className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
+        >
+          {sendingTestMessages ? (
+            <>
+              <IconUpload className="mr-2 size-4 animate-pulse" />
+              Sending...
+            </>
+          ) : (
+            <>
+              📱 Send Payment Reminders
+            </>
+          )}
+        </Button>
         </div>
         <div className="flex gap-2">
           <Button
