@@ -123,6 +123,30 @@ export async function POST(req: NextRequest) {
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
+    // Create bank statement record
+    const dates = parsed.transactions.map(t => t.date).filter(d => d)
+    const minDate = dates.length > 0 ? dates.reduce((a, b) => a < b ? a : b) : null
+    const maxDate = dates.length > 0 ? dates.reduce((a, b) => a > b ? a : b) : null
+    
+    const { rows: statementRows } = await pool.query(`
+      INSERT INTO bank_statements 
+        (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `, [
+      finalAccountId,
+      file.name,
+      file.size,
+      file.type,
+      minDate,
+      maxDate,
+      parsed.transactions.length,
+      userId
+    ])
+    
+    const statementId = statementRows[0]?.id
+    console.log(`📄 Created bank statement record: ${statementId}`)
+
     // Match transactions to members for categorization (CREDIT ONLY) - SKIP FOR DONATION ACCOUNTS
     let memberMatches: Array<{ memberId: string; memberName: string } | null> = []
     
@@ -215,8 +239,8 @@ export async function POST(req: NextRequest) {
         
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
-               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10)
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category, statement_id) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10, $11)
                ON CONFLICT DO NOTHING
                RETURNING id, transaction_date, transaction_name, description, category`,
               [
@@ -230,6 +254,7 @@ export async function POST(req: NextRequest) {
             userId,
             txn.reference,
             category,
+            statementId
           ]
         )
         if (inserted.length > 0) {

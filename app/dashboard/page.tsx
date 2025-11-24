@@ -201,14 +201,16 @@ export default async function DashboardPage() {
     const { rows } = await pool.query(`
       SELECT 
         u.id,
+        u.member_id,
         u.name,
         u.current_balance
       FROM users u
-      WHERE u.current_balance != 0
+      WHERE u.current_balance IS NOT NULL AND u.current_balance != 0
       ORDER BY u.current_balance ASC
       LIMIT 10
     `)
     unpaidBalances = rows
+    console.log(`📊 Found ${unpaidBalances.length} members with outstanding balances`)
   } catch (error) {
     console.error('Error fetching unpaid balances:', error)
   }

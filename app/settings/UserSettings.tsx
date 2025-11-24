@@ -82,11 +82,24 @@ export default function UserSettings({ user }: Props) {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A'
-    return new Date(dateStr).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+    } catch {
+      return 'N/A'
+    }
+  }
+
+  // Check if user data is loaded
+  if (!user || !user.id) {
+    return (
+      <div className="border rounded-lg p-6">
+        <p className="text-sm text-muted-foreground">Loading profile...</p>
+      </div>
+    )
   }
 
   return (
