@@ -5,21 +5,24 @@ import { MainLayout } from '@/components/Sidebar'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 import MonthlyFeeSettings from './MonthlyFeeSettings'
 import FineSettings from './FineSettings'
+import UserSettings from './UserSettings'
 import { Pool } from 'pg'
 
 export default async function SettingsPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
   
+  let userId: string
   try {
-    jwt.verify(token, process.env.AUTH_SECRET)
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
+    userId = decoded.sub
   } catch {
     redirect('/')
   }
   
   const user = await getUserFromToken()
 
-  // Get current settings
+  // Get current settings and full user data
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
@@ -28,14 +31,16 @@ export default async function SettingsPage() {
   let currentFee = '50.00'
   let finesEnabled = false
   let fineAmount = '10.00'
+  let fullUserData: any = {}
   
   try {
-    const { rows } = await pool.query(`
+    // Get system settings
+    const { rows: settingsRows } = await pool.query(`
       SELECT key, value FROM system_settings 
       WHERE key IN ('monthly_membership_fee', 'late_payment_fines_enabled', 'late_payment_fine_amount')
     `)
     
-    rows.forEach(row => {
+    settingsRows.forEach(row => {
       if (row.key === 'monthly_membership_fee') {
         currentFee = row.value
       } else if (row.key === 'late_payment_fines_enabled') {
@@ -44,6 +49,19 @@ export default async function SettingsPage() {
         fineAmount = row.value
       }
     })
+
+    // Get full user data
+    const { rows: userRows } = await pool.query(`
+      SELECT 
+        id, member_id, name, email, phone, address, 
+        household_members, joined_date, created_at, role
+      FROM users 
+      WHERE id = $1
+    `, [userId])
+    
+    if (userRows.length > 0) {
+      fullUserData = userRows[0]
+    }
   } catch (error) {
     console.error('Error fetching settings:', error)
   }
@@ -52,6 +70,7 @@ export default async function SettingsPage() {
     <MainLayout user={user}>
       <SettingsClient 
         user={user} 
+        fullUserData={fullUserData}
         currentFee={currentFee}
         finesEnabled={finesEnabled}
         fineAmount={fineAmount}
@@ -62,11 +81,13 @@ export default async function SettingsPage() {
 
 function SettingsClient({ 
   user, 
+  fullUserData,
   currentFee,
   finesEnabled,
   fineAmount
 }: { 
   user: any
+  fullUserData: any
   currentFee: string
   finesEnabled: boolean
   fineAmount: string
@@ -79,28 +100,8 @@ function SettingsClient({
       <h1 className="text-2xl font-semibold">Settings</h1>
       
       <div className="max-w-2xl space-y-6">
-        {/* User Profile Settings */}
-        <div className="border rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Profile</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Name</label>
-              <p className="text-sm">{user?.name || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Email</label>
-              <p className="text-sm">{user?.email || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Phone</label>
-              <p className="text-sm">{user?.phone || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Role</label>
-              <p className="text-sm">{user?.role || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
+        {/* User Profile Settings - Editable */}
+        <UserSettings user={fullUserData} />
 
         {/* Admin Settings - Only for Board/Admin */}
         {isAdmin && (
