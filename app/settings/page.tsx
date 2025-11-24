@@ -6,6 +6,7 @@ import { getUserFromToken } from '@/lib/getUserFromToken'
 import MonthlyFeeSettings from './MonthlyFeeSettings'
 import FineSettings from './FineSettings'
 import UserSettings from './UserSettings'
+import ExportData from './ExportData'
 import { Pool } from 'pg'
 
 export default async function SettingsPage() {
@@ -123,6 +124,14 @@ function SettingsClient({
                 initialEnabled={finesEnabled}
                 initialAmount={fineAmount}
               />
+            </div>
+
+            <div className="border rounded-lg p-6">
+              <h2 className="text-lg font-medium mb-4">Export Data</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Export member, event, or finance data to CSV or Excel format
+              </p>
+              <ExportData />
             </div>
           </>
         )}
