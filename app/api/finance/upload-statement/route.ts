@@ -56,6 +56,36 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Check for duplicate statement upload
+    // Get date range from parsed transactions
+    const dates = parsed.transactions.map(t => t.date).filter(d => d)
+    if (dates.length > 0) {
+      const minDate = dates.reduce((a, b) => a < b ? a : b)
+      const maxDate = dates.reduce((a, b) => a > b ? a : b)
+      const firstTransactionName = parsed.transactions[0]?.name || ''
+      const lastTransactionName = parsed.transactions[parsed.transactions.length - 1]?.name || ''
+      
+      // Check if we already have transactions from this exact date range with matching details
+      const { rows: existingStatements } = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM transactions
+        WHERE account_id = $1
+          AND transaction_date BETWEEN $2::date AND $3::date
+          AND source = 'bank_statement'
+        HAVING COUNT(*) >= $4
+      `, [accountId || parsed.accountNumber, minDate, maxDate, Math.floor(parsed.transactions.length * 0.8)])
+      
+      if (existingStatements.length > 0 && existingStatements[0].count >= Math.floor(parsed.transactions.length * 0.8)) {
+        return NextResponse.json({ 
+          error: `This statement appears to have already been uploaded. Found ${existingStatements[0].count} existing transactions between ${minDate} and ${maxDate}. If you believe this is an error, please contact support.`,
+          duplicate: true,
+          dateRange: { min: minDate, max: maxDate },
+          existingCount: existingStatements[0].count,
+          newCount: parsed.transactions.length
+        }, { status: 409 })
+      }
+    }
+
     // Determine which account to use
     let finalAccountId = accountId
     let isDonationAccount = false
