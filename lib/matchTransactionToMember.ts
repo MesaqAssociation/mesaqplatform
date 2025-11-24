@@ -78,40 +78,19 @@ export async function matchTransactionToMember(
   
   const transactionNameLower = transactionName.toLowerCase()
   
-  // Try exact match first - check each banking name if multiple
+  // Match full banking names only (separated by comma)
   for (const member of members) {
-    // Split by comma to support multiple banking names
+    // Split by comma to support multiple banking names like "jack adams, mark smith"
     const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
     
     for (const bankingName of bankingNames) {
+      // Only match the FULL banking name, not individual parts
       if (bankingName && transactionNameLower.includes(bankingName)) {
         return {
           memberId: member.id,
           memberName: member.name,
           matchType: 'banking_name',
           confidence: 'high'
-        }
-      }
-    }
-  }
-  
-  // Try fuzzy match (split banking name into words)
-  for (const member of members) {
-    const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
-    
-    for (const bankingName of bankingNames) {
-      const bankingNameWords = bankingName.split(/\s+/)
-      // If all words from banking name appear in transaction name, it's a match
-      const allWordsMatch = bankingNameWords.every(word => 
-        word.length > 2 && transactionNameLower.includes(word)
-      )
-      
-      if (allWordsMatch && bankingNameWords.length >= 2) {
-        return {
-          memberId: member.id,
-          memberName: member.name,
-          matchType: 'banking_name',
-          confidence: 'low'
         }
       }
     }
@@ -196,10 +175,10 @@ export async function batchMatchTransactions(
       }
     }
     
-    // Step 2: Check banking name
+    // Step 2: Check banking name (full name match only)
     const txnNameLower = txn.name.toLowerCase()
     
-    // Exact match
+    // Match full banking names only
     for (const [bankingName, member] of bankingNameMap.entries()) {
       if (txnNameLower.includes(bankingName)) {
         return {
@@ -207,23 +186,6 @@ export async function batchMatchTransactions(
           memberName: member.name,
           matchType: 'banking_name' as const,
           confidence: 'high' as const
-        }
-      }
-    }
-    
-    // Fuzzy match
-    for (const [bankingName, member] of bankingNameMap.entries()) {
-      const words = bankingName.split(/\s+/)
-      const allWordsMatch = words.every(word => 
-        word.length > 2 && txnNameLower.includes(word)
-      )
-      
-      if (allWordsMatch && words.length >= 2) {
-        return {
-          memberId: member.id,
-          memberName: member.name,
-          matchType: 'banking_name' as const,
-          confidence: 'low' as const
         }
       }
     }

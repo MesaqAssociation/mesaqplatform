@@ -144,15 +144,6 @@ export function Sidebar({ user }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* Search */}
-      <div className="px-4 pb-2">
-        <input
-          type="search"
-          placeholder={t("search")}
-          className="w-full h-8 px-3 text-sm bg-background border border-sidebar-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
-
       {/* User */}
       <div className="p-4 border-t border-sidebar-border">
         <NavUser user={{ 

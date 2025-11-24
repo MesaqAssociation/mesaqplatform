@@ -102,7 +102,13 @@ function SettingsClient({
       
       <div className="max-w-2xl space-y-6">
         {/* User Profile Settings - Editable */}
-        <UserSettings user={fullUserData} />
+        {fullUserData && fullUserData.id ? (
+          <UserSettings user={fullUserData} />
+        ) : (
+          <div className="border rounded-lg p-6">
+            <p className="text-sm text-muted-foreground">Unable to load user profile. Please try refreshing the page.</p>
+          </div>
+        )}
 
         {/* Admin Settings - Only for Board/Admin */}
         {isAdmin && (

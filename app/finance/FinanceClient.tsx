@@ -36,6 +36,10 @@ type Transaction = {
   source?: string | null
   matched_member_id?: string | null
   matched_member_name?: string | null
+  statement_id?: string | null
+  statement_file_name?: string | null
+  statement_date_from?: string | null
+  statement_date_to?: string | null
 }
 
 type Member = {
@@ -109,6 +113,11 @@ export default function FinanceClient({
   const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
   // Update balance when account changes
+  // Sync transactions with initial data when component mounts or initialTransactions changes
+  useEffect(() => {
+    setTransactions(initialTransactions)
+  }, [initialTransactions])
+
   useEffect(() => {
     setBalance(currentAccount.current_balance)
     setEditValue(currentAccount.current_balance.toString())

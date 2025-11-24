@@ -36,9 +36,10 @@ export async function GET(req: NextRequest) {
   
   try {
     const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
-    // Only allow admins to export
-    if (decoded.role !== 'board' && decoded.role !== 'admin' && decoded.role !== 'Manager') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Only allow board/admin/officers to export
+    const allowedRoles = ['board', 'admin', 'Manager', 'Finance Officer', 'Public Officer', 'Logistics Officer']
+    if (!allowedRoles.includes(decoded.role)) {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
     }
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
