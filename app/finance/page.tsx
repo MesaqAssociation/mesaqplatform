@@ -16,6 +16,12 @@ export default async function FinancePage() {
   }
   
   const user = await getUserFromToken()
+  
+  // Restrict finance page to admins/board only
+  const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
+  if (!isAdmin) {
+    redirect('/dashboard') // Redirect regular members to dashboard
+  }
 
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,

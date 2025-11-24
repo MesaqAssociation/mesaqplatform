@@ -5,23 +5,121 @@ import { MainLayout } from '@/components/Sidebar'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import DashboardClient from './DashboardClient'
+import MemberDashboardClient from './MemberDashboardClient'
 
 export default async function DashboardPage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')
+  
+  let userId: string
   try {
-    jwt.verify(token, process.env.AUTH_SECRET)
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
+    userId = decoded.sub
   } catch {
     redirect('/')
   }
   
   const user = await getUserFromToken()
   
+  // Check if user is admin/board
+  const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
+  
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
+  // If regular member, show member-specific dashboard
+  if (!isAdmin) {
+    let memberData: any = {}
+    let memberTransactions: any[] = []
+    let upcomingEvents: any[] = []
+    let paymentStatus: any = null
+
+    try {
+      // Get member data
+      const { rows: memberRows } = await pool.query(`
+        SELECT 
+          name, 
+          current_balance, 
+          member_id, 
+          household_members, 
+          joined_date
+        FROM users
+        WHERE id = $1
+      `, [userId])
+      memberData = memberRows[0] || {}
+    } catch (error) {
+      console.error('Error fetching member data:', error)
+    }
+
+    try {
+      // Get member's recent transactions
+      const { rows } = await pool.query(`
+        SELECT 
+          t.id,
+          t.transaction_date,
+          t.transaction_name,
+          t.amount,
+          t.transaction_type
+        FROM transactions t
+        WHERE t.matched_member_id = $1
+        ORDER BY t.transaction_date DESC
+        LIMIT 10
+      `, [userId])
+      memberTransactions = rows
+    } catch (error) {
+      console.error('Error fetching member transactions:', error)
+    }
+
+    try {
+      // Get upcoming events
+      const { rows } = await pool.query(`
+        SELECT 
+          id,
+          title,
+          event_date,
+          start_time,
+          event_type
+        FROM events
+        WHERE event_date >= CURRENT_DATE
+        ORDER BY event_date ASC, start_time ASC
+        LIMIT 5
+      `)
+      upcomingEvents = rows
+    } catch (error) {
+      console.error('Error fetching events:', error)
+    }
+
+    try {
+      // Get current month payment status
+      const { rows } = await pool.query(`
+        SELECT 
+          payment_status,
+          total_paid,
+          monthly_fee,
+          payment_month
+        FROM current_month_payment_status
+        WHERE user_id = $1
+      `, [userId])
+      paymentStatus = rows[0] || null
+    } catch (error) {
+      console.error('Error fetching payment status:', error)
+    }
+
+    return (
+      <MainLayout user={user}>
+        <MemberDashboardClient
+          memberData={memberData}
+          recentTransactions={memberTransactions}
+          upcomingEvents={upcomingEvents}
+          paymentStatus={paymentStatus}
+        />
+      </MainLayout>
+    )
+  }
+
+  // Admin/Board dashboard
   let memberStats = { families: 0, total_members: 0 }
   let recentTransactions: any[] = []
   let upcomingEvents: any[] = []

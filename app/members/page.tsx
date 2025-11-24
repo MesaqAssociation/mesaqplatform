@@ -25,35 +25,65 @@ export default async function MembersPage() {
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
   
-  // Fetch members with their current month payment status
-  const { rows } = await pool.query(`
-    SELECT 
-      u.id, 
-      u.member_id, 
-      u.phone, 
-      u.name, 
-      u.email, 
-      u.address, 
-      u.image, 
-      u.role, 
-      u.household_members,
-      cps.payment_status,
-      cps.total_paid,
-      cps.monthly_fee
-    FROM users u
-    LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
-    ORDER BY u.name ASC 
-    LIMIT 200
-  `)
+  // Check if user is admin
+  const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
+  
+  let rows: any[]
+  
+  if (isAdmin) {
+    // Admins see full details
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.member_id, 
+        u.phone, 
+        u.name, 
+        u.email, 
+        u.address, 
+        u.image, 
+        u.role, 
+        u.household_members,
+        cps.payment_status,
+        cps.total_paid,
+        cps.monthly_fee
+      FROM users u
+      LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
+      ORDER BY u.name ASC 
+      LIMIT 200
+    `)
+    rows = result.rows
+  } else {
+    // Regular members see only names and member IDs
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.member_id, 
+        u.name, 
+        u.image,
+        NULL as phone,
+        NULL as email,
+        NULL as address,
+        NULL as role,
+        NULL as household_members,
+        NULL as payment_status,
+        NULL as total_paid,
+        NULL as monthly_fee
+      FROM users u
+      ORDER BY u.name ASC 
+      LIMIT 200
+    `)
+    rows = result.rows
+  }
+  
   return (
     <MainLayout user={user}>
-      <MembersPageWrapper initial={rows} />
+      <MembersPageWrapper initial={rows} isAdmin={isAdmin} />
     </MainLayout>
   )
 }
 
-function MembersPageWrapper({ initial }: { initial: any[] }) {
-  return <MembersPageClient initial={initial} />
+function MembersPageWrapper({ initial, isAdmin }: { initial: any[], isAdmin: boolean }) {
+  return <MembersPageClient initial={initial} isAdmin={isAdmin} />
 }
 
 

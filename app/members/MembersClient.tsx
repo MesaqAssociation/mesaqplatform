@@ -24,7 +24,7 @@ type Member = {
 
 type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first'
 
-export default function MembersClient({ initial }: { initial: Member[] }) {
+export default function MembersClient({ initial, isAdmin = true }: { initial: Member[], isAdmin?: boolean }) {
   const { t } = useI18n()
   const router = useRouter()
   const [sortBy, setSortBy] = useState<SortOption>('name-asc')
@@ -127,34 +127,40 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
   
   return (
     <div className="space-y-4">
-      {/* Filter Controls */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="sort" className="text-sm font-medium">
-          Sort by:
-        </label>
-        <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Sort by..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-            <SelectItem value="most-paid">Most Paid</SelectItem>
-            <SelectItem value="least-paid">Least Paid</SelectItem>
-            <SelectItem value="unpaid-first">Unpaid First</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Filter Controls - Only show for admins */}
+      {isAdmin && (
+        <div className="flex items-center gap-2">
+          <label htmlFor="sort" className="text-sm font-medium">
+            Sort by:
+          </label>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+              <SelectItem value="most-paid">Most Paid</SelectItem>
+              <SelectItem value="least-paid">Least Paid</SelectItem>
+              <SelectItem value="unpaid-first">Unpaid First</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="overflow-auto">
         <table className="min-w-[800px] w-full text-sm">
           <thead>
             <tr className="text-left">
               <th className="py-3 px-2">{t("name")}</th>
-              <th className="py-3 px-2">{t("email")}</th>
-              <th className="py-3 px-2">{t("phone")}</th>
-              <th className="py-3 px-2">{t("householdMembers")}</th>
-              <th className="py-3 px-2">{t("role")}</th>
-              <th className="py-3 px-2">Payment Status</th>
+              {isAdmin && (
+                <>
+                  <th className="py-3 px-2">{t("email")}</th>
+                  <th className="py-3 px-2">{t("phone")}</th>
+                  <th className="py-3 px-2">{t("householdMembers")}</th>
+                  <th className="py-3 px-2">{t("role")}</th>
+                  <th className="py-3 px-2">Payment Status</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>

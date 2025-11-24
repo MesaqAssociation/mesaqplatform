@@ -18,7 +18,7 @@ type Member = {
   role: string | null
 }
 
-export default function MembersPageClient({ initial }: { initial: Member[] }) {
+export default function MembersPageClient({ initial, isAdmin = true }: { initial: Member[], isAdmin?: boolean }) {
   const { t } = useI18n()
   const searchParams = useSearchParams()
   const [showToast, setShowToast] = useState(false)
@@ -46,11 +46,13 @@ export default function MembersPageClient({ initial }: { initial: Member[] }) {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{t("members")}</h1>
-        <Link href="/members/create">
-          <Button>{t("createNew")}</Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/members/create">
+            <Button>{t("createNew")}</Button>
+          </Link>
+        )}
       </div>
-      <MembersClient initial={initial} />
+      <MembersClient initial={initial} isAdmin={isAdmin} />
       
       {showToast && (
         <div 
