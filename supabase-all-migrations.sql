@@ -85,9 +85,11 @@ ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE bank_statements 
 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
--- Remove file_url column if it exists (we don't use cloud storage yet)
+-- Add file_url column for Cloudflare R2 storage (nullable)
 ALTER TABLE bank_statements 
-DROP COLUMN IF EXISTS file_url;
+ADD COLUMN IF NOT EXISTS file_url TEXT;
+
+COMMENT ON COLUMN bank_statements.file_url IS 'Public URL of the statement file in Cloudflare R2 storage';
 
 -- Indexes for bank statements
 CREATE INDEX IF NOT EXISTS idx_bank_statements_account ON bank_statements(account_id);

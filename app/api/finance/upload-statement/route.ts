@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken'
 import { parseBankStatementPDF } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
+import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 
@@ -123,6 +124,21 @@ export async function POST(req: NextRequest) {
     )
     let runningBalance = accounts[0]?.current_balance || 0
 
+    // Upload to R2 storage (if configured)
+    let fileUrl: string | null = null
+    if (isR2Configured()) {
+      try {
+        console.log('☁️ Uploading to Cloudflare R2...')
+        fileUrl = await uploadToR2(buffer, file.name, file.type)
+        console.log(`✅ Uploaded to R2: ${fileUrl}`)
+      } catch (r2Error) {
+        console.error('⚠️ R2 upload failed, continuing without file URL:', r2Error)
+        // Don't fail the whole upload if R2 fails
+      }
+    } else {
+      console.log('ℹ️ R2 not configured, skipping file upload')
+    }
+
     // Create bank statement record
     const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
     const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
@@ -130,8 +146,8 @@ export async function POST(req: NextRequest) {
     
     const { rows: statementRows } = await pool.query(`
       INSERT INTO bank_statements 
-        (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, uploaded_by, file_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `, [
       finalAccountId,
@@ -141,11 +157,12 @@ export async function POST(req: NextRequest) {
       minDate,
       maxDate,
       parsed.transactions.length,
-      userId
+      userId,
+      fileUrl
     ])
     
     const statementId = statementRows[0]?.id
-    console.log(`📄 Created bank statement record: ${statementId}`)
+    console.log(`📄 Created bank statement record: ${statementId}${fileUrl ? ` with R2 URL` : ''}`)
 
     // Match transactions to members for categorization (CREDIT ONLY) - SKIP FOR DONATION ACCOUNTS
     let memberMatches: Array<{ memberId: string; memberName: string } | null> = []

@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { parseBankStatementPDF } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
+import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 
@@ -76,6 +77,43 @@ export async function POST(req: NextRequest) {
         } else {
           accountId = accounts[0].id
         }
+
+        // Upload to R2 storage (if configured)
+        let fileUrl: string | null = null
+        if (isR2Configured()) {
+          try {
+            console.log('☁️ [Telegram] Uploading to Cloudflare R2...')
+            fileUrl = await uploadToR2(pdfBuffer, document.file_name, 'application/pdf')
+            console.log(`✅ [Telegram] Uploaded to R2: ${fileUrl}`)
+          } catch (r2Error) {
+            console.error('⚠️ [Telegram] R2 upload failed:', r2Error)
+            // Continue without file URL
+          }
+        }
+
+        // Create bank statement record
+        const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
+        const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
+        const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
+        
+        const { rows: statementRows } = await pool.query(`
+          INSERT INTO bank_statements 
+            (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, file_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING id
+        `, [
+          accountId,
+          document.file_name,
+          document.file_size || 0,
+          'application/pdf',
+          minDate,
+          maxDate,
+          parsed.transactions.length,
+          fileUrl
+        ])
+        
+        const statementId = statementRows[0]?.id
+        console.log(`📄 [Telegram] Created bank statement record: ${statementId}${fileUrl ? ` with R2 URL` : ''}`)
 
         // Get current account balance
         const { rows: accountData } = await pool.query(
@@ -151,8 +189,8 @@ export async function POST(req: NextRequest) {
             
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
-               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference, category) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8, $9)
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference, category, statement_id) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8, $9, $10)
                ON CONFLICT DO NOTHING
                RETURNING id, transaction_date, transaction_name, description, category`,
               [
@@ -165,6 +203,7 @@ export async function POST(req: NextRequest) {
                 txn.balance || runningBalance,
                 txn.reference,
                 category,
+                statementId
               ]
             )
             if (inserted.length > 0) {
