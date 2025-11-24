@@ -1,9 +1,11 @@
 "use client"
 
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useI18n } from '@/components/I18nProvider'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type Member = {
   id: string
@@ -20,9 +22,12 @@ type Member = {
   monthly_fee: number | null
 }
 
+type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first'
+
 export default function MembersClient({ initial }: { initial: Member[] }) {
   const { t } = useI18n()
   const router = useRouter()
+  const [sortBy, setSortBy] = useState<SortOption>('name-asc')
   
   const getRoleTranslation = (role: string | null) => {
     if (role === 'Manager') return t('manager')
@@ -78,22 +83,82 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
       </span>
     )
   }
+
+  // Sort members based on selected option
+  const sortedMembers = useMemo(() => {
+    const sorted = [...initial]
+    
+    switch (sortBy) {
+      case 'name-asc':
+        return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      
+      case 'most-paid':
+        return sorted.sort((a, b) => {
+          const aTotal = a.total_paid || 0
+          const bTotal = b.total_paid || 0
+          return bTotal - aTotal // Highest first
+        })
+      
+      case 'least-paid':
+        return sorted.sort((a, b) => {
+          const aTotal = a.total_paid || 0
+          const bTotal = b.total_paid || 0
+          return aTotal - bTotal // Lowest first
+        })
+      
+      case 'unpaid-first':
+        return sorted.sort((a, b) => {
+          const aFee = a.monthly_fee || 0
+          const aPaid = a.total_paid || 0
+          const bFee = b.monthly_fee || 0
+          const bPaid = b.total_paid || 0
+          
+          const aOwes = aFee - aPaid
+          const bOwes = bFee - bPaid
+          
+          // Show those who owe the most first
+          return bOwes - aOwes
+        })
+      
+      default:
+        return sorted
+    }
+  }, [initial, sortBy])
   
   return (
-    <div className="overflow-auto">
-      <table className="min-w-[800px] w-full text-sm">
-        <thead>
-          <tr className="text-left">
-            <th className="py-3 px-2">{t("name")}</th>
-            <th className="py-3 px-2">{t("email")}</th>
-            <th className="py-3 px-2">{t("phone")}</th>
-            <th className="py-3 px-2">{t("householdMembers")}</th>
-            <th className="py-3 px-2">{t("role")}</th>
-            <th className="py-3 px-2">Payment Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {initial.map(m => (
+    <div className="space-y-4">
+      {/* Filter Controls */}
+      <div className="flex items-center gap-2">
+        <label htmlFor="sort" className="text-sm font-medium">
+          Sort by:
+        </label>
+        <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+            <SelectItem value="most-paid">Most Paid</SelectItem>
+            <SelectItem value="least-paid">Least Paid</SelectItem>
+            <SelectItem value="unpaid-first">Unpaid First</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="overflow-auto">
+        <table className="min-w-[800px] w-full text-sm">
+          <thead>
+            <tr className="text-left">
+              <th className="py-3 px-2">{t("name")}</th>
+              <th className="py-3 px-2">{t("email")}</th>
+              <th className="py-3 px-2">{t("phone")}</th>
+              <th className="py-3 px-2">{t("householdMembers")}</th>
+              <th className="py-3 px-2">{t("role")}</th>
+              <th className="py-3 px-2">Payment Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedMembers.map(m => (
             <tr 
               key={m.id} 
               onClick={() => m.member_id && router.push(`/members/${m.member_id}`)}
@@ -126,9 +191,10 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 {getPaymentStatusBadge(m)}
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
