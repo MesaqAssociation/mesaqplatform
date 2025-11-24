@@ -56,16 +56,17 @@ COMMENT ON COLUMN financial_accounts.is_donation_account IS 'If true, this accou
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS bank_statements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id TEXT REFERENCES financial_accounts(id) ON DELETE CASCADE,
-  file_name TEXT NOT NULL,
-  file_size INTEGER,
-  file_type TEXT DEFAULT 'application/pdf',
-  uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  account_id TEXT REFERENCES financial_accounts(id) ON DELETE CASCADE NOT NULL,
+  file_name TEXT NOT NULL
 );
 
--- Add columns if they don't exist (in case table was created earlier)
+-- Add all optional columns (in case table was created earlier without them)
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS file_size INTEGER;
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT 'application/pdf';
+
 ALTER TABLE bank_statements 
 ADD COLUMN IF NOT EXISTS statement_date_from DATE;
 
@@ -74,6 +75,15 @@ ADD COLUMN IF NOT EXISTS statement_date_to DATE;
 
 ALTER TABLE bank_statements 
 ADD COLUMN IF NOT EXISTS transaction_count INTEGER DEFAULT 0;
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Indexes for bank statements
 CREATE INDEX IF NOT EXISTS idx_bank_statements_account ON bank_statements(account_id);
