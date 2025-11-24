@@ -26,13 +26,15 @@ export default async function DashboardPage() {
   let recentTransactions: any[] = []
   let upcomingEvents: any[] = []
   let accounts: any[] = []
+  let unpaidBalances: any[] = []
 
   try {
-    // Get member stats: families (registered members) and total members (registered + sum of household members)
+    // Get member stats: families (registered members) and total members (sum of household sizes)
+    // If household_members is NULL or 0, count as 1 person (the registered member)
     const { rows: stats } = await pool.query(`
       SELECT 
         COUNT(*) as families,
-        COUNT(*) + COALESCE(SUM(household_members), 0) as total_members
+        SUM(GREATEST(COALESCE(household_members, 1), 1)) as total_members
       FROM users
     `)
     
@@ -45,9 +47,9 @@ export default async function DashboardPage() {
   }
 
   try {
-    // Get all financial accounts
+    // Get all financial accounts with current balances
     const { rows } = await pool.query(`
-      SELECT id, account_name, account_number
+      SELECT id, account_name, account_number, current_balance
       FROM financial_accounts
       ORDER BY created_at ASC
     `)
@@ -94,6 +96,24 @@ export default async function DashboardPage() {
   } catch (error) {
     console.error('Error fetching events:', error)
   }
+
+  try {
+    // Get members with unpaid balances (negative balance = owes money)
+    // Show worst offenders first (most negative), then positive balances
+    const { rows } = await pool.query(`
+      SELECT 
+        u.id,
+        u.name,
+        u.current_balance
+      FROM users u
+      WHERE u.current_balance != 0
+      ORDER BY u.current_balance ASC
+      LIMIT 10
+    `)
+    unpaidBalances = rows
+  } catch (error) {
+    console.error('Error fetching unpaid balances:', error)
+  }
   
   return (
     <MainLayout user={user}>
@@ -102,6 +122,7 @@ export default async function DashboardPage() {
         recentTransactions={recentTransactions}
         upcomingEvents={upcomingEvents}
         accounts={accounts}
+        unpaidBalances={unpaidBalances}
       />
     </MainLayout>
   )

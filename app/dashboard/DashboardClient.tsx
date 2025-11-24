@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useI18n } from '@/components/I18nProvider'
-import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight } from '@tabler/icons-react'
+import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
 import Link from 'next/link'
 
 type Transaction = {
@@ -27,6 +27,7 @@ type Account = {
   id: string
   account_name: string
   account_number: string | null
+  current_balance: number
 }
 
 type MemberStats = {
@@ -34,14 +35,21 @@ type MemberStats = {
   total_members: number
 }
 
+type UnpaidBalance = {
+  id: string
+  name: string
+  current_balance: number
+}
+
 type Props = {
   memberStats: MemberStats
   recentTransactions: Transaction[]
   upcomingEvents: Event[]
   accounts: Account[]
+  unpaidBalances: UnpaidBalance[]
 }
 
-export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts }: Props) {
+export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts, unpaidBalances }: Props) {
   const { t } = useI18n()
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
@@ -171,6 +179,19 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
             </div>
           )}
 
+          {/* Current Balance */}
+          {selectedAccountId && accounts.find(a => a.id === selectedAccountId) && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+              <p className="text-lg font-bold">
+                ${accounts.find(a => a.id === selectedAccountId)!.current_balance.toLocaleString('en-AU', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-3">
             {accountTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("noTransactions")}</p>
@@ -257,6 +278,45 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
 
       </div>
+
+      {/* Unpaid Balances Card - Full Width */}
+      {unpaidBalances.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-500/10 p-3 rounded-lg">
+                <IconAlertCircle className="size-6 text-orange-500" />
+              </div>
+              <h2 className="text-lg font-semibold">Outstanding Balances</h2>
+            </div>
+            <Link href="/members" className="text-sm text-primary hover:underline">
+              View All Members
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {unpaidBalances.map((member) => (
+              <Link 
+                href={`/members/${member.id}`}
+                key={member.id}
+                className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{member.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.current_balance < 0 ? 'Owes' : 'Credit'}
+                  </p>
+                </div>
+                <div className={`text-sm font-bold ml-2 flex-shrink-0 ${
+                  member.current_balance < 0 ? 'text-red-500' : 'text-green-500'
+                }`}>
+                  {member.current_balance < 0 ? '-' : '+'}${Math.abs(member.current_balance).toFixed(2)}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
