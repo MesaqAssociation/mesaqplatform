@@ -57,12 +57,17 @@ export async function GET(req: NextRequest) {
         t.created_by,
         t.source,
         t.matched_member_id,
+        t.statement_id,
         t.created_at,
         u.name as creator_name,
-        m.name as matched_member_name
+        m.name as matched_member_name,
+        bs.file_name as statement_file_name,
+        to_char(bs.statement_date_from, 'YYYY-MM-DD') as statement_date_from,
+        to_char(bs.statement_date_to, 'YYYY-MM-DD') as statement_date_to
       FROM transactions t 
       LEFT JOIN users u ON t.created_by = u.id 
       LEFT JOIN users m ON t.matched_member_id = m.id
+      LEFT JOIN bank_statements bs ON t.statement_id = bs.id
       WHERE t.account_id = $1 
         AND EXTRACT(YEAR FROM t.transaction_date) = $2
         AND EXTRACT(MONTH FROM t.transaction_date) = $3

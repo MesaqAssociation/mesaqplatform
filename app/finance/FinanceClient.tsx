@@ -1205,6 +1205,23 @@ export default function FinanceClient({
                 </p>
               </div>
 
+              {selectedTransaction.statement_file_name && (
+                <div className="border-t pt-4">
+                  <Label className="text-muted-foreground text-xs">Bank Statement</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <IconFileText className="size-4 text-blue-500" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{selectedTransaction.statement_file_name}</p>
+                      {selectedTransaction.statement_date_from && selectedTransaction.statement_date_to && (
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(selectedTransaction.statement_date_from)} - {formatDate(selectedTransaction.statement_date_to)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between pt-4 border-t">
                 <Button 
                   variant="destructive" 
