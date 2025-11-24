@@ -124,9 +124,9 @@ export async function POST(req: NextRequest) {
     let runningBalance = accounts[0]?.current_balance || 0
 
     // Create bank statement record
-    const dates = parsed.transactions.map(t => t.date).filter(d => d)
-    const minDate = dates.length > 0 ? dates.reduce((a, b) => a < b ? a : b) : null
-    const maxDate = dates.length > 0 ? dates.reduce((a, b) => a > b ? a : b) : null
+    const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
+    const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
+    const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
     
     const { rows: statementRows } = await pool.query(`
       INSERT INTO bank_statements 
