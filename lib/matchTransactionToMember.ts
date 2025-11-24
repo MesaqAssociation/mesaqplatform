@@ -84,13 +84,18 @@ export async function matchTransactionToMember(
     const bankingNames = member.banking_name.split(',').map((n: string) => n.trim().toLowerCase())
     
     for (const bankingName of bankingNames) {
-      // Only match the FULL banking name, not individual parts
-      if (bankingName && transactionNameLower.includes(bankingName)) {
-        return {
-          memberId: member.id,
-          memberName: member.name,
-          matchType: 'banking_name',
-          confidence: 'high'
+      // Only match the FULL banking name with word boundaries to prevent partial matches
+      // e.g., "karim" should NOT match "karimi"
+      if (bankingName && bankingName.length >= 3) {
+        // Use word boundary regex to match whole words only
+        const regex = new RegExp(`\\b${bankingName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+        if (regex.test(transactionName)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'banking_name',
+            confidence: 'high'
+          }
         }
       }
     }
@@ -175,17 +180,21 @@ export async function batchMatchTransactions(
       }
     }
     
-    // Step 2: Check banking name (full name match only)
-    const txnNameLower = txn.name.toLowerCase()
+    // Step 2: Check banking name (full name match only with word boundaries)
+    const txnName = txn.name
     
-    // Match full banking names only
+    // Match full banking names only with word boundaries
     for (const [bankingName, member] of bankingNameMap.entries()) {
-      if (txnNameLower.includes(bankingName)) {
-        return {
-          memberId: member.id,
-          memberName: member.name,
-          matchType: 'banking_name' as const,
-          confidence: 'high' as const
+      if (bankingName && bankingName.length >= 3) {
+        // Use word boundary regex to prevent partial matches like "karim" matching "karimi"
+        const regex = new RegExp(`\\b${bankingName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+        if (regex.test(txnName)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'banking_name' as const,
+            confidence: 'high' as const
+          }
         }
       }
     }

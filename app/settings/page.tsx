@@ -62,9 +62,14 @@ export default async function SettingsPage() {
     
     if (userRows.length > 0) {
       fullUserData = userRows[0]
+      console.log('✅ Loaded user data for:', fullUserData.name)
+    } else {
+      console.error('❌ No user found with id:', userId)
     }
   } catch (error) {
     console.error('Error fetching settings:', error)
+  } finally {
+    await pool.end()
   }
   
   return (

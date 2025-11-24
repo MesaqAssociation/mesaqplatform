@@ -85,6 +85,10 @@ ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE bank_statements 
 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
+-- Remove file_url column if it exists (we don't use cloud storage yet)
+ALTER TABLE bank_statements 
+DROP COLUMN IF EXISTS file_url;
+
 -- Indexes for bank statements
 CREATE INDEX IF NOT EXISTS idx_bank_statements_account ON bank_statements(account_id);
 CREATE INDEX IF NOT EXISTS idx_bank_statements_dates ON bank_statements(statement_date_from, statement_date_to);

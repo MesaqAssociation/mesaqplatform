@@ -5,25 +5,34 @@ import { useRouter } from 'next/navigation'
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { IconSearch, IconUser, IconCalendarEvent, IconUsersGroup } from '@tabler/icons-react'
 
-type SearchResult = {
-  type: 'member' | 'event' | 'meeting'
+type MemberResult = {
+  type: 'member'
   id: string | number
-  name?: string
-  title?: string
+  name: string
   email?: string
   phone?: string
+  role?: string
+}
+
+type EventResult = {
+  type: 'event' | 'meeting'
+  id: string | number
+  title: string
   event_date?: string
   location?: string
+  event_type?: string
 }
+
+type SearchResult = MemberResult | EventResult
 
 export default function GlobalSearch() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{
-    members: SearchResult[]
-    events: SearchResult[]
-    meetings: SearchResult[]
+    members: MemberResult[]
+    events: EventResult[]
+    meetings: EventResult[]
   }>({
     members: [],
     events: [],
@@ -57,7 +66,14 @@ export default function GlobalSearch() {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
         if (res.ok) {
           const data = await res.json()
-          setResults(data)
+          console.log('Search results:', data)
+          setResults({
+            members: data.members || [],
+            events: data.events || [],
+            meetings: data.meetings || []
+          })
+        } else {
+          console.error('Search API error:', res.status, res.statusText)
         }
       } catch (error) {
         console.error('Search failed:', error)
