@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button'
 import { NavUser } from '@/components/nav-user'
 import { useI18n } from '@/components/I18nProvider'
+import GlobalSearch from '@/components/GlobalSearch'
 
 type SidebarProps = {
   user?: {
@@ -44,6 +45,11 @@ export function Sidebar({ user }: SidebarProps) {
         <Link href="/dashboard" className="flex items-center">
           <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" className="object-contain" />
         </Link>
+      </div>
+
+      {/* Global Search */}
+      <div className="px-4 pb-2">
+        <GlobalSearch />
       </div>
 
       {/* Quick Create */}
