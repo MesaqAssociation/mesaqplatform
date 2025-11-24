@@ -60,13 +60,20 @@ CREATE TABLE IF NOT EXISTS bank_statements (
   file_name TEXT NOT NULL,
   file_size INTEGER,
   file_type TEXT DEFAULT 'application/pdf',
-  statement_date_from DATE,
-  statement_date_to DATE,
-  transaction_count INTEGER DEFAULT 0,
   uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
   uploaded_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add columns if they don't exist (in case table was created earlier)
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS statement_date_from DATE;
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS statement_date_to DATE;
+
+ALTER TABLE bank_statements 
+ADD COLUMN IF NOT EXISTS transaction_count INTEGER DEFAULT 0;
 
 -- Indexes for bank statements
 CREATE INDEX IF NOT EXISTS idx_bank_statements_account ON bank_statements(account_id);
