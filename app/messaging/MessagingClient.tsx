@@ -76,61 +76,57 @@ export default function MessagingClient() {
       return
     }
 
-    if (!confirm(`Send message to ${selectedMembers.size} member(s)?`)) {
-      return
-    }
-
     setSending(true)
     setSendProgress(0)
     setSendStatus('Starting...')
 
+    let sent = 0
+    let failed = 0
+
     try {
-      const res = await fetch('/api/messaging/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberIds: Array.from(selectedMembers),
-          message: message.trim(),
-        }),
-      })
+      const memberIds = Array.from(selectedMembers)
+      
+      for (let i = 0; i < memberIds.length; i++) {
+        const memberId = memberIds[i]
+        const progress = Math.round(((i + 1) / memberIds.length) * 100)
+        
+        // Get member name for status
+        const member = members.find(m => m.id === memberId)
+        setSendStatus(`Sending to ${member?.name || 'member'}... (${i + 1}/${memberIds.length})`)
+        setSendProgress(progress)
 
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
+        try {
+          // Send individual message
+          const res = await fetch('/api/messaging/send-single', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              memberId,
+              message: message.trim(),
+            }),
+          })
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk.split('\n').filter(line => line.trim())
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6))
-                if (data.progress !== undefined) {
-                  setSendProgress(data.progress)
-                }
-                if (data.status) {
-                  setSendStatus(data.status)
-                }
-                if (data.complete) {
-                  // Clear everything first
-                  setMessage('')
-                  setSelectedMembers(new Set())
-                  setSearchQuery('')
-                  
-                  // Show success message
-                  alert(`✅ Messages sent successfully!\n\nSent: ${data.sent}\nFailed: ${data.failed}`)
-                }
-              } catch (e) {
-                console.error('Error parsing SSE data:', e)
-              }
-            }
+          if (res.ok) {
+            sent++
+          } else {
+            failed++
           }
+        } catch (err) {
+          console.error(`Failed to send to ${member?.name}:`, err)
+          failed++
         }
+
+        // Small delay between messages
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
+
+      // Clear everything
+      setMessage('')
+      setSelectedMembers(new Set())
+      setSearchQuery('')
+      
+      // Show success message
+      alert(`✅ Messages sent successfully!\n\nSent: ${sent}\nFailed: ${failed}`)
     } catch (err) {
       console.error('Send error:', err)
       alert('Failed to send messages')

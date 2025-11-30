@@ -34,7 +34,12 @@ export async function DELETE(
     [userId]
   )
   
-  if (userRows.length === 0 || !['admin', 'board', 'Manager'].includes(userRows[0].role)) {
+  if (userRows.length === 0) {
+    return NextResponse.json({ error: 'User not found' }, { status: 403 })
+  }
+  
+  const userRole = (userRows[0].role || '').toLowerCase()
+  if (!['admin', 'board', 'manager'].includes(userRole)) {
     return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 })
   }
 

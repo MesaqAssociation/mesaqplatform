@@ -60,15 +60,41 @@ export default function DocumentsClient({ user }: { user: User | null }) {
     }
   }
 
+  const handleFileSelect = async (selectedFile: File) => {
+    setFile(selectedFile)
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadComplete(false)
+
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev
+        return prev + 10
+      })
+    }, 200)
+
+    // Simulate file processing time
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    clearInterval(progressInterval)
+    setUploadProgress(100)
+    setUploadComplete(true)
+    setUploading(false)
+  }
+
   const handleUpload = async () => {
     if (!title || !file) {
       alert('Please provide a title and file')
       return
     }
 
+    if (!uploadComplete) {
+      alert('Please wait for file upload to complete')
+      return
+    }
+
     setUploading(true)
-    setUploadProgress(0)
-    setUploadComplete(false)
 
     try {
       const formData = new FormData()
@@ -76,26 +102,12 @@ export default function DocumentsClient({ user }: { user: User | null }) {
       formData.append('description', description)
       formData.append('file', file)
 
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) return prev
-          return prev + 10
-        })
-      }, 200)
-
       const res = await fetch('/api/documents', {
         method: 'POST',
         body: formData,
       })
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-      setUploadComplete(true)
-
       if (res.ok) {
-        // Wait a moment to show 100% complete
-        await new Promise(resolve => setTimeout(resolve, 500))
         alert('Document uploaded successfully!')
         setShowUploadDialog(false)
         setTitle('')
@@ -273,9 +285,15 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               <Input
                 id="file"
                 type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  const selectedFile = e.target.files?.[0]
+                  if (selectedFile) {
+                    handleFileSelect(selectedFile)
+                  }
+                }}
                 className="mt-1"
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                disabled={uploading}
               />
               {file && (
                 <p className="text-xs text-muted-foreground mt-1">

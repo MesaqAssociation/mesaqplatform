@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -132,14 +132,9 @@ export default function FinanceClient({
     setHasMounted(true)
   }, [])
   
-  // Load transactions when account or month changes (but skip on initial mount)
-  useEffect(() => {
-    if (hasMounted && selectedAccountId) {
-      loadTransactions()
-    }
-  }, [selectedAccountId, currentMonth, hasMounted])
-  
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
+    if (!selectedAccountId) return
+    
     setLoadingTransactions(true)
     try {
       const year = currentMonth.getFullYear()
@@ -157,7 +152,14 @@ export default function FinanceClient({
     } finally {
       setLoadingTransactions(false)
     }
-  }
+  }, [selectedAccountId, currentMonth])
+  
+  // Load transactions when account or month changes (but skip on initial mount)
+  useEffect(() => {
+    if (hasMounted) {
+      loadTransactions()
+    }
+  }, [hasMounted, loadTransactions])
   
   const handleAddAccount = async () => {
     if (!newAccountName.trim() || !newAccountNumber.trim() || !newAccountBSB.trim()) {

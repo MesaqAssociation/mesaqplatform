@@ -69,8 +69,16 @@ export async function POST(req: NextRequest) {
     [userId]
   )
   
-  if (userRows.length === 0 || !['admin', 'board', 'Manager'].includes(userRows[0].role)) {
-    return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 })
+  if (userRows.length === 0) {
+    return NextResponse.json({ error: 'User not found' }, { status: 403 })
+  }
+  
+  const userRole = (userRows[0].role || '').toLowerCase()
+  if (!['admin', 'board', 'manager'].includes(userRole)) {
+    return NextResponse.json({ 
+      error: 'Unauthorized - Admin only',
+      debug: `Your role: ${userRows[0].role}`
+    }, { status: 403 })
   }
 
   try {
