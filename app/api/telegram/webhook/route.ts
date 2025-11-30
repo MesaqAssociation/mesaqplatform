@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
 
       try {
         // Download the PDF file
-        const fileUrl = await getTelegramFileUrl(document.file_id)
-        const pdfBuffer = await downloadFile(fileUrl)
+        const telegramFileUrl = await getTelegramFileUrl(document.file_id)
+        const pdfBuffer = await downloadFile(telegramFileUrl)
 
         // Parse the PDF
         const parsed = await parseBankStatementPDF(pdfBuffer)
