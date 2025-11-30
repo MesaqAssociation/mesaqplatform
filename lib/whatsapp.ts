@@ -34,45 +34,36 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<boo
 }
 
 /**
- * Send message using WhatsApp Business API
+ * Send message using wasenderapi
  */
 async function sendActualMessage(to: string, body: string): Promise<boolean> {
-  const apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0'
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+  const apiKey = process.env.WASENDER_API_KEY
 
-  if (!phoneNumberId || !accessToken) {
-    console.error('❌ WhatsApp API credentials not configured')
-    console.error('   Missing:', {
-      phoneNumberId: !phoneNumberId ? 'WHATSAPP_PHONE_NUMBER_ID' : '✓',
-      accessToken: !accessToken ? 'WHATSAPP_ACCESS_TOKEN' : '✓'
-    })
+  if (!apiKey) {
+    console.error('❌ Wasender API key not configured')
+    console.error('   Missing: WASENDER_API_KEY')
     return false
   }
 
   try {
     const cleanPhone = to.replace(/\s+/g, '') // Remove spaces from phone number
-    console.log(`📤 Sending WhatsApp to: ${cleanPhone}`)
+    console.log(`📤 Sending WhatsApp via wasenderapi to: ${cleanPhone}`)
     
-    const response = await fetch(`${apiUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch('https://wasenderapi.com/api/send-message', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        messaging_product: 'whatsapp',
         to: cleanPhone,
-        type: 'text',
-        text: {
-          body: body
-        }
+        text: body
       })
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      console.error('❌ WhatsApp API error:', {
+      const error = await response.text()
+      console.error('❌ Wasender API error:', {
         status: response.status,
         statusText: response.statusText,
         error: error
@@ -84,7 +75,7 @@ async function sendActualMessage(to: string, body: string): Promise<boolean> {
     console.log(`✅ WhatsApp message sent to ${to}`, result)
     return true
   } catch (error) {
-    console.error('❌ Error calling WhatsApp API:', error)
+    console.error('❌ Error calling Wasender API:', error)
     return false
   }
 }

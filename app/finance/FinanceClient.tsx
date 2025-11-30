@@ -679,12 +679,12 @@ export default function FinanceClient({
 
   const handleTestSendMessages = async () => {
     const confirm = window.confirm(
-      `🧪 TEST MODE: Send Payment Status\n\n` +
-      `This will send payment status for unpaid members to YOUR test number.\n\n` +
+      `🧪 TEST MODE: Send All Member Balances\n\n` +
+      `This will send a complete balance report to YOUR test number.\n\n` +
       `What happens:\n` +
-      `• Checks who hasn't paid for last month\n` +
-      `• ALL messages go to WHATSAPP_TEST_NUMBER\n` +
-      `• Shows who would get messages in production\n` +
+      `• Calculates balance for ALL members\n` +
+      `• Shows + for credit (ahead) and - for debt (behind)\n` +
+      `• Sends to WHATSAPP_TEST_NUMBER via wasenderapi\n` +
       `• NO real members messaged\n` +
       `• NO DATA stored\n\n` +
       `Continue?`

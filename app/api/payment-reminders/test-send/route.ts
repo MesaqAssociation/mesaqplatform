@@ -5,7 +5,6 @@ import jwt from 'jsonwebtoken'
 import { 
   sendWhatsAppMessage, 
   formatPhoneNumber,
-  generateFirstReminderMessage,
 } from '@/lib/whatsapp'
 
 export const runtime = 'nodejs'
@@ -16,9 +15,8 @@ const pool = new Pool({
 })
 
 /**
- * Test endpoint to send first reminders as if it's Day 7 of next month
- * Does NOT store any data in payment_reminders table
- * Resets on page refresh
+ * Test endpoint to send ALL members' balance status
+ * Shows + for credit (ahead on payments) and - for debt (behind on payments)
  */
 export async function POST(req: NextRequest) {
   // Verify user is authenticated
@@ -34,21 +32,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check if WhatsApp is configured
-    if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_ACCESS_TOKEN) {
+    // Check if Wasender API is configured
+    if (!process.env.WASENDER_API_KEY) {
       return NextResponse.json({ 
-        error: 'WhatsApp not configured',
-        message: 'WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN must be set'
+        error: 'Wasender API not configured',
+        message: 'WASENDER_API_KEY must be set'
       }, { status: 400 })
     }
 
-    // Simulate Day 7 of next month
-    const today = new Date()
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 7)
-    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    
-    console.log(`🧪 TEST MODE: Simulating Day 7 of ${nextMonth.toLocaleDateString()}`)
-    console.log(`   Checking for unpaid fees from ${lastMonth.toLocaleDateString()}`)
+    console.log(`🧪 TEST MODE: Fetching all members with balance status...`)
 
     // Get monthly fee
     const { rows: feeRows } = await pool.query(
@@ -56,106 +48,159 @@ export async function POST(req: NextRequest) {
     )
     const monthlyFee = parseFloat(feeRows[0]?.value || '50.00')
 
-    // Get all members with phone numbers
+    // Get all members
     const { rows: members } = await pool.query(`
       SELECT 
         u.id,
+        u.member_id,
         u.name,
         u.phone,
-        u.email
+        u.created_at
       FROM users u
-      WHERE u.phone IS NOT NULL AND u.phone != ''
+      ORDER BY u.name
     `)
 
-    const monthName = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    console.log(`📊 Found ${members.length} members total`)
+
+    // Calculate balance for each member
+    const memberBalances = []
     
-    let messagesSent = 0
-    let messagesFailed = 0
-    let memberResults: any[] = []
-
-    console.log(`📊 Found ${members.length} members with phone numbers`)
-
     for (const member of members) {
       try {
-        // Check if member has paid for last month
-        const { rows: paymentRows } = await pool.query(`
-          SELECT SUM(amount) as total_paid
+        // Calculate months since member joined
+        const startDate = member.created_at ? new Date(member.created_at) : new Date()
+        const currentDate = new Date()
+        const currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+        const now = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+        
+        const months: string[] = []
+        while (currentMonth <= now) {
+          months.push(currentMonth.toISOString().split('T')[0])
+          currentMonth.setMonth(currentMonth.getMonth() + 1)
+        }
+
+        // Get all payments for this member
+        const { rows: payments } = await pool.query(`
+          SELECT 
+            payment_month,
+            SUM(amount) as total_amount
           FROM membership_payments
           WHERE user_id = $1
-            AND payment_month = $2
-            AND status = 'paid'
-        `, [member.id, lastMonth.toISOString().split('T')[0]])
+          GROUP BY payment_month
+        `, [member.id])
 
-        const totalPaid = parseFloat(paymentRows[0]?.total_paid || '0')
-        const hasPaid = totalPaid >= monthlyFee
+        // Build payment map
+        const paymentMap = new Map()
+        payments.forEach(p => {
+          const monthKey = new Date(p.payment_month).toISOString().split('T')[0]
+          paymentMap.set(monthKey, parseFloat(p.total_amount))
+        })
 
-        if (!hasPaid) {
-          // Send first reminder
-          const message = generateFirstReminderMessage(member.name, monthlyFee, monthName)
-          const phone = formatPhoneNumber(member.phone)
-
-          console.log(`📤 Sending test message to ${member.name} (${phone})...`)
-          const sent = await sendWhatsAppMessage({ to: phone, body: message })
-
-          if (sent) {
-            messagesSent++
-            memberResults.push({
-              name: member.name,
-              phone: member.phone,
-              amount: monthlyFee,
-              month: monthName,
-              sent: true
-            })
-            console.log(`✅ TEST: Sent reminder to ${member.name}`)
-          } else {
-            messagesFailed++
-            memberResults.push({
-              name: member.name,
-              phone: member.phone,
-              amount: monthlyFee,
-              month: monthName,
-              sent: false,
-              error: 'Failed to send'
-            })
-            console.log(`❌ TEST: Failed to send to ${member.name}`)
-          }
-        } else {
-          memberResults.push({
-            name: member.name,
-            phone: member.phone,
-            amount: monthlyFee,
-            month: monthName,
-            sent: false,
-            skipped: true,
-            reason: 'Already paid'
-          })
-          console.log(`✓ ${member.name} already paid - skipped`)
+        // Calculate running balance
+        let runningBalance = 0
+        for (const month of months) {
+          const payment = paymentMap.get(month) || 0
+          runningBalance = runningBalance + payment - monthlyFee
         }
-      } catch (memberErr: any) {
-        console.error(`Error processing member ${member.name}:`, memberErr)
-        messagesFailed++
-        memberResults.push({
+
+        memberBalances.push({
+          memberId: member.member_id,
           name: member.name,
           phone: member.phone,
-          sent: false,
+          balance: runningBalance,
+          monthsOwed: months.length,
+          totalPaid: payments.reduce((sum, p) => sum + parseFloat(p.total_amount), 0)
+        })
+
+      } catch (memberErr: any) {
+        console.error(`Error processing member ${member.name}:`, memberErr)
+        memberBalances.push({
+          memberId: member.member_id,
+          name: member.name,
+          phone: member.phone,
+          balance: 0,
           error: memberErr.message
         })
       }
     }
 
-    console.log(`🧪 TEST COMPLETE: ${messagesSent} messages sent, ${messagesFailed} failed (no data stored)`)
+    // Sort by balance (most negative first, then most positive)
+    memberBalances.sort((a, b) => a.balance - b.balance)
+
+    // Format message with all members and their balances
+    let message = '📊 MEMBER BALANCE REPORT\n'
+    message += `Date: ${new Date().toLocaleDateString('en-AU')}\n`
+    message += `Total Members: ${memberBalances.length}\n`
+    message += '━━━━━━━━━━━━━━━━━━━━\n\n'
+
+    for (const member of memberBalances) {
+      const sign = member.balance >= 0 ? '+' : '-'
+      const amount = Math.abs(member.balance).toFixed(2)
+      const status = member.balance >= 0 ? '✅' : '❌'
+      
+      message += `${status} ${member.name}\n`
+      message += `   ID: ${member.memberId || 'N/A'} | Balance: ${sign}$${amount}\n`
+      if (member.phone) {
+        message += `   Phone: ${member.phone}\n`
+      }
+      message += '\n'
+    }
+
+    // Summary statistics
+    const behindCount = memberBalances.filter(m => m.balance < 0).length
+    const aheadCount = memberBalances.filter(m => m.balance > 0).length
+    const evenCount = memberBalances.filter(m => m.balance === 0).length
+    const totalDebt = memberBalances
+      .filter(m => m.balance < 0)
+      .reduce((sum, m) => sum + Math.abs(m.balance), 0)
+    const totalCredit = memberBalances
+      .filter(m => m.balance > 0)
+      .reduce((sum, m) => sum + m.balance, 0)
+
+    message += '━━━━━━━━━━━━━━━━━━━━\n'
+    message += '📈 SUMMARY\n'
+    message += `Behind: ${behindCount} members (-$${totalDebt.toFixed(2)})\n`
+    message += `Ahead: ${aheadCount} members (+$${totalCredit.toFixed(2)})\n`
+    message += `Even: ${evenCount} members\n`
+
+    // Send to test number
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+    if (!testNumber) {
+      return NextResponse.json({ 
+        error: 'Test number not configured',
+        message: 'WHATSAPP_TEST_NUMBER must be set',
+        data: memberBalances
+      }, { status: 400 })
+    }
+
+    console.log(`📤 Sending balance report to test number: ${testNumber}`)
+    const sent = await sendWhatsAppMessage({ 
+      to: formatPhoneNumber(testNumber), 
+      body: message 
+    })
+
+    if (!sent) {
+      return NextResponse.json({ 
+        error: 'Failed to send message',
+        data: memberBalances
+      }, { status: 500 })
+    }
+
+    console.log(`✅ TEST COMPLETE: Balance report sent`)
 
     return NextResponse.json({
       success: true,
       testMode: true,
-      simulatedDate: nextMonth.toISOString().split('T')[0],
-      simulatedDay: 7,
-      checkingMonth: monthName,
-      totalMembers: members.length,
-      messagesSent,
-      messagesFailed,
-      results: memberResults,
-      note: 'This was a test - no data was stored in the database'
+      totalMembers: memberBalances.length,
+      behindCount,
+      aheadCount,
+      evenCount,
+      totalDebt,
+      totalCredit,
+      messageSent: true,
+      sentTo: testNumber,
+      data: memberBalances,
+      note: 'Balance report sent to test number'
     })
   } catch (err: any) {
     console.error('Test send error:', err)
