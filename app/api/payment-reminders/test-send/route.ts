@@ -15,8 +15,8 @@ const pool = new Pool({
 })
 
 /**
- * Test endpoint to send ALL members' balance status
- * Shows + for credit (ahead on payments) and - for debt (behind on payments)
+ * Test endpoint to send personalized payment reminder to members who are behind
+ * For now, only sends to 1 member as a test
  */
 export async function POST(req: NextRequest) {
   // Verify user is authenticated
@@ -40,7 +40,27 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log(`🧪 TEST MODE: Fetching all members with balance status...`)
+    console.log(`🧪 TEST MODE: Sending personalized payment reminders...`)
+
+    // Get first bank account details
+    const { rows: accounts } = await pool.query(`
+      SELECT id, account_name, account_number
+      FROM financial_accounts
+      WHERE is_donation_account = false OR is_donation_account IS NULL
+      ORDER BY created_at ASC
+      LIMIT 1
+    `)
+
+    if (accounts.length === 0) {
+      return NextResponse.json({ 
+        error: 'No bank account found',
+        message: 'Please add a bank account first'
+      }, { status: 400 })
+    }
+
+    const bankAccount = accounts[0]
+    const accountNumber = bankAccount.account_number || 'Not set'
+    const bsb = process.env.BANK_BSB || 'Contact admin'
 
     // Get monthly fee
     const { rows: feeRows } = await pool.query(
@@ -48,7 +68,7 @@ export async function POST(req: NextRequest) {
     )
     const monthlyFee = parseFloat(feeRows[0]?.value || '50.00')
 
-    // Get all members
+    // Get all members with phone numbers
     const { rows: members } = await pool.query(`
       SELECT 
         u.id,
@@ -57,13 +77,14 @@ export async function POST(req: NextRequest) {
         u.phone,
         u.created_at
       FROM users u
+      WHERE u.phone IS NOT NULL AND u.phone != ''
       ORDER BY u.name
     `)
 
-    console.log(`📊 Found ${members.length} members total`)
+    console.log(`📊 Found ${members.length} members with phone numbers`)
 
-    // Calculate balance for each member
-    const memberBalances = []
+    // Calculate balance for each member who is behind
+    const membersBehind = []
     
     for (const member of members) {
       try {
@@ -103,77 +124,62 @@ export async function POST(req: NextRequest) {
           runningBalance = runningBalance + payment - monthlyFee
         }
 
-        memberBalances.push({
-          memberId: member.member_id,
-          name: member.name,
-          phone: member.phone,
-          balance: runningBalance,
-          monthsOwed: months.length,
-          totalPaid: payments.reduce((sum, p) => sum + parseFloat(p.total_amount), 0)
-        })
+        // Only include members who are behind (negative balance)
+        if (runningBalance < 0) {
+          membersBehind.push({
+            memberId: member.member_id,
+            name: member.name,
+            phone: member.phone,
+            balance: runningBalance,
+            amountOwed: Math.abs(runningBalance)
+          })
+        }
 
       } catch (memberErr: any) {
         console.error(`Error processing member ${member.name}:`, memberErr)
-        memberBalances.push({
-          memberId: member.member_id,
-          name: member.name,
-          phone: member.phone,
-          balance: 0,
-          error: memberErr.message
-        })
       }
     }
 
-    // Sort by balance (most negative first, then most positive)
-    memberBalances.sort((a, b) => a.balance - b.balance)
+    // Sort by amount owed (most owed first)
+    membersBehind.sort((a, b) => a.balance - b.balance)
 
-    // Format message with all members and their balances
-    let message = '📊 MEMBER BALANCE REPORT\n'
-    message += `Date: ${new Date().toLocaleDateString('en-AU')}\n`
-    message += `Total Members: ${memberBalances.length}\n`
-    message += '━━━━━━━━━━━━━━━━━━━━\n\n'
-
-    for (const member of memberBalances) {
-      const sign = member.balance >= 0 ? '+' : '-'
-      const amount = Math.abs(member.balance).toFixed(2)
-      const status = member.balance >= 0 ? '✅' : '❌'
-      
-      message += `${status} ${member.name}\n`
-      message += `   ID: ${member.memberId || 'N/A'} | Balance: ${sign}$${amount}\n`
-      if (member.phone) {
-        message += `   Phone: ${member.phone}\n`
-      }
-      message += '\n'
+    if (membersBehind.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No members are behind on payments!',
+        totalMembers: members.length,
+        membersBehind: 0
+      })
     }
 
-    // Summary statistics
-    const behindCount = memberBalances.filter(m => m.balance < 0).length
-    const aheadCount = memberBalances.filter(m => m.balance > 0).length
-    const evenCount = memberBalances.filter(m => m.balance === 0).length
-    const totalDebt = memberBalances
-      .filter(m => m.balance < 0)
-      .reduce((sum, m) => sum + Math.abs(m.balance), 0)
-    const totalCredit = memberBalances
-      .filter(m => m.balance > 0)
-      .reduce((sum, m) => sum + m.balance, 0)
+    console.log(`💰 Found ${membersBehind.length} members behind on payments`)
 
-    message += '━━━━━━━━━━━━━━━━━━━━\n'
-    message += '📈 SUMMARY\n'
-    message += `Behind: ${behindCount} members (-$${totalDebt.toFixed(2)})\n`
-    message += `Ahead: ${aheadCount} members (+$${totalCredit.toFixed(2)})\n`
-    message += `Even: ${evenCount} members\n`
+    // For now, just send to the FIRST member who is behind (TEST MODE)
+    const testMember = membersBehind[0]
+    
+    // Format personalized message
+    const message = `Dear ${testMember.name},
 
-    // Send to test number
+You are behind $${testMember.amountOwed.toFixed(2)} on your Mesaq membership. Please pay to:
+
+Account Number: ${accountNumber}
+BSB: ${bsb}
+
+Make sure to have your phone number in the description or you may not be detected.
+
+Thank you,
+Mesaq Association`
+
+    // Send to test number (not to actual member)
     const testNumber = process.env.WHATSAPP_TEST_NUMBER
     if (!testNumber) {
       return NextResponse.json({ 
         error: 'Test number not configured',
-        message: 'WHATSAPP_TEST_NUMBER must be set',
-        data: memberBalances
+        message: 'WHATSAPP_TEST_NUMBER must be set'
       }, { status: 400 })
     }
 
-    console.log(`📤 Sending balance report to test number: ${testNumber}`)
+    console.log(`📤 TEST MODE: Sending message for ${testMember.name} to test number: ${testNumber}`)
     const sent = await sendWhatsAppMessage({ 
       to: formatPhoneNumber(testNumber), 
       body: message 
@@ -181,26 +187,29 @@ export async function POST(req: NextRequest) {
 
     if (!sent) {
       return NextResponse.json({ 
-        error: 'Failed to send message',
-        data: memberBalances
+        error: 'Failed to send message'
       }, { status: 500 })
     }
 
-    console.log(`✅ TEST COMPLETE: Balance report sent`)
+    console.log(`✅ TEST COMPLETE: Message sent to test number`)
 
     return NextResponse.json({
       success: true,
       testMode: true,
-      totalMembers: memberBalances.length,
-      behindCount,
-      aheadCount,
-      evenCount,
-      totalDebt,
-      totalCredit,
-      messageSent: true,
+      totalMembers: members.length,
+      membersBehind: membersBehind.length,
+      testMemberSent: {
+        name: testMember.name,
+        phone: testMember.phone,
+        amountOwed: testMember.amountOwed
+      },
       sentTo: testNumber,
-      data: memberBalances,
-      note: 'Balance report sent to test number'
+      bankAccount: {
+        name: bankAccount.account_name,
+        accountNumber,
+        bsb
+      },
+      note: 'TEST MODE: Message sent to WHATSAPP_TEST_NUMBER (not to actual member)'
     })
   } catch (err: any) {
     console.error('Test send error:', err)

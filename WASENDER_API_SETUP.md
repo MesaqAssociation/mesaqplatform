@@ -13,15 +13,14 @@ The system has been switched from the official WhatsApp Business API to **wasend
 - Only requires `WASENDER_API_KEY` environment variable
 
 ### 2. Updated Test Endpoint (`app/api/payment-reminders/test-send/route.ts`)
-- **New Functionality**: Sends ALL members' balance status
-- Calculates running balance for each member
-- Shows:
-  - `+` for credit (member is ahead on payments)
-  - `-` for debt (member is behind on payments)
-- Includes summary statistics:
-  - How many members are behind
-  - How many members are ahead
-  - Total debt and credit amounts
+- **New Functionality**: Sends personalized payment reminders
+- Calculates balance for members who are behind on payments
+- Sends customized message with:
+  - Member's name
+  - Exact amount owed
+  - Bank account details (account number & BSB)
+  - Payment instructions
+- **Test Mode**: Only sends to 1 member (to test number)
 
 ### 3. Updated Test Button (`app/finance/FinanceClient.tsx`)
 - Updated confirmation dialog to reflect new functionality
@@ -38,6 +37,9 @@ WASENDER_API_KEY=your_token_here
 
 # Test phone number to receive messages (required for testing)
 WHATSAPP_TEST_NUMBER=+1234567890
+
+# Bank details for payment instructions (optional, defaults to "Contact admin")
+BANK_BSB=123-456
 ```
 
 ### No Longer Needed
@@ -61,34 +63,29 @@ You can remove these old WhatsApp API variables:
 
 3. **Check Your Phone**:
    - You'll receive a WhatsApp message with:
-     - Complete list of all members
-     - Each member's balance (+$XX.XX or -$XX.XX)
-     - Summary statistics
+     - Personalized payment reminder for 1 member
+     - Amount owed
+     - Bank account details for payment
 
 ## Message Format
 
 The test message will look like:
 
 ```
-📊 MEMBER BALANCE REPORT
-Date: 30/11/2025
-Total Members: 45
-━━━━━━━━━━━━━━━━━━━━
+Dear John Smith,
 
-❌ John Smith
-   ID: 101 | Balance: -$120.00
-   Phone: +61412345678
+You are behind $120.00 on your Mesaq membership. Please pay to:
 
-✅ Jane Doe
-   ID: 102 | Balance: +$40.00
-   Phone: +61498765432
+Account Number: 12345678901234
+BSB: 123-456
 
-━━━━━━━━━━━━━━━━━━━━
-📈 SUMMARY
-Behind: 12 members (-$1,450.00)
-Ahead: 8 members (+$320.00)
-Even: 25 members
+Make sure to have your phone number in the description or you may not be detected.
+
+Thank you,
+Mesaq Association
 ```
+
+**Note**: This is sent to YOUR test number, not to the actual member.
 
 ## API Format
 
@@ -119,11 +116,13 @@ const response = await fetch('https://wasenderapi.com/api/send-message', {
 
 - [ ] Add `WASENDER_API_KEY` to environment variables
 - [ ] Add `WHATSAPP_TEST_NUMBER` to environment variables
+- [ ] Add `BANK_BSB` to environment variables (optional)
+- [ ] Make sure first bank account has `account_number` set
 - [ ] Redeploy application (if on Vercel)
 - [ ] Navigate to Finance page
 - [ ] Click test button
 - [ ] Confirm you receive the WhatsApp message
-- [ ] Verify all members are listed with correct balances
+- [ ] Verify message has correct member name and amount owed
 
 ## Balance Calculation Logic
 
@@ -138,11 +137,24 @@ Examples:
 - Joined 5 months ago, monthly fee $40, paid $240 → Balance: +$40 (ahead)
 - Joined 5 months ago, monthly fee $40, paid $120 → Balance: -$80 (behind)
 
+**Only members with negative balance (behind) receive reminders.**
+
+## Bank Account Setup
+
+The test message includes bank account details for payment. Make sure:
+
+1. **Account Number**: Set on the first financial account in Finance page
+2. **BSB**: Set via `BANK_BSB` environment variable (e.g., "123-456")
+
+If BSB is not set, message will show "Contact admin" as BSB.
+
 ## Notes
 
 - This is a **test-only** feature
+- Currently sends to **1 member only** (the one most behind)
 - NO production messages are sent to real members
 - All messages go to `WHATSAPP_TEST_NUMBER`
 - NO data is stored in the database
 - Calculations are done in real-time each time you click the button
+- Message includes payment instructions with bank details
 
