@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         id,
         account_name,
         account_number,
+        bsb,
         current_balance,
         currency,
         is_donation_account,
@@ -59,10 +60,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { account_name, account_number, is_donation_account } = body
+    const { account_name, account_number, bsb, is_donation_account } = body
 
-    if (!account_name || !account_number) {
-      return NextResponse.json({ error: 'Account name and number are required' }, { status: 400 })
+    if (!account_name || !account_number || !bsb) {
+      return NextResponse.json({ error: 'Account name, number, and BSB are required' }, { status: 400 })
     }
 
     // Validate account number format (14 digits)
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
     if (!/^\d{14}$/.test(cleanNumber)) {
       return NextResponse.json({ error: 'Account number must be 14 digits' }, { status: 400 })
     }
+
+    // Validate BSB format (6 digits, with or without dash)
+    const cleanBSB = bsb.replace(/-/g, '')
+    if (!/^\d{6}$/.test(cleanBSB)) {
+      return NextResponse.json({ error: 'BSB must be 6 digits (format: XXX-XXX)' }, { status: 400 })
+    }
+    // Format BSB as XXX-XXX
+    const formattedBSB = cleanBSB.slice(0, 3) + '-' + cleanBSB.slice(3)
 
     // Check if account number already exists
     const { rows: existing } = await pool.query(
@@ -83,10 +92,10 @@ export async function POST(req: NextRequest) {
 
     // Create new account
     const { rows: newAccount } = await pool.query(
-      `INSERT INTO financial_accounts (account_name, account_number, current_balance, is_donation_account)
-       VALUES ($1, $2, 0.00, $3)
-       RETURNING id, account_name, account_number, current_balance, currency, is_donation_account, created_at`,
-      [account_name, cleanNumber, is_donation_account || false]
+      `INSERT INTO financial_accounts (account_name, account_number, bsb, current_balance, is_donation_account)
+       VALUES ($1, $2, $3, 0.00, $4)
+       RETURNING id, account_name, account_number, bsb, current_balance, currency, is_donation_account, created_at`,
+      [account_name, cleanNumber, formattedBSB, is_donation_account || false]
     )
 
     return NextResponse.json({ 

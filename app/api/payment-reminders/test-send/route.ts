@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // Get first bank account details
     const { rows: accounts } = await pool.query(`
-      SELECT id, account_name, account_number
+      SELECT id, account_name, account_number, bsb
       FROM financial_accounts
       WHERE is_donation_account = false OR is_donation_account IS NULL
       ORDER BY created_at ASC
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const bankAccount = accounts[0]
     const accountNumber = bankAccount.account_number || 'Not set'
-    const bsb = process.env.BANK_BSB || 'Contact admin'
+    const bsb = bankAccount.bsb || 'Not set'
 
     // Get monthly fee
     const { rows: feeRows } = await pool.query(

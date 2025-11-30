@@ -68,6 +68,7 @@ export default function FinanceClient({
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [newAccountName, setNewAccountName] = useState('')
   const [newAccountNumber, setNewAccountNumber] = useState('')
+  const [newAccountBSB, setNewAccountBSB] = useState('')
   const [newAccountIsDonation, setNewAccountIsDonation] = useState(false)
   
   // Current account data
@@ -151,8 +152,15 @@ export default function FinanceClient({
   }
   
   const handleAddAccount = async () => {
-    if (!newAccountName.trim() || !newAccountNumber.trim()) {
-      showToast('Please fill in all fields', 'error')
+    if (!newAccountName.trim() || !newAccountNumber.trim() || !newAccountBSB.trim()) {
+      showToast('Please fill in all required fields', 'error')
+      return
+    }
+
+    // Validate BSB format (XXX-XXX or XXXXXX)
+    const cleanBSB = newAccountBSB.replace(/-/g, '')
+    if (cleanBSB.length !== 6 || !/^\d{6}$/.test(cleanBSB)) {
+      showToast('BSB must be 6 digits (format: XXX-XXX)', 'error')
       return
     }
     
@@ -164,6 +172,7 @@ export default function FinanceClient({
         body: JSON.stringify({
           account_name: newAccountName,
           account_number: newAccountNumber,
+          bsb: newAccountBSB,
           is_donation_account: newAccountIsDonation,
         }),
       })
@@ -176,6 +185,7 @@ export default function FinanceClient({
         setShowAddAccountDialog(false)
         setNewAccountName('')
         setNewAccountNumber('')
+        setNewAccountBSB('')
         setNewAccountIsDonation(false)
       } else {
         showToast(data.error || 'Failed to add account', 'error')
@@ -1292,6 +1302,29 @@ export default function FinanceClient({
                 {newAccountNumber.length}/14 digits
               </p>
             </div>
+            <div>
+              <Label htmlFor="bsb">BSB (6 digits) *</Label>
+              <Input
+                id="bsb"
+                value={newAccountBSB}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, '')
+                  if (value.length <= 6) {
+                    // Format as XXX-XXX
+                    if (value.length > 3) {
+                      value = value.slice(0, 3) + '-' + value.slice(3)
+                    }
+                    setNewAccountBSB(value)
+                  }
+                }}
+                placeholder="123-456"
+                className="mt-1"
+                maxLength={7}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Bank State Branch number (format: XXX-XXX)
+              </p>
+            </div>
             <div className="flex items-center space-x-2 py-2">
               <Checkbox 
                 id="donation-account"
@@ -1320,7 +1353,7 @@ export default function FinanceClient({
               </Button>
               <Button 
                 onClick={handleAddAccount} 
-                disabled={!newAccountName.trim() || newAccountNumber.length !== 14 || loading}
+                disabled={!newAccountName.trim() || newAccountNumber.length !== 14 || newAccountBSB.replace(/-/g, '').length !== 6 || loading}
               >
                 {loading ? 'Adding...' : 'Add Account'}
               </Button>

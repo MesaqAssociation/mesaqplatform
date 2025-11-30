@@ -16,7 +16,7 @@ export default async function FinancePage() {
   }
   
   const user = await getUserFromToken()
-  
+
   // Restrict finance page to admins/board only
   const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
   if (!isAdmin) {
@@ -34,6 +34,7 @@ export default async function FinancePage() {
       id,
       account_name,
       account_number,
+      bsb,
       current_balance,
       currency,
       created_at
