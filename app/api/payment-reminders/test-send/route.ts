@@ -157,8 +157,9 @@ export async function POST(req: NextRequest) {
     // For now, just send to the FIRST member who is behind (TEST MODE)
     const testMember = membersBehind[0]
     
-    // Get test number for display
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER || 'TEST_NUMBER'
+    // Get test number for sending and display
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+    const displayTestNumber = testNumber || 'TEST_NUMBER'
     
     // Format personalized bilingual message (English + Farsi)
     const message = `[TEST - Would send to: ${testMember.phone}]
@@ -177,7 +178,7 @@ Mesaq Association
 
 _____________________________________________________
 
-[تست - به: ${testNumber} ارسال خواهد شد]
+[تست - به: ${displayTestNumber} ارسال خواهد شد]
 
 محترم ${testMember.name}،
 
@@ -192,7 +193,6 @@ BSB: ${bsb}
 انجمن مساق`
 
     // Send to test number (not to actual member)
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
     if (!testNumber) {
       return NextResponse.json({ 
         error: 'Test number not configured',

@@ -116,9 +116,13 @@ export default function MessagingClient() {
                   setSendStatus(data.status)
                 }
                 if (data.complete) {
-                  alert(`✅ Messages sent!\n\nSuccess: ${data.sent}\nFailed: ${data.failed}`)
+                  // Clear everything first
                   setMessage('')
                   setSelectedMembers(new Set())
+                  setSearchQuery('')
+                  
+                  // Show success message
+                  alert(`✅ Messages sent successfully!\n\nSent: ${data.sent}\nFailed: ${data.failed}`)
                 }
               } catch (e) {
                 console.error('Error parsing SSE data:', e)

@@ -111,22 +111,40 @@ export async function sendBoardNotification(message: string): Promise<boolean> {
 
 /**
  * Format phone number for WhatsApp (ensure + and country code)
+ * Handles formats: 04, 4, +614, 0614, 614, +61, etc.
  */
 export function formatPhoneNumber(phone: string): string {
-  // Remove all non-digit characters
-  let cleaned = phone.replace(/\D/g, '')
-
-  // If doesn't start with country code, assume Australian +61
-  if (!phone.startsWith('+')) {
-    // Remove leading 0 if present
-    if (cleaned.startsWith('0')) {
-      cleaned = cleaned.substring(1)
-    }
-    // Add Australian country code
-    cleaned = '61' + cleaned
+  if (!phone) return ''
+  
+  // Remove all non-digit characters except +
+  let cleaned = phone.replace(/[^\d+]/g, '')
+  
+  // Remove + to work with just digits
+  cleaned = cleaned.replace(/\+/g, '')
+  
+  // If starts with 614, it's already correct format (just needs +)
+  if (cleaned.startsWith('614')) {
+    return '+' + cleaned
   }
-
-  return '+' + cleaned
+  
+  // If starts with 61 but not 614, it might be +61 4... → +614...
+  if (cleaned.startsWith('61')) {
+    return '+' + cleaned
+  }
+  
+  // If starts with 04, 05, 06, 07, 08, 09 → remove 0 and add 61
+  if (cleaned.startsWith('0') && cleaned.length >= 10) {
+    cleaned = cleaned.substring(1) // Remove leading 0
+    return '+61' + cleaned
+  }
+  
+  // If starts with 4, 5, 6, 7, 8, 9 and doesn't have country code → add 61
+  if (/^[4-9]/.test(cleaned) && cleaned.length >= 9) {
+    return '+61' + cleaned
+  }
+  
+  // Default: assume it needs +61
+  return '+61' + cleaned
 }
 
 /**
