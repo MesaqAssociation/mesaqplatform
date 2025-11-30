@@ -147,23 +147,23 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
         </div>
       )}
 
-      <div className="overflow-auto">
-        <table className="min-w-[800px] w-full text-sm">
-          <thead>
-            <tr className="text-left">
-              <th className="py-3 px-2">{t("name")}</th>
+    <div className="overflow-auto">
+      <table className="min-w-[800px] w-full text-sm">
+        <thead>
+          <tr className="text-left">
+            <th className="py-3 px-2">{t("name")}</th>
               {isAdmin && (
                 <>
-                  <th className="py-3 px-2">{t("email")}</th>
-                  <th className="py-3 px-2">{t("phone")}</th>
-                  <th className="py-3 px-2">{t("householdMembers")}</th>
-                  <th className="py-3 px-2">{t("role")}</th>
-                  <th className="py-3 px-2">Payment Status</th>
+            <th className="py-3 px-2">{t("email")}</th>
+            <th className="py-3 px-2">{t("phone")}</th>
+            <th className="py-3 px-2">{t("householdMembers")}</th>
+            <th className="py-3 px-2">{t("role")}</th>
+            <th className="py-3 px-2">Payment Status</th>
                 </>
               )}
-            </tr>
-          </thead>
-          <tbody>
+          </tr>
+        </thead>
+        <tbody>
             {sortedMembers.map(m => (
             <tr 
               key={m.id} 
@@ -197,9 +197,9 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
                 {getPaymentStatusBadge(m)}
               </td>
             </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </table>
       </div>
     </div>
   )

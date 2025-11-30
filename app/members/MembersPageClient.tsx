@@ -47,9 +47,9 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{t("members")}</h1>
         {isAdmin && (
-          <Link href="/members/create">
-            <Button>{t("createNew")}</Button>
-          </Link>
+        <Link href="/members/create">
+          <Button>{t("createNew")}</Button>
+        </Link>
         )}
       </div>
       <MembersClient initial={initial} isAdmin={isAdmin} />

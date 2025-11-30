@@ -33,24 +33,24 @@ export default async function MembersPage() {
   if (isAdmin) {
     // Admins see full details
     const result = await pool.query(`
-      SELECT 
-        u.id, 
-        u.member_id, 
-        u.phone, 
-        u.name, 
-        u.email, 
-        u.address, 
-        u.image, 
-        u.role, 
-        u.household_members,
-        cps.payment_status,
-        cps.total_paid,
-        cps.monthly_fee
-      FROM users u
-      LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
-      ORDER BY u.name ASC 
-      LIMIT 200
-    `)
+    SELECT 
+      u.id, 
+      u.member_id, 
+      u.phone, 
+      u.name, 
+      u.email, 
+      u.address, 
+      u.image, 
+      u.role, 
+      u.household_members,
+      cps.payment_status,
+      cps.total_paid,
+      cps.monthly_fee
+    FROM users u
+    LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
+    ORDER BY u.name ASC 
+    LIMIT 200
+  `)
     rows = result.rows
   } else {
     // Regular members see only names and member IDs

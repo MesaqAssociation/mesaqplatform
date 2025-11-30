@@ -113,6 +113,9 @@ export default function FinanceClient({
   // Test send messages
   const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
+  // Track if component has mounted
+  const [hasMounted, setHasMounted] = useState(false)
+  
   // Update balance when account changes
   // Sync transactions with initial data when component mounts or initialTransactions changes
   useEffect(() => {
@@ -124,12 +127,17 @@ export default function FinanceClient({
     setEditValue(currentAccount.current_balance.toString())
   }, [currentAccount])
   
-  // Load transactions when account or month changes
+  // Mark as mounted after first render
   useEffect(() => {
-    if (selectedAccountId) {
+    setHasMounted(true)
+  }, [])
+  
+  // Load transactions when account or month changes (but skip on initial mount)
+  useEffect(() => {
+    if (hasMounted && selectedAccountId) {
       loadTransactions()
     }
-  }, [selectedAccountId, currentMonth])
+  }, [selectedAccountId, currentMonth, hasMounted])
   
   const loadTransactions = async () => {
     setLoadingTransactions(true)

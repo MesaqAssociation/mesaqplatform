@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconCirclePlusFilled, IconChevronRight, IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings } from '@tabler/icons-react'
+import { IconCirclePlusFilled, IconChevronRight, IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend } from '@tabler/icons-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { NavUser } from '@/components/nav-user'
@@ -36,6 +36,8 @@ export function Sidebar({ user }: SidebarProps) {
         { title: t("events"), url: '/events' },
       ]
     },
+    { title: "Documents", url: "/documents", icon: IconFileText },
+    { title: "Messaging", url: "/messaging", icon: IconSend },
   ]
 
   return (

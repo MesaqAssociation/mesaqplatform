@@ -171,17 +171,17 @@ export async function POST(req: NextRequest) {
       console.log(`\n⚠️ Donation account detected - skipping member matching`)
       memberMatches = new Array(parsed.transactions.length).fill(null)
     } else {
-      console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
+    console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
       memberMatches = await batchMatchTransactions(
-        pool,
-        parsed.transactions.map(txn => ({
-          name: txn.name,
+      pool,
+      parsed.transactions.map(txn => ({
+        name: txn.name,
           description: txn.description,
           type: txn.type // Pass type to filter out debits
-        }))
-      )
-      
-      console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
+      }))
+    )
+    
+    console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
     }
     
     // Insert transactions

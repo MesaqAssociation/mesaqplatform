@@ -25,6 +25,27 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const query = searchParams.get('q')
+    const membersOnly = searchParams.get('membersOnly') === 'true'
+    const memberId = searchParams.get('memberId')
+
+    // If fetching specific member by ID
+    if (memberId) {
+      const { rows: memberRows } = await pool.query(`
+        SELECT 
+          id,
+          member_id,
+          name,
+          email,
+          phone,
+          role
+        FROM users 
+        WHERE id = $1
+      `, [memberId])
+
+      return NextResponse.json({ 
+        member: memberRows[0] || null
+      })
+    }
 
     if (!query || query.length < 2) {
       return NextResponse.json({ members: [], events: [], meetings: [] })
@@ -35,8 +56,8 @@ export async function GET(req: NextRequest) {
     // Search members
     const { rows: members } = await pool.query(`
       SELECT 
-        'member' as type,
-        member_id as id,
+        id,
+        member_id,
         name,
         email,
         phone,
@@ -44,8 +65,13 @@ export async function GET(req: NextRequest) {
       FROM users 
       WHERE name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1
       ORDER BY name ASC
-      LIMIT 5
+      LIMIT 10
     `, [searchPattern])
+
+    // If only searching members, return early
+    if (membersOnly) {
+      return NextResponse.json({ members })
+    }
 
     // Search events (not meetings)
     const { rows: events } = await pool.query(`
