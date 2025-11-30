@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
 import { IconFileText, IconDownload, IconTrash, IconPlus, IconUpload } from '@tabler/icons-react'
 
 type Document = {
@@ -36,6 +37,8 @@ export default function DocumentsClient({ user }: { user: User | null }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadComplete, setUploadComplete] = useState(false)
 
   const isAdmin = user && ['admin', 'board', 'Manager'].includes(user.role)
 
@@ -64,23 +67,42 @@ export default function DocumentsClient({ user }: { user: User | null }) {
     }
 
     setUploading(true)
+    setUploadProgress(0)
+    setUploadComplete(false)
+
     try {
       const formData = new FormData()
       formData.append('title', title)
       formData.append('description', description)
       formData.append('file', file)
 
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) return prev
+          return prev + 10
+        })
+      }, 200)
+
       const res = await fetch('/api/documents', {
         method: 'POST',
         body: formData,
       })
 
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+      setUploadComplete(true)
+
       if (res.ok) {
+        // Wait a moment to show 100% complete
+        await new Promise(resolve => setTimeout(resolve, 500))
         alert('Document uploaded successfully!')
         setShowUploadDialog(false)
         setTitle('')
         setDescription('')
         setFile(null)
+        setUploadProgress(0)
+        setUploadComplete(false)
         loadDocuments()
       } else {
         const data = await res.json()
@@ -261,6 +283,14 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                 </p>
               )}
             </div>
+            {uploading && (
+              <div className="space-y-2">
+                <Progress value={uploadProgress} />
+                <p className="text-sm text-center text-muted-foreground">
+                  {uploadComplete ? 'Upload complete!' : `Uploading... ${uploadProgress}%`}
+                </p>
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
               <Button 
                 variant="outline" 
@@ -275,13 +305,20 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               </Button>
               <Button 
                 onClick={handleUpload} 
-                disabled={!title || !file || uploading}
+                disabled={!title || !file || uploading || !uploadComplete && uploadProgress > 0}
               >
                 {uploading ? (
-                  <>
-                    <IconUpload className="mr-2 size-4 animate-pulse" />
-                    Uploading...
-                  </>
+                  uploadComplete ? (
+                    <>
+                      <IconUpload className="mr-2 size-4" />
+                      Complete!
+                    </>
+                  ) : (
+                    <>
+                      <IconUpload className="mr-2 size-4 animate-pulse" />
+                      Uploading...
+                    </>
+                  )
                 ) : (
                   <>
                     <IconUpload className="mr-2 size-4" />

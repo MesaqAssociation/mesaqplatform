@@ -157,8 +157,13 @@ export async function POST(req: NextRequest) {
     // For now, just send to the FIRST member who is behind (TEST MODE)
     const testMember = membersBehind[0]
     
-    // Format personalized message
-    const message = `Dear ${testMember.name},
+    // Get test number for display
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER || 'TEST_NUMBER'
+    
+    // Format personalized bilingual message (English + Farsi)
+    const message = `[TEST - Would send to: ${testMember.phone}]
+
+Dear ${testMember.name},
 
 You are behind $${testMember.amountOwed.toFixed(2)} on your Mesaq membership. Please pay to:
 
@@ -168,7 +173,23 @@ BSB: ${bsb}
 Make sure to have your phone number in the description or you may not be detected.
 
 Thank you,
-Mesaq Association`
+Mesaq Association
+
+_____________________________________________________
+
+[تست - به: ${testNumber} ارسال خواهد شد]
+
+محترم ${testMember.name}،
+
+شما در عضویت Mesaq تان از $${testMember.amountOwed.toFixed(2)} عقب هستید. لطفاً به:
+
+شماره حساب: ${accountNumber}
+BSB: ${bsb}
+
+مطمئن شوید که شماره تلیفون تان را در توضیحات دارید در غیر آن ممکن شما تشخیص نشوید.
+
+تشکر،
+انجمن مساق`
 
     // Send to test number (not to actual member)
     const testNumber = process.env.WHATSAPP_TEST_NUMBER

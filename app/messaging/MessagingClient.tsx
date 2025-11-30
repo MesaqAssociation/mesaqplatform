@@ -137,11 +137,15 @@ export default function MessagingClient() {
     }
   }
 
-  const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (m.phone && m.phone.includes(searchQuery))
-  )
+  const filteredMembers = members.filter(m => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      (m.name && m.name.toLowerCase().includes(query)) ||
+      (m.email && m.email.toLowerCase().includes(query)) ||
+      (m.phone && m.phone.includes(searchQuery))
+    )
+  })
 
   return (
     <div className="space-y-6">
