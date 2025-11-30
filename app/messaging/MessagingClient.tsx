@@ -78,25 +78,14 @@ export default function MessagingClient() {
 
     setSending(true)
     setSendProgress(0)
-    setSendStatus('Starting...')
-
-    let sent = 0
-    let failed = 0
+    setSendStatus('Sending messages...')
 
     try {
       const memberIds = Array.from(selectedMembers)
       
-      for (let i = 0; i < memberIds.length; i++) {
-        const memberId = memberIds[i]
-        const progress = Math.round(((i + 1) / memberIds.length) * 100)
-        
-        // Get member name for status
-        const member = members.find(m => m.id === memberId)
-        setSendStatus(`Sending to ${member?.name || 'member'}... (${i + 1}/${memberIds.length})`)
-        setSendProgress(progress)
-
+      // Send all messages simultaneously
+      const sendPromises = memberIds.map(async (memberId) => {
         try {
-          // Send individual message
           const res = await fetch('/api/messaging/send-single', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -105,28 +94,28 @@ export default function MessagingClient() {
               message: message.trim(),
             }),
           })
-
-          if (res.ok) {
-            sent++
-          } else {
-            failed++
-          }
+          return { success: res.ok, memberId }
         } catch (err) {
-          console.error(`Failed to send to ${member?.name}:`, err)
-          failed++
+          console.error(`Failed to send to member ${memberId}:`, err)
+          return { success: false, memberId }
         }
+      })
 
-        // Small delay between messages
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      // Wait for all to complete
+      const results = await Promise.all(sendPromises)
+      
+      const sent = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
 
+      setSendProgress(100)
+      
       // Clear everything
       setMessage('')
       setSelectedMembers(new Set())
       setSearchQuery('')
       
       // Show success message
-      alert(`✅ Messages sent successfully!\n\nSent: ${sent}\nFailed: ${failed}`)
+      alert(`✅ Messages sent!\n\nSent: ${sent}\nFailed: ${failed}`)
     } catch (err) {
       console.error('Send error:', err)
       alert('Failed to send messages')

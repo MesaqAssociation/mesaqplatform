@@ -63,7 +63,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Only admins/board can upload documents
-  const userId = decoded.userId
+  const userId = decoded.userId || decoded.sub
+  if (!userId) {
+    return NextResponse.json({ error: 'Invalid token - no user ID' }, { status: 401 })
+  }
+  
   const { rows: userRows } = await pool.query(
     'SELECT role FROM users WHERE id = $1',
     [userId]

@@ -281,20 +281,32 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               />
             </div>
             <div>
-              <Label htmlFor="file">File *</Label>
-              <Input
-                id="file"
-                type="file"
-                onChange={(e) => {
-                  const selectedFile = e.target.files?.[0]
-                  if (selectedFile) {
-                    handleFileSelect(selectedFile)
-                  }
-                }}
-                className="mt-1"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
-                disabled={uploading}
-              />
+              <Label>File *</Label>
+              <div className="mt-1">
+                <input
+                  id="file-upload"
+                  type="file"
+                  onChange={(e) => {
+                    const selectedFile = e.target.files?.[0]
+                    if (selectedFile) {
+                      handleFileSelect(selectedFile)
+                    }
+                  }}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                  disabled={uploading}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  disabled={uploading}
+                  className="w-full"
+                >
+                  <IconUpload className="mr-2 size-4" />
+                  {file ? 'Change File' : 'Upload'}
+                </Button>
+              </div>
               {file && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Selected: {file.name} ({formatFileSize(file.size)})

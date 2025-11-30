@@ -117,20 +117,16 @@ export default function FinanceClient({
   const [hasMounted, setHasMounted] = useState(false)
   
   // Update balance when account changes
-  // Sync transactions with initial data when component mounts or initialTransactions changes
-  useEffect(() => {
-    setTransactions(initialTransactions)
-  }, [initialTransactions])
-
   useEffect(() => {
     setBalance(currentAccount.current_balance)
     setEditValue(currentAccount.current_balance.toString())
   }, [currentAccount])
   
-  // Mark as mounted after first render
+  // Set initial transactions only on first mount
   useEffect(() => {
+    setTransactions(initialTransactions)
     setHasMounted(true)
-  }, [])
+  }, []) // Empty dependency - only run once on mount
   
   const loadTransactions = useCallback(async () => {
     if (!selectedAccountId) return
