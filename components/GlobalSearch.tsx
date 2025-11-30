@@ -16,11 +16,33 @@ type Member = {
 
 export default function GlobalSearch() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [query, setQuery] = useState('')
   const [members, setMembers] = useState<Member[]>([])
   const [showResults, setShowResults] = useState(false)
   const [searching, setSearching] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  
+  // Get filtered member from URL
+  const filteredMemberId = searchParams.get('member')
+  const [filteredMember, setFilteredMember] = useState<Member | null>(null)
+
+  // Load filtered member name
+  useEffect(() => {
+    if (filteredMemberId) {
+      fetch(`/api/search?q=&memberId=${filteredMemberId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.member) {
+            setFilteredMember(data.member)
+          }
+        })
+        .catch(() => {})
+    } else {
+      setFilteredMember(null)
+    }
+  }, [filteredMemberId])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -60,25 +82,48 @@ export default function GlobalSearch() {
   }, [query])
 
   const handleSelectMember = (member: Member) => {
-    // Navigate to member's page
-    router.push(`/members/${member.member_id || member.id}`)
+    // Add member filter to current page URL
+    const newUrl = `${pathname}?member=${member.id}`
+    router.push(newUrl)
     setQuery('')
     setShowResults(false)
   }
 
+  const clearFilter = () => {
+    // Remove member filter from URL
+    router.push(pathname)
+  }
+
   return (
     <div ref={wrapperRef} className="relative">
-      <div className="relative">
-        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Search members..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => query.length >= 2 && setShowResults(true)}
-          className="pl-9"
-        />
-      </div>
+      {filteredMember ? (
+        // Show filtered member badge
+        <div className="flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-primary/10 border-primary">
+          <IconUser className="size-4 flex-shrink-0" />
+          <span className="flex-1 truncate font-medium">{filteredMember.name}</span>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={clearFilter}
+            className="h-5 w-5 p-0 hover:bg-primary/20"
+          >
+            <IconX className="size-3" />
+          </Button>
+        </div>
+      ) : (
+        // Show search input
+        <div className="relative">
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search members..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => query.length >= 2 && setShowResults(true)}
+            className="pl-9"
+          />
+        </div>
+      )}
 
       {/* Search Results Dropdown */}
       {showResults && members.length > 0 && (
