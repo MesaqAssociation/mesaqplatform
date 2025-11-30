@@ -78,47 +78,38 @@ export default function MessagingClient() {
 
     setSending(true)
     setSendProgress(0)
-    setSendStatus('Sending messages...')
+    setSendStatus('Queueing messages...')
 
     try {
       const memberIds = Array.from(selectedMembers)
       
-      // Send all messages simultaneously
-      const sendPromises = memberIds.map(async (memberId) => {
-        try {
-          const res = await fetch('/api/messaging/send-single', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              memberId,
-              message: message.trim(),
-            }),
-          })
-          return { success: res.ok, memberId }
-        } catch (err) {
-          console.error(`Failed to send to member ${memberId}:`, err)
-          return { success: false, memberId }
-        }
+      // Queue all messages in the backend (with 5-second delays)
+      const res = await fetch('/api/messaging/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberIds: memberIds,
+          message: message.trim(),
+        }),
       })
 
-      // Wait for all to complete
-      const results = await Promise.all(sendPromises)
-      
-      const sent = results.filter(r => r.success).length
-      const failed = results.filter(r => !r.success).length
-
-      setSendProgress(100)
-      
-      // Clear everything
-      setMessage('')
-      setSelectedMembers(new Set())
-      setSearchQuery('')
-      
-      // Show success message
-      alert(`✅ Messages sent!\n\nSent: ${sent}\nFailed: ${failed}`)
+      if (res.ok) {
+        const data = await res.json()
+        
+        // Clear everything immediately
+        setMessage('')
+        setSelectedMembers(new Set())
+        setSearchQuery('')
+        
+        // Show success message - messages will continue sending in background
+        alert(`✅ Messages queued successfully!\n\n${data.queued} messages will be sent with 5-second intervals.\n\nYou can close this page - messages will continue sending in the background.`)
+      } else {
+        const error = await res.json()
+        alert(`Failed to queue messages: ${error.error || 'Unknown error'}`)
+      }
     } catch (err) {
       console.error('Send error:', err)
-      alert('Failed to send messages')
+      alert('Failed to queue messages')
     } finally {
       setSending(false)
       setSendProgress(0)

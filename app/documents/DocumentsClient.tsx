@@ -314,12 +314,7 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               )}
             </div>
             {uploading && (
-              <div className="space-y-2">
-                <Progress value={uploadProgress} />
-                <p className="text-sm text-center text-muted-foreground">
-                  {uploadComplete ? 'Upload complete!' : `Uploading... ${uploadProgress}%`}
-                </p>
-              </div>
+              <Progress value={uploadProgress} />
             )}
             <div className="flex gap-2 justify-end">
               <Button 
