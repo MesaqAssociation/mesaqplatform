@@ -116,6 +116,46 @@ export default function FinanceClient({
   const [addTxnMemberResults, setAddTxnMemberResults] = useState<Member[]>([])
   const [addTxnSearching, setAddTxnSearching] = useState(false)
   
+  // Member Search for advance payment dialog
+  const [advanceMemberQuery, setAdvanceMemberQuery] = useState('')
+  const [advanceMemberResults, setAdvanceMemberResults] = useState<Member[]>([])
+  const [advanceSearching, setAdvanceSearching] = useState(false)
+  const [allMembers, setAllMembers] = useState<Member[]>([])
+
+  // Load all members when advance payment dialog opens
+  useEffect(() => {
+    if (showAdvancePaymentDialog && allMembers.length === 0) {
+      const loadMembers = async () => {
+        try {
+          const res = await fetch('/api/members')
+          if (res.ok) {
+            const data = await res.json()
+            setAllMembers(data.members || [])
+            setAdvanceMemberResults(data.members || [])
+          }
+        } catch (err) {
+          console.error('Failed to load members', err)
+        }
+      }
+      loadMembers()
+    }
+  }, [showAdvancePaymentDialog, allMembers.length])
+
+  // Filter members based on search query
+  useEffect(() => {
+    if (advanceMemberQuery.trim() === '') {
+      setAdvanceMemberResults(allMembers)
+    } else {
+      const query = advanceMemberQuery.toLowerCase()
+      const filtered = allMembers.filter(m => 
+        m.name?.toLowerCase().includes(query) ||
+        m.email?.toLowerCase().includes(query) ||
+        m.phone?.toLowerCase().includes(query)
+      )
+      setAdvanceMemberResults(filtered)
+    }
+  }, [advanceMemberQuery, allMembers])
+  
   // Test send messages
   const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
@@ -598,6 +638,50 @@ export default function FinanceClient({
     } catch (err) {
       console.error('Failed to add transaction', err)
       showToast('Failed to add transaction. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle advance payment
+  const handleAdvancePayment = async () => {
+    if (!advanceMemberId || !advanceMonths || advanceMonths < 1) {
+      showToast('Please select a member and enter months', 'error')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/advance-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: advanceMemberId,
+          months: advanceMonths,
+          description: advanceDescription,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(`Success! ${data.months} month(s) paid in advance for ${data.memberName}. Expires: ${data.expiryDate}`, 'success')
+        
+        // Reset form
+        setShowAdvancePaymentDialog(false)
+        setAdvanceMonths(1)
+        setAdvanceDescription('')
+        setAdvanceMemberId(null)
+        setAdvanceMemberName('')
+        
+        // Reload transactions to show if any were added to current month
+        loadTransactions()
+      } else {
+        showToast(data.error || 'Failed to record advance payment', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to record advance payment', err)
+      showToast('Failed to record advance payment. Please try again.', 'error')
     } finally {
       setLoading(false)
     }
@@ -1576,6 +1660,136 @@ export default function FinanceClient({
                 disabled={!newTransactionName.trim() || !newTransactionAmount.trim() || loading}
               >
                 {loading ? 'Adding...' : 'Add Transaction'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Advance Payment Dialog */}
+      <Dialog open={showAdvancePaymentDialog} onOpenChange={setShowAdvancePaymentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Advance Payment</DialogTitle>
+            <DialogDescription>
+              Record a member paying for multiple months in advance. This will create membership payment records for future months.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="advance-member">Member *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between mt-1"
+                  >
+                    {advanceMemberName || "Select member..."}
+                    <IconSearch className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Search member..." 
+                      value={advanceMemberQuery}
+                      onValueChange={setAdvanceMemberQuery}
+                    />
+                    <CommandList>
+                      <CommandEmpty>
+                        {advanceSearching ? 'Searching...' : 'No members found'}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {advanceMemberResults.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            onSelect={() => {
+                              setAdvanceMemberId(member.id)
+                              setAdvanceMemberName(member.name)
+                              setAdvanceMemberQuery('')
+                              setAdvanceMemberResults([])
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{member.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {member.email} • {member.phone}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {advanceMemberName && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {advanceMemberName}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="advance-months">Number of Months *</Label>
+              <Select value={advanceMonths.toString()} onValueChange={(value) => setAdvanceMonths(parseInt(value))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                    <SelectItem key={m} value={m.toString()}>
+                      {m} {m === 1 ? 'month' : 'months'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Covers: {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} → {new Date(new Date().getFullYear(), new Date().getMonth() + advanceMonths, 0).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="advance-description">Description (Optional)</Label>
+              <Input
+                id="advance-description"
+                value={advanceDescription}
+                onChange={(e) => setAdvanceDescription(e.target.value)}
+                placeholder="e.g., Annual membership paid in full"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="bg-muted p-3 rounded-md">
+              <p className="text-sm font-medium">Payment Summary</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {advanceMonths} month(s) × $40.00 = ${(advanceMonths * 40).toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Valid until: {new Date(new Date().getFullYear(), new Date().getMonth() + advanceMonths, 0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAdvancePaymentDialog(false)
+                  setAdvanceMonths(1)
+                  setAdvanceDescription('')
+                  setAdvanceMemberId(null)
+                  setAdvanceMemberName('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAdvancePayment} 
+                disabled={!advanceMemberId || advanceMonths < 1 || loading}
+              >
+                {loading ? 'Recording...' : 'Record Payment'}
               </Button>
             </div>
           </div>
