@@ -69,46 +69,57 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    // Start sending messages in the background (don't wait)
-    // This will continue even if the user closes their browser
-    setImmediate(async () => {
-      for (let i = 0; i < members.length; i++) {
-        const member = members[i]
-        
-        try {
-          // Replace variables in message
-          let personalizedMessage = message
-            .replace(/\{\{name\}\}/g, member.name)
-            .replace(/\{\{phone\}\}/g, member.phone || '')
-            .replace(/\{\{email\}\}/g, member.email || '')
+    console.log(`📤 Starting to send ${members.length} messages with 5-second delays...`)
 
-          const phone = formatPhoneNumber(member.phone)
-          
-          // Send WhatsApp message
-          await sendWhatsAppMessage({
-            to: phone,
-            body: personalizedMessage
-          })
+    // Send messages sequentially with 5-second delays
+    // Must complete before returning since serverless doesn't support background jobs
+    let sent = 0
+    let failed = 0
 
-          console.log(`✅ Sent message to ${member.name}`)
-        } catch (err) {
-          console.error(`❌ Failed to send to ${member.name}:`, err)
-        }
-
-        // Wait 5 seconds before next message (except for the last one)
-        if (i < members.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 5000))
-        }
-      }
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i]
       
-      console.log(`✅ Batch complete: ${members.length} messages processed`)
-    })
+      try {
+        // Replace variables in message
+        let personalizedMessage = message
+          .replace(/\{\{name\}\}/g, member.name)
+          .replace(/\{\{phone\}\}/g, member.phone || '')
+          .replace(/\{\{email\}\}/g, member.email || '')
 
-    // Return immediately - messages will continue sending in background
+        const phone = formatPhoneNumber(member.phone)
+        
+        // Send WhatsApp message
+        const success = await sendWhatsAppMessage({
+          to: phone,
+          body: personalizedMessage
+        })
+
+        if (success) {
+          sent++
+          console.log(`✅ (${i + 1}/${members.length}) Sent to ${member.name}`)
+        } else {
+          failed++
+          console.log(`❌ (${i + 1}/${members.length}) Failed to send to ${member.name}`)
+        }
+      } catch (err) {
+        failed++
+        console.error(`❌ (${i + 1}/${members.length}) Error sending to ${member.name}:`, err)
+      }
+
+      // Wait 5 seconds before next message (except for the last one)
+      if (i < members.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000))
+      }
+    }
+    
+    console.log(`✅ Batch complete: ${sent} sent, ${failed} failed`)
+
     return NextResponse.json({ 
       success: true,
       queued: members.length,
-      message: 'Messages queued and will be sent with 5-second intervals'
+      sent,
+      failed,
+      message: 'All messages sent with 5-second intervals'
     })
   } catch (err: any) {
     console.error('Send batch error:', err)

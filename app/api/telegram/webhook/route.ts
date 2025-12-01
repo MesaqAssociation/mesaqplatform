@@ -258,6 +258,18 @@ export async function POST(req: NextRequest) {
           })]
         )
 
+        // Get monthly fee from settings
+        const { rows: feeRows } = await pool.query(
+          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+        )
+        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+
+        // Find unexplained payments (CREDIT transactions that are NOT exactly the monthly fee)
+        const unexplainedPayments = parsed.transactions.filter(txn => {
+          const amount = Math.abs(txn.credit || 0)
+          return txn.type === 'credit' && amount > 0 && amount !== monthlyFee
+        })
+
         // Send success message
         let responseMessage = `✅ Bank statement processed successfully!\n\n`
         responseMessage += `📊 Summary:\n\n`
@@ -267,6 +279,23 @@ export async function POST(req: NextRequest) {
 
         if (parsed.accountNumber) {
           responseMessage += `\n🏦 Account: ${parsed.accountNumber}`
+        }
+
+        // Add unexplained payments section
+        if (unexplainedPayments.length > 0) {
+          responseMessage += `\n\n⚠️ Unexplained Payments: ${unexplainedPayments.length}\n\n`
+          responseMessage += `These payments are not exactly $${monthlyFee.toFixed(2)}:\n\n`
+          
+          unexplainedPayments.forEach(txn => {
+            const amount = Math.abs(txn.credit || 0)
+            responseMessage += `• $${amount.toFixed(2)} - ${txn.description || txn.name || 'No description'}\n`
+          })
+          
+          responseMessage += `\n💡 These may be:\n`
+          responseMessage += `• Special event payments\n`
+          responseMessage += `• Donations\n`
+          responseMessage += `• Other contributions\n\n`
+          responseMessage += `Please attribute these to members or provide a reason in the finance page.`
         }
 
         await sendTelegramMessage(chatId, responseMessage)

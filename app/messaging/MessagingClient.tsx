@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { IconSend, IconUsers, IconSearch } from '@tabler/icons-react'
 import { Progress } from '@/components/ui/progress'
+import { showToast } from '@/lib/toast'
 
 type Member = {
   id: string
@@ -67,12 +68,12 @@ export default function MessagingClient() {
 
   const handleSend = async () => {
     if (selectedMembers.size === 0) {
-      alert('Please select at least one member')
+      showToast('Please select at least one member', 'error')
       return
     }
 
     if (!message.trim()) {
-      alert('Please enter a message')
+      showToast('Please enter a message', 'error')
       return
     }
 
@@ -101,15 +102,18 @@ export default function MessagingClient() {
         setSelectedMembers(new Set())
         setSearchQuery('')
         
-        // Show success message - messages will continue sending in background
-        alert(`✅ Messages queued successfully!\n\n${data.queued} messages will be sent with 5-second intervals.\n\nYou can close this page - messages will continue sending in the background.`)
+        // Show success toast
+        showToast(
+          `${data.queued} messages queued! Sending with 5-second intervals. You can close this page.`,
+          'success'
+        )
       } else {
         const error = await res.json()
-        alert(`Failed to queue messages: ${error.error || 'Unknown error'}`)
+        showToast(`Failed to queue messages: ${error.error || 'Unknown error'}`, 'error')
       }
     } catch (err) {
       console.error('Send error:', err)
-      alert('Failed to queue messages')
+      showToast('Failed to queue messages', 'error')
     } finally {
       setSending(false)
       setSendProgress(0)
