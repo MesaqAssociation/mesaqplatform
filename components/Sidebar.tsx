@@ -54,29 +54,6 @@ export function Sidebar({ user }: SidebarProps) {
         <GlobalSearch />
       </div>
 
-      {/* Quick Create */}
-      <div className="px-4 pb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
-              <IconCirclePlusFilled className="size-4" />
-              <span>{t("quickCreate")}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="right">
-            <DropdownMenuItem asChild>
-              <Link href="/finance" className="cursor-pointer">Bank Statement</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/events/create" className="cursor-pointer">Event</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/meetings/create" className="cursor-pointer">Meeting</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 px-4 py-2 overflow-y-auto">
         <ul className="space-y-1">

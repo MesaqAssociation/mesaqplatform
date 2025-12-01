@@ -154,19 +154,24 @@ export async function POST(req: NextRequest) {
 
     console.log(`💰 Found ${membersBehind.length} members behind on payments`)
 
-    // For now, just send to the FIRST member who is behind (TEST MODE)
-    const testMember = membersBehind[0]
-    
-    // Get test number for sending and display
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
-    const displayTestNumber = testNumber || 'TEST_NUMBER'
-    
-    // Format personalized bilingual message (English + Farsi)
-    const message = `[TEST - Would send to: ${testMember.phone}]
+    // Send to ALL members who are behind
+    let sent = 0
+    let failed = 0
+    const results = []
 
-Dear ${testMember.name},
+    for (const member of membersBehind) {
+      try {
+        // Skip members without phone numbers
+        if (!member.phone) {
+          failed++
+          results.push({ name: member.name, status: 'failed', reason: 'No phone number' })
+          continue
+        }
 
-You are behind $${testMember.amountOwed.toFixed(2)} on your Mesaq membership. Please pay to:
+        // Format personalized bilingual message (English + Farsi)
+        const message = `Dear ${member.name},
+
+You are behind $${member.amountOwed.toFixed(2)} on your Mesaq membership. Please pay to:
 
 Account Number: ${accountNumber}
 BSB: ${bsb}
@@ -178,11 +183,9 @@ Mesaq Association
 
 _____________________________________________________
 
-[تست - به: ${displayTestNumber} ارسال خواهد شد]
+محترم ${member.name}،
 
-محترم ${testMember.name}،
-
-شما در عضویت Mesaq تان از $${testMember.amountOwed.toFixed(2)} عقب هستید. لطفاً به:
+شما در عضویت Mesaq تان از $${member.amountOwed.toFixed(2)} عقب هستید. لطفاً به:
 
 شماره حساب: ${accountNumber}
 BSB: ${bsb}
@@ -192,45 +195,44 @@ BSB: ${bsb}
 تشکر،
 انجمن مساق`
 
-    // Send to test number (not to actual member)
-    if (!testNumber) {
-      return NextResponse.json({ 
-        error: 'Test number not configured',
-        message: 'WHATSAPP_TEST_NUMBER must be set'
-      }, { status: 400 })
+        console.log(`📤 Sending reminder to ${member.name} at ${member.phone}`)
+        const success = await sendWhatsAppMessage({ 
+          to: formatPhoneNumber(member.phone), 
+          body: message 
+        })
+
+        if (success) {
+          sent++
+          results.push({ name: member.name, phone: member.phone, amountOwed: member.amountOwed, status: 'sent' })
+        } else {
+          failed++
+          results.push({ name: member.name, phone: member.phone, status: 'failed', reason: 'Send failed' })
+        }
+
+        // Wait 5 seconds between messages
+        await new Promise(resolve => setTimeout(resolve, 5000))
+
+      } catch (err: any) {
+        console.error(`Failed to send to ${member.name}:`, err)
+        failed++
+        results.push({ name: member.name, status: 'failed', reason: err.message })
+      }
     }
 
-    console.log(`📤 TEST MODE: Sending message for ${testMember.name} to test number: ${testNumber}`)
-    const sent = await sendWhatsAppMessage({ 
-      to: formatPhoneNumber(testNumber), 
-      body: message 
-    })
-
-    if (!sent) {
-      return NextResponse.json({ 
-        error: 'Failed to send message'
-      }, { status: 500 })
-    }
-
-    console.log(`✅ TEST COMPLETE: Message sent to test number`)
+    console.log(`✅ COMPLETE: Sent ${sent} reminders, ${failed} failed`)
 
     return NextResponse.json({
       success: true,
-      testMode: true,
       totalMembers: members.length,
       membersBehind: membersBehind.length,
-      testMemberSent: {
-        name: testMember.name,
-        phone: testMember.phone,
-        amountOwed: testMember.amountOwed
-      },
-      sentTo: testNumber,
+      sent,
+      failed,
+      results,
       bankAccount: {
         name: bankAccount.account_name,
         accountNumber,
         bsb
-      },
-      note: 'TEST MODE: Message sent to WHATSAPP_TEST_NUMBER (not to actual member)'
+      }
     })
   } catch (err: any) {
     console.error('Test send error:', err)

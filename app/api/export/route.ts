@@ -34,26 +34,41 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   
+  let decoded: any
   try {
-    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
-    // Allow board members, admins, and officers to export
-    // Treat 'board' as admin-level for export purposes
-    const allowedRoles = ['board', 'admin', 'Manager', 'Finance Officer', 'Public Officer', 'Logistics Officer']
-    const userRole = decoded.role
-    
-    console.log(`Export request from user with role: ${userRole}`)
-    
-    if (!allowedRoles.includes(userRole)) {
-      console.log(`❌ Role "${userRole}" not in allowed list:`, allowedRoles)
-      return NextResponse.json({ 
-        error: 'Forbidden - Board/Admin access required',
-        yourRole: userRole,
-        allowedRoles 
-      }, { status: 403 })
-    }
+    decoded = jwt.verify(token, process.env.AUTH_SECRET)
   } catch (error) {
     console.error('JWT verification failed:', error)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Check user role from database
+  const userId = decoded.userId || decoded.sub
+  if (!userId) {
+    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+  }
+
+  const { rows: userRows } = await pool.query(
+    'SELECT role FROM users WHERE id = $1',
+    [userId]
+  )
+  
+  if (userRows.length === 0) {
+    return NextResponse.json({ error: 'User not found' }, { status: 403 })
+  }
+  
+  const userRole = (userRows[0].role || '').toLowerCase()
+  const allowedRoles = ['board', 'admin', 'manager']
+  
+  console.log(`Export request from user with role: ${userRole}`)
+  
+  if (!allowedRoles.includes(userRole)) {
+    console.log(`❌ Role "${userRole}" not in allowed list:`, allowedRoles)
+    return NextResponse.json({ 
+      error: 'Forbidden - Board/Admin access required',
+      yourRole: userRows[0].role,
+      allowedRoles 
+    }, { status: 403 })
   }
 
   try {

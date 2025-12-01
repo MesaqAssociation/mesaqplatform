@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -89,6 +90,7 @@ export default function FinanceClient({
   
   // Add Transaction Dialog
   const [showAddTransactionDialog, setShowAddTransactionDialog] = useState(false)
+  const [showAdvancePaymentDialog, setShowAdvancePaymentDialog] = useState(false)
   const [newTransactionDate, setNewTransactionDate] = useState(new Date().toISOString().split('T')[0])
   const [newTransactionName, setNewTransactionName] = useState('')
   const [newTransactionDescription, setNewTransactionDescription] = useState('')
@@ -96,6 +98,12 @@ export default function FinanceClient({
   const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
+  
+  // Advance Payment
+  const [advanceMonths, setAdvanceMonths] = useState<number>(1)
+  const [advanceDescription, setAdvanceDescription] = useState('')
+  const [advanceMemberId, setAdvanceMemberId] = useState<string | null>(null)
+  const [advanceMemberName, setAdvanceMemberName] = useState<string>('')
   
   // Member Search for matching (in table)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
@@ -910,13 +918,23 @@ export default function FinanceClient({
         </Button>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => setShowAddTransactionDialog(true)}
-            disabled={loading}
-          >
-            <IconPlus className="mr-2 size-4" />
-            Add Transaction
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={loading}>
+                <IconPlus className="mr-2 size-4" />
+                Add Transaction
+                <IconChevronDown className="ml-2 size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setShowAddTransactionDialog(true)}>
+                Regular Transaction
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAdvancePaymentDialog(true)}>
+                Advance Payment
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             onClick={() => setShowAddAccountDialog(true)}
