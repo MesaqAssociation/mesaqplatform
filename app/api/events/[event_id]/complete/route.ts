@@ -50,19 +50,7 @@ export async function POST(
     )
     const userName = userRows[0]?.name || 'Unknown'
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, user_name, action, entity_type, entity_id, details)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        userId,
-        userName,
-        'complete_event',
-        'event',
-        params.event_id,
-        JSON.stringify({ summary, finalCost, filesCount: files?.length || 0 })
-      ]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ success: true })
   } catch (error) {

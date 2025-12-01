@@ -244,19 +244,7 @@ export async function POST(req: NextRequest) {
           )
         }
 
-        // Log the upload
-        await pool.query(
-          `INSERT INTO audit_logs (action, entity_type, details) 
-           VALUES ('telegram_bank_statement_upload', 'bank_statement', $1)`,
-          [JSON.stringify({
-            telegramUserId: userId,
-            telegramUserName: userName,
-            fileName: document.file_name,
-            transactionsFound: parsed.transactions.length,
-            transactionsInserted: insertedCount.length,
-            accountNumber: parsed.accountNumber,
-          })]
-        )
+        // Audit log removed - logs system no longer in use
 
         // Get monthly fee from settings
         const { rows: feeRows } = await pool.query(

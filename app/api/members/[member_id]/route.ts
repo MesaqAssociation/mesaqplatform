@@ -51,16 +51,7 @@ export async function DELETE(
     // Delete member (cascade will handle related records)
     await pool.query('DELETE FROM users WHERE member_id = $1', [memberId])
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) 
-       VALUES ($1, 'member_delete', 'user', $2, $3)`,
-      [userId, member.id, JSON.stringify({ 
-        memberName: member.name, 
-        memberEmail: member.email,
-        memberPhone: member.phone 
-      })]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

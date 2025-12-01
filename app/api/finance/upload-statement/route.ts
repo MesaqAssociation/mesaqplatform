@@ -332,17 +332,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Log the upload
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, details) 
-       VALUES ($1, 'bank_statement_upload', 'bank_statement', $2)`,
-      [userId, JSON.stringify({ 
-        fileName: file.name, 
-        transactionsFound: parsed.transactions.length,
-        transactionsInserted: insertedCount.length,
-        accountNumber: parsed.accountNumber,
-      })]
-    )
+    // Audit log removed - logs system no longer in use
 
     // Auto-detect membership payments after upload
     try {

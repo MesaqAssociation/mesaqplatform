@@ -231,20 +231,7 @@ export async function POST(req: NextRequest) {
       })
     })
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, details) 
-       VALUES ($1, 'detect_membership_payments', 'membership_payments', $2)`,
-      [userId, JSON.stringify({ 
-        totalMembers: allMembers.length,
-        totalAdded,
-        step1Matches,
-        step2Matches,
-        step5Matches,
-        finalUnpaid: finalUnpaidMembers.length,
-        log: detectionLog 
-      })]
-    )
+    // Audit log removed - logs system no longer in use
 
     console.log('\n✅ Payment detection complete!')
     console.log(`📈 Summary: ${totalAdded} payments matched, ${finalUnpaidMembers.length} members still unpaid`)
