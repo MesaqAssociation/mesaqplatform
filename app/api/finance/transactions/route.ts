@@ -136,6 +136,15 @@ export async function POST(req: NextRequest) {
       ? currentBalance + transactionAmount 
       : currentBalance - transactionAmount
 
+    // Get monthly fee to determine category
+    const { rows: feeRows } = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+    )
+    const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+    
+    // Determine category based on amount
+    const category = Math.abs(transactionAmount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
+
     // Insert transaction
     const { rows: newTransaction } = await pool.query(`
       INSERT INTO transactions (
@@ -173,7 +182,7 @@ export async function POST(req: NextRequest) {
       description || '',
       transactionAmount,
       transactionType,
-      matchedMemberId ? 'Member Payment' : 'Misc',
+      category,
       balanceAfter,
       auth.userId,
       'manual',

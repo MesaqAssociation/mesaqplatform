@@ -251,8 +251,14 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // Determine category based on member match
-        const category = match ? match.memberName : 'Misc'
+        // Get monthly fee from system settings to determine category
+        const { rows: feeRows } = await pool.query(
+          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+        )
+        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+        
+        // Determine category based on amount
+        const category = Math.abs(amount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
         
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
