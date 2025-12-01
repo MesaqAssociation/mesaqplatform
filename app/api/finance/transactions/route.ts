@@ -252,9 +252,9 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { transactionId, memberId } = body
+    const { transactionId, memberId, category } = body
 
-    console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId)
+    console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId, 'category:', category)
 
     if (!transactionId) {
       return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400 })
@@ -271,15 +271,56 @@ export async function PATCH(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // Update transaction with member match
+    // Handle category-only update
+    if (category !== undefined && memberId === undefined) {
+      const { rows: updatedTransaction } = await pool.query(`
+        UPDATE transactions 
+        SET category = $1
+        WHERE id = $2
+        RETURNING 
+          id,
+          account_id,
+          to_char(transaction_date, 'YYYY-MM-DD') as transaction_date,
+          transaction_name,
+          description,
+          category,
+          amount,
+          transaction_type,
+          reference,
+          balance_after,
+          created_by,
+          source,
+          matched_member_id,
+          statement_id,
+          created_at
+      `, [category, transactionId])
+
+      if (updatedTransaction.length === 0) {
+        return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+      }
+
+      // Get member name if matched
+      let matchedMemberName = null
+      if (updatedTransaction[0].matched_member_id) {
+        const { rows: memberRows } = await pool.query(
+          'SELECT name FROM users WHERE id = $1',
+          [updatedTransaction[0].matched_member_id]
+        )
+        matchedMemberName = memberRows[0]?.name || null
+      }
+
+      return NextResponse.json({ 
+        transaction: {
+          ...updatedTransaction[0],
+          matched_member_name: matchedMemberName
+        }
+      })
+    }
+
+    // Handle member match update
     const { rows: updatedTransaction } = await pool.query(`
       UPDATE transactions 
-      SET 
-        matched_member_id = $1::text,
-        category = CASE 
-          WHEN $1::text IS NOT NULL THEN 'Member Payment'
-          ELSE 'Misc'
-        END
+      SET matched_member_id = $1::text
       WHERE id = $2
       RETURNING 
         id,

@@ -1189,12 +1189,12 @@ export default function FinanceClient({
                           value={txn.category || (Math.abs(txn.amount) === 40 ? 'Membership Payment' : 'Special Payment')}
                           onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                         >
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-background">
-                            <SelectValue className="text-foreground" />
+                          <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground">
+                            <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                            <SelectItem value="Special Payment">Special Payment</SelectItem>
+                          <SelectContent className="bg-background">
+                            <SelectItem value="Membership Payment" className="text-foreground">Membership Payment</SelectItem>
+                            <SelectItem value="Special Payment" className="text-foreground">Special Payment</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
