@@ -120,10 +120,18 @@ export default function DocumentsClient({ user }: { user: User | null }) {
       } else {
         const data = await res.json()
         showToast(data.error || 'Failed to upload document', 'error')
+        // Reset upload state on error
+        setUploadProgress(0)
+        setUploadComplete(false)
+        setFile(null)
       }
     } catch (err) {
       console.error('Upload error:', err)
       showToast('Failed to upload document', 'error')
+      // Reset upload state on error
+      setUploadProgress(0)
+      setUploadComplete(false)
+      setFile(null)
     } finally {
       setUploading(false)
     }

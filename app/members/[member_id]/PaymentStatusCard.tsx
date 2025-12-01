@@ -184,9 +184,7 @@ export default function PaymentStatusCard({ memberId }: { memberId: number }) {
                 className={`flex items-center justify-between p-2 rounded-md ${
                   month.paid 
                     ? 'bg-green-50 dark:bg-green-900/10' 
-                    : month.status === 'overdue'
-                    ? 'bg-red-50 dark:bg-red-900/10'
-                    : 'bg-muted/50'
+                    : 'bg-red-50 dark:bg-red-900/10'
                 }`}
               >
                 <div className="flex items-center gap-2">

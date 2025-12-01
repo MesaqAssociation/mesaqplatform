@@ -109,12 +109,12 @@ export async function GET(
         amount: payment?.amount || monthlyFee,
         paymentDate: payment?.paymentDate || null,
         transactionDescription: payment?.transactionDescription || null,
-        status: payment ? payment.status : (new Date(month) < currentDate ? 'overdue' : 'pending')
+        status: payment ? 'PAID' : 'UNPAID'
       }
     })
 
     const paidCount = monthlyStatus.filter(m => m.paid).length
-    const overdueCount = monthlyStatus.filter(m => m.status === 'overdue').length
+    const overdueCount = monthlyStatus.filter(m => !m.paid).length
     const totalExpected = expectedMonths.length
     const totalOwed = (totalExpected - paidCount) * monthlyFee
 
