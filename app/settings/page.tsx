@@ -1,3 +1,5 @@
+'use client'
+
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
@@ -8,6 +10,7 @@ import FineSettings from './FineSettings'
 import UserSettings from './UserSettings'
 import ExportData from './ExportData'
 import { Pool } from 'pg'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default async function SettingsPage() {
   const token = cookies().get('auth_token')?.value
@@ -84,10 +87,6 @@ export default async function SettingsPage() {
     </MainLayout>
   )
 }
-
-'use client'
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 function SettingsClient({ 
   user, 
