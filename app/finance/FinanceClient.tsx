@@ -1056,6 +1056,7 @@ export default function FinanceClient({
                   <th className="text-left py-3 px-2">Date</th>
                   <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
+                  <th className="text-left py-3 px-2">Member</th>
                   <th className="text-left py-3 px-2">Category</th>
                   <th className="text-right py-3 px-2">Amount</th>
                 </tr>
@@ -1063,7 +1064,7 @@ export default function FinanceClient({
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No transactions yet
                     </td>
                   </tr>
@@ -1153,6 +1154,20 @@ export default function FinanceClient({
                             </Command>
                           </PopoverContent>
                         </Popover>
+                      </td>
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
+                        <Select 
+                          value={txn.category || (Math.abs(txn.amount) === 40 ? 'Membership Payment' : 'Special Payment')}
+                          onValueChange={(value) => handleUpdateCategory(txn.id, value)}
+                        >
+                          <SelectTrigger className="w-[150px] h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                            <SelectItem value="Special Payment">Special Payment</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         txn.transaction_type === 'credit' 

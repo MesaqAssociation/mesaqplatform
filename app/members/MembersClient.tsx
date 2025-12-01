@@ -38,48 +38,21 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
   }
 
   const getPaymentStatusBadge = (member: Member) => {
-    const { payment_status, total_paid, monthly_fee } = member
+    const { payment_status } = member
     
     // Don't show badge for N/A (not joined yet)
     if (payment_status === 'N/A') return null
     
-    // Check if status is an amount (starts with $)
-    if (payment_status && payment_status.startsWith('$')) {
-      // Determine badge color based on payment amount
-      let badgeColor = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' // Default: fully paid
-      
-      if (total_paid != null && monthly_fee != null) {
-        const paidAmount = Number(total_paid)
-        const feeAmount = Number(monthly_fee)
-        
-        if (paidAmount < feeAmount) {
-          // Partial payment = yellow
-          badgeColor = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-        } else if (paidAmount > feeAmount) {
-          // Overpayment = purple
-          badgeColor = 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-        }
-      }
-      
-      return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
-          {payment_status}
-        </span>
-      )
-    }
-    
-    const configs = {
-      'UNPAID': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'UNPAID' },
-      'OVERDUE': { bg: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: 'OVERDUE' },
-      'REVIEW': { bg: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', label: 'REVIEW' },
-    }
-    
-    // Default to UNPAID if status is null, empty, or unknown
-    const config = configs[payment_status as keyof typeof configs] || configs.UNPAID
+    // Only show PAID or UNPAID
+    const isPaid = payment_status === 'PAID'
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg}`}>
-        {config.label}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        isPaid 
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+      }`}>
+        {isPaid ? 'PAID' : 'UNPAID'}
       </span>
     )
   }
