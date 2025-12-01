@@ -85,6 +85,10 @@ export default async function SettingsPage() {
   )
 }
 
+'use client'
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
 function SettingsClient({ 
   user, 
   fullUserData,
@@ -102,22 +106,29 @@ function SettingsClient({
   const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-6">Settings</h1>
       
-      <div className="max-w-2xl space-y-6">
-        {/* User Profile Settings - Editable */}
-        {fullUserData && fullUserData.id ? (
-          <UserSettings user={fullUserData} />
-        ) : (
-          <div className="border rounded-lg p-6">
-            <p className="text-sm text-muted-foreground">Unable to load user profile. Please try refreshing the page.</p>
-          </div>
-        )}
+      <Tabs defaultValue="personal" className="max-w-4xl">
+        <TabsList>
+          <TabsTrigger value="personal">Personal Settings</TabsTrigger>
+          {isAdmin && <TabsTrigger value="community">Community Settings</TabsTrigger>}
+        </TabsList>
 
-        {/* Admin Settings - Only for Board/Admin */}
+        {/* Personal Settings Tab - Available to Everyone */}
+        <TabsContent value="personal" className="space-y-6 mt-6">
+          {fullUserData && fullUserData.id ? (
+            <UserSettings user={fullUserData} />
+          ) : (
+            <div className="border rounded-lg p-6">
+              <p className="text-sm text-muted-foreground">Unable to load user profile. Please try refreshing the page.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Community Settings Tab - Admin Only */}
         {isAdmin && (
-          <>
+          <TabsContent value="community" className="space-y-6 mt-6">
             <div className="border rounded-lg p-6">
               <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
               <p className="text-sm text-muted-foreground mb-4">
@@ -144,17 +155,9 @@ function SettingsClient({
               </p>
               <ExportData />
             </div>
-          </>
+          </TabsContent>
         )}
-
-        {!isAdmin && (
-          <div className="border rounded-lg p-6 bg-muted/30">
-            <p className="text-sm text-muted-foreground">
-              Additional settings are only available to administrators and board members.
-            </p>
-          </div>
-        )}
-      </div>
+      </Tabs>
     </div>
   )
 }
