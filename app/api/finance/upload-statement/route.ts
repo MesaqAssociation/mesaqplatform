@@ -257,17 +257,17 @@ export async function POST(req: NextRequest) {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
         
-        // Determine category based on amount
+        // Determine category based on amount - ONLY $40 is membership payment
         const category = Math.abs(amount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
         
-            const { rows: inserted } = await pool.query(
-              `INSERT INTO transactions 
-               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category, statement_id) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10, $11)
-               ON CONFLICT DO NOTHING
-               RETURNING id, transaction_date, transaction_name, description, category`,
-              [
-                finalAccountId,
+        const { rows: inserted } = await pool.query(
+          `INSERT INTO transactions 
+           (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category, statement_id, matched_member_id) 
+           VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, 'bank_statement', $9, $10, $11, $12)
+           ON CONFLICT DO NOTHING
+           RETURNING id, transaction_date, transaction_name, description, category, matched_member_id`,
+          [
+            finalAccountId,
             txn.date,
             txn.name,
             txn.description,
@@ -277,7 +277,8 @@ export async function POST(req: NextRequest) {
             userId,
             txn.reference,
             category,
-            statementId
+            statementId,
+            match ? match.memberId : null
           ]
         )
         if (inserted.length > 0) {

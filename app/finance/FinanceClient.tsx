@@ -1137,7 +1137,7 @@ export default function FinanceClient({
                             <button
                               className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-70 cursor-pointer bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
                             >
-                              {txn.matched_member_name || 'Unmatched'}
+                              {txn.matched_member_name || 'Unknown'}
                               <IconChevronDown className="ml-1 size-3" />
                             </button>
                           </PopoverTrigger>
