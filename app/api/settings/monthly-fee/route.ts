@@ -71,12 +71,7 @@ export async function POST(req: NextRequest) {
       DO UPDATE SET value = $1, updated_at = NOW(), updated_by = $2
     `, [feeValue, userId])
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, user_name, action, entity_type, details) 
-       VALUES ($1, $2, 'update_monthly_fee', 'system_settings', $3)`,
-      [userId, userRows[0].name, JSON.stringify({ oldFee: body.oldFee, newFee: feeValue })]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ 
       success: true,

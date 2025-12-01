@@ -70,17 +70,7 @@ export async function POST(req: NextRequest) {
       payments.push(inserted[0])
     }
 
-    // Create audit log
-    await pool.query(`
-      INSERT INTO audit_logs (user_id, action, details)
-      VALUES ($1, 'advance_payment_created', $2)
-    `, [userId, JSON.stringify({
-      memberId,
-      memberName: member.name,
-      months,
-      totalAmount,
-      payments: payments.length
-    })])
+    // Audit log removed - logs system no longer in use
 
     const expiryDate = new Date(startDate.getFullYear(), startDate.getMonth() + months, 0)
 

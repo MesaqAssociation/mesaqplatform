@@ -58,12 +58,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) 
-       VALUES ($1, 'role_change', 'user', $2, $3)`,
-      [userId, rows[0].id, JSON.stringify({ oldRole: role, newRole: role, memberName: rows[0].name })]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ success: true, member: rows[0] })
   } catch (err: any) {

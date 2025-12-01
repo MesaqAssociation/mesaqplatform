@@ -56,12 +56,7 @@ export async function POST(req: NextRequest) {
       [accountId, today, `Balance Adjustment: ${reason}`, difference, newBalance, userId]
     )
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) 
-       VALUES ($1, 'balance_adjustment', 'transaction', $2, $3)`,
-      [userId, rows[0].id, JSON.stringify({ oldBalance, newBalance, reason })]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ transaction: rows[0] })
   } catch (err: any) {

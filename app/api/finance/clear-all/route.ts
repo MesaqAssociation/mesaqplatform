@@ -55,12 +55,7 @@ export async function POST(req: NextRequest) {
       [accountId]
     )
 
-    // Log the action
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, details) 
-       VALUES ($1, 'clear_all_transactions', 'transactions', $2)`,
-      [userId, JSON.stringify({ deletedCount: rowCount, accountId })]
-    )
+    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ 
       success: true, 
