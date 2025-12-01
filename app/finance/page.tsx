@@ -57,41 +57,11 @@ export default async function FinancePage() {
 
   const firstAccount = accounts[0]
 
-  // Get current month transactions for first account
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  
-  const { rows: transactions } = await pool.query(`
-    SELECT 
-      t.id,
-      t.account_id,
-      to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
-      t.transaction_name,
-      t.description,
-      t.category,
-      t.amount,
-      t.transaction_type,
-      t.reference,
-      t.balance_after,
-      t.created_by,
-      t.source,
-      t.created_at,
-      u.name as creator_name 
-    FROM transactions t 
-    LEFT JOIN users u ON t.created_by = u.id 
-    WHERE t.account_id = $1 
-      AND EXTRACT(YEAR FROM t.transaction_date) = $2
-      AND EXTRACT(MONTH FROM t.transaction_date) = $3
-    ORDER BY t.transaction_date DESC, t.created_at DESC
-  `, [firstAccount.id, year, month])
-
   return (
     <MainLayout user={user}>
       <div className="p-6">
         <FinanceClient 
           account={firstAccount} 
-          initialTransactions={transactions}
           allAccounts={accounts}
         />
       </div>

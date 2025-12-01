@@ -53,11 +53,9 @@ type Member = {
 
 export default function FinanceClient({ 
   account, 
-  initialTransactions,
   allAccounts
 }: { 
   account: Account
-  initialTransactions: Transaction[]
   allAccounts: Account[]
 }) {
   // Account management
@@ -113,20 +111,11 @@ export default function FinanceClient({
   // Test send messages
   const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
-  // Track if component has mounted
-  const [hasMounted, setHasMounted] = useState(false)
-  
   // Update balance when account changes
   useEffect(() => {
     setBalance(currentAccount.current_balance)
     setEditValue(currentAccount.current_balance.toString())
   }, [currentAccount])
-  
-  // Set initial transactions only on first mount
-  useEffect(() => {
-    setTransactions(initialTransactions)
-    setHasMounted(true)
-  }, []) // Empty dependency - only run once on mount
   
   const loadTransactions = useCallback(async () => {
     if (!selectedAccountId) return
@@ -150,12 +139,10 @@ export default function FinanceClient({
     }
   }, [selectedAccountId, currentMonth])
   
-  // Load transactions when account or month changes (but skip on initial mount)
+  // Load transactions on mount and when account or month changes
   useEffect(() => {
-    if (hasMounted) {
-      loadTransactions()
-    }
-  }, [hasMounted, loadTransactions])
+    loadTransactions()
+  }, [loadTransactions])
   
   const handleAddAccount = async () => {
     if (!newAccountName.trim() || !newAccountNumber.trim() || !newAccountBSB.trim()) {
