@@ -27,6 +27,8 @@ export default function MessagingClient() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sendProgress, setSendProgress] = useState(0)
   const [sendStatus, setSendStatus] = useState<string>('')
+  const [estimatedTime, setEstimatedTime] = useState<number>(0)
+  const [timeRemaining, setTimeRemaining] = useState<number>(0)
 
   useEffect(() => {
     loadMembers()
@@ -79,7 +81,25 @@ export default function MessagingClient() {
 
     setSending(true)
     setSendProgress(0)
-    setSendStatus('Queueing messages...')
+    setSendStatus('Sending messages...')
+
+    const memberCount = selectedMembers.size
+    // Calculate total time: 5 seconds per message
+    const totalSeconds = memberCount * 5
+    setEstimatedTime(totalSeconds)
+    setTimeRemaining(totalSeconds)
+
+    // Start countdown timer
+    const startTime = Date.now()
+    const timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      const remaining = Math.max(0, totalSeconds - elapsed)
+      setTimeRemaining(remaining)
+      
+      if (remaining === 0) {
+        clearInterval(timerInterval)
+      }
+    }, 1000)
 
     try {
       const memberIds = Array.from(selectedMembers)
@@ -94,6 +114,8 @@ export default function MessagingClient() {
         }),
       })
 
+      clearInterval(timerInterval)
+
       if (res.ok) {
         const data = await res.json()
         
@@ -104,20 +126,23 @@ export default function MessagingClient() {
         
         // Show success toast
         showToast(
-          `${data.queued} messages queued! Sending with 5-second intervals. You can close this page.`,
+          `${data.sent} messages sent successfully! (${data.failed} failed)`,
           'success'
         )
       } else {
         const error = await res.json()
-        showToast(`Failed to queue messages: ${error.error || 'Unknown error'}`, 'error')
+        showToast(`Failed to send messages: ${error.error || 'Unknown error'}`, 'error')
       }
     } catch (err) {
       console.error('Send error:', err)
-      showToast('Failed to queue messages', 'error')
+      showToast('Failed to send messages', 'error')
+      clearInterval(timerInterval)
     } finally {
       setSending(false)
       setSendProgress(0)
       setSendStatus('')
+      setTimeRemaining(0)
+      setEstimatedTime(0)
     }
   }
 
@@ -244,7 +269,14 @@ You can use these variables:
               {sending && (
                 <div className="space-y-2">
                   <Progress value={sendProgress} />
-                  <p className="text-sm text-center text-muted-foreground">{sendStatus}</p>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{sendStatus}</span>
+                    {timeRemaining > 0 && (
+                      <span className="font-mono">
+                        {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -6,6 +6,9 @@ import { Pool } from 'pg'
 import FinanceClient from './FinanceClient'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 
+// Force dynamic rendering to avoid hydration issues
+export const dynamic = 'force-dynamic'
+
 export default async function FinancePage() {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) redirect('/')

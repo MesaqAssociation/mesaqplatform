@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { IconFileText, IconDownload, IconTrash, IconPlus, IconUpload } from '@tabler/icons-react'
+import { showToast } from '@/lib/toast'
 
 type Document = {
   id: string
@@ -85,12 +86,12 @@ export default function DocumentsClient({ user }: { user: User | null }) {
 
   const handleUpload = async () => {
     if (!title || !file) {
-      alert('Please provide a title and file')
+      showToast('Please provide a title and file', 'error')
       return
     }
 
     if (!uploadComplete) {
-      alert('Please wait for file upload to complete')
+      showToast('Please wait for file upload to complete', 'error')
       return
     }
 
@@ -108,7 +109,7 @@ export default function DocumentsClient({ user }: { user: User | null }) {
       })
 
       if (res.ok) {
-        alert('Document uploaded successfully!')
+        showToast('Document uploaded successfully!', 'success')
         setShowUploadDialog(false)
         setTitle('')
         setDescription('')
@@ -118,36 +119,32 @@ export default function DocumentsClient({ user }: { user: User | null }) {
         loadDocuments()
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to upload document')
+        showToast(data.error || 'Failed to upload document', 'error')
       }
     } catch (err) {
       console.error('Upload error:', err)
-      alert('Failed to upload document')
+      showToast('Failed to upload document', 'error')
     } finally {
       setUploading(false)
     }
   }
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) {
-      return
-    }
-
+  const handleDelete = async (id: string, docTitle: string) => {
     try {
       const res = await fetch(`/api/documents/${id}`, {
         method: 'DELETE',
       })
 
       if (res.ok) {
-        alert('Document deleted successfully')
+        showToast('Document deleted successfully', 'success')
         loadDocuments()
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to delete document')
+        showToast(data.error || 'Failed to delete document', 'error')
       }
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete document')
+      showToast('Failed to delete document', 'error')
     }
   }
 
@@ -237,7 +234,11 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDelete(doc.id, doc.title)}
+                      onClick={() => {
+                        if (confirm(`Delete "${doc.title}"?`)) {
+                          handleDelete(doc.id, doc.title)
+                        }
+                      }}
                     >
                       <IconTrash className="size-4" />
                     </Button>
