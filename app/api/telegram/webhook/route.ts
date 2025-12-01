@@ -302,7 +302,11 @@ export async function POST(req: NextRequest) {
 
         // Auto-detect membership payments
         try {
-          const monthlyFee = parseFloat(process.env.MONTHLY_FEE || '50.00')
+          // Get monthly fee from system settings (same as above)
+          const { rows: feeRows2 } = await pool.query(
+            "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+          )
+          const monthlyFee = parseFloat(feeRows2[0]?.value || '40.00')
 
           const { rows: members } = await pool.query(`
             SELECT id, banking_name, name, date_joined

@@ -69,57 +69,60 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    console.log(`📤 Starting to send ${members.length} messages with 5-second delays...`)
+    console.log(`📤 Queuing ${members.length} messages with 5-second delays...`)
 
-    // Send messages sequentially with 5-second delays
-    // Must complete before returning since serverless doesn't support background jobs
-    let sent = 0
-    let failed = 0
+    // Start sending in background (function will continue after response)
+    const sendMessages = async () => {
+      let sent = 0
+      let failed = 0
 
-    for (let i = 0; i < members.length; i++) {
-      const member = members[i]
-      
-      try {
-        // Replace variables in message
-        let personalizedMessage = message
-          .replace(/\{\{name\}\}/g, member.name)
-          .replace(/\{\{phone\}\}/g, member.phone || '')
-          .replace(/\{\{email\}\}/g, member.email || '')
-
-        const phone = formatPhoneNumber(member.phone)
+      for (let i = 0; i < members.length; i++) {
+        const member = members[i]
         
-        // Send WhatsApp message
-        const success = await sendWhatsAppMessage({
-          to: phone,
-          body: personalizedMessage
-        })
+        try {
+          // Replace variables in message
+          let personalizedMessage = message
+            .replace(/\{\{name\}\}/g, member.name)
+            .replace(/\{\{phone\}\}/g, member.phone || '')
+            .replace(/\{\{email\}\}/g, member.email || '')
 
-        if (success) {
-          sent++
-          console.log(`✅ (${i + 1}/${members.length}) Sent to ${member.name}`)
-        } else {
+          const phone = formatPhoneNumber(member.phone)
+          
+          // Send WhatsApp message
+          const success = await sendWhatsAppMessage({
+            to: phone,
+            body: personalizedMessage
+          })
+
+          if (success) {
+            sent++
+            console.log(`✅ (${i + 1}/${members.length}) Sent to ${member.name}`)
+          } else {
+            failed++
+            console.log(`❌ (${i + 1}/${members.length}) Failed to send to ${member.name}`)
+          }
+        } catch (err) {
           failed++
-          console.log(`❌ (${i + 1}/${members.length}) Failed to send to ${member.name}`)
+          console.error(`❌ (${i + 1}/${members.length}) Error sending to ${member.name}:`, err)
         }
-      } catch (err) {
-        failed++
-        console.error(`❌ (${i + 1}/${members.length}) Error sending to ${member.name}:`, err)
-      }
 
-      // Wait 5 seconds before next message (except for the last one)
-      if (i < members.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 5000))
+        // Wait 5 seconds before next message (except for the last one)
+        if (i < members.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 5000))
+        }
       }
+      
+      console.log(`✅ Batch complete: ${sent} sent, ${failed} failed`)
     }
-    
-    console.log(`✅ Batch complete: ${sent} sent, ${failed} failed`)
 
+    // Start sending (don't await - let it run in background)
+    sendMessages()
+
+    // Return immediately to user
     return NextResponse.json({ 
       success: true,
       queued: members.length,
-      sent,
-      failed,
-      message: 'All messages sent with 5-second intervals'
+      message: `Sending ${members.length} messages with 5-second intervals. You can close this page.`
     })
   } catch (err: any) {
     console.error('Send batch error:', err)

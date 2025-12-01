@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown } from '@tabler/icons-react'
+import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown, IconCheck } from '@tabler/icons-react'
 import BalanceCard from './BalanceCard'
 import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -78,6 +78,7 @@ export default function MemberDetailClient({
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [openTransactionMonth, setOpenTransactionMonth] = useState<string | null>(null)
+  const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
 
   // Group transactions by month
   const transactionsByMonth = transactions.reduce((acc, txn) => {
@@ -201,6 +202,41 @@ export default function MemberDetailClient({
       style: 'currency',
       currency: 'AUD',
     }).format(Math.abs(amount))
+  }
+
+  const handleConvertToMembership = async (txn: Transaction) => {
+    if (!confirm(`Convert this $${Math.abs(txn.amount).toFixed(2)} transaction to a membership payment?`)) {
+      return
+    }
+
+    setConvertingTxn(txn.id)
+    try {
+      const res = await fetch('/api/finance/convert-to-membership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: txn.id,
+          memberId: member.id,
+          amount: Math.abs(txn.amount),
+          transactionDate: txn.transaction_date
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(`Converted to membership payment for ${data.monthName}`, 'success')
+        // Refresh page to show updated data
+        router.refresh()
+      } else {
+        showToast(data.error || 'Failed to convert transaction', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to convert transaction', err)
+      showToast('Failed to convert transaction', 'error')
+    } finally {
+      setConvertingTxn(null)
+    }
   }
 
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
@@ -384,11 +420,24 @@ export default function MemberDetailClient({
                                     )}
                                   </div>
                                 </div>
-                                <div className="text-sm font-semibold ml-2 flex-shrink-0">
-                                  <span className={txn.transaction_type === 'credit' || txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                    {txn.transaction_type === 'credit' || txn.amount > 0 ? '+' : '-'}
-                                    {formatCurrency(txn.amount)}
-                                  </span>
+                                <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                                  <div className="text-sm font-semibold">
+                                    <span className={txn.transaction_type === 'credit' || txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                      {txn.transaction_type === 'credit' || txn.amount > 0 ? '+' : '-'}
+                                      {formatCurrency(txn.amount)}
+                                    </span>
+                                  </div>
+                                  {(txn.transaction_type === 'credit' || txn.amount > 0) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleConvertToMembership(txn)}
+                                      disabled={convertingTxn === txn.id}
+                                      title="Convert to membership payment"
+                                    >
+                                      <IconCheck className="size-3" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             ))}

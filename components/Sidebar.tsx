@@ -49,11 +49,6 @@ export function Sidebar({ user }: SidebarProps) {
         </Link>
       </div>
 
-      {/* Global Search */}
-      <div className="px-4 pb-2">
-        <GlobalSearch />
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 px-4 py-2 overflow-y-auto">
         <ul className="space-y-1">
