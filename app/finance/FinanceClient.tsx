@@ -729,6 +729,35 @@ export default function FinanceClient({
     }
   }
 
+  // Update transaction category
+  const handleUpdateCategory = async (transactionId: string, category: string) => {
+    try {
+      const res = await fetch('/api/finance/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          category,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        // Update transaction in list
+        setTransactions(transactions.map(t => 
+          t.id === transactionId ? data.transaction : t
+        ))
+        showToast('Category updated successfully', 'success')
+      } else {
+        showToast(data.error || 'Failed to update category', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to update category', err)
+      showToast('Failed to update category', 'error')
+    }
+  }
+
   const handleDeleteTransaction = async () => {
     if (!selectedTransaction) return
 
