@@ -417,10 +417,8 @@ export default function FinanceClient({
             })
           }
           
-          // Reload transactions instead of page
-          setTimeout(() => {
-            loadTransactions()
-          }, data.failed > 0 || data.skipped > 0 ? 8000 : 2000)
+          // Reload transactions immediately to show new imports
+          loadTransactions()
         }, 500)
       } else {
         setUploadProgress(null)
