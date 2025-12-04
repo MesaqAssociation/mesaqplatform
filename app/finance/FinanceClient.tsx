@@ -189,8 +189,10 @@ export default function FinanceClient({
   
   // Load transactions on mount and when account or month changes
   useEffect(() => {
-    loadTransactions()
-  }, [loadTransactions])
+    if (selectedAccountId) {
+      loadTransactions()
+    }
+  }, [selectedAccountId, currentMonth, loadTransactions])
   
   const handleAddAccount = async () => {
     if (!newAccountName.trim() || !newAccountNumber.trim() || !newAccountBSB.trim()) {
@@ -1156,7 +1158,11 @@ export default function FinanceClient({
                                   {memberSearchResults.map((member) => (
                                     <CommandItem
                                       key={member.id}
-                                      onSelect={() => handleMatchMember(txn.id, member.id)}
+                                      onSelect={() => {
+                                        handleMatchMember(txn.id, member.id)
+                                        setOpenPopoverId(null)
+                                        setMemberSearchQuery('')
+                                      }}
                                       className="cursor-pointer"
                                     >
                                       <div className="flex flex-col">
@@ -1186,15 +1192,15 @@ export default function FinanceClient({
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Select 
-                          value={txn.category || (Math.abs(txn.amount) === 40 ? 'Membership Payment' : 'Special Payment')}
+                          value={txn.category || 'Special Payment'}
                           onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                         >
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground">
-                            <SelectValue />
+                          <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
+                            <SelectValue placeholder="Select category" />
                           </SelectTrigger>
-                          <SelectContent className="bg-background">
-                            <SelectItem value="Membership Payment" className="text-foreground">Membership Payment</SelectItem>
-                            <SelectItem value="Special Payment" className="text-foreground">Special Payment</SelectItem>
+                          <SelectContent className="bg-background border-input">
+                            <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
+                            <SelectItem value="Special Payment" className="text-foreground cursor-pointer">Special Payment</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>

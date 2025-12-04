@@ -279,14 +279,19 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               />
             </div>
             <div>
-              <Label htmlFor="description">Description (optional)</Label>
+              <Label htmlFor="description">Description (optional) {description.length}/500</Label>
               <Textarea
                 id="description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) {
+                    setDescription(e.target.value)
+                  }
+                }}
                 placeholder="Brief description of the document"
                 className="mt-1"
                 rows={3}
+                maxLength={500}
               />
             </div>
             <div>

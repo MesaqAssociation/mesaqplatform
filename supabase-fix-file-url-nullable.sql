@@ -13,3 +13,4 @@ FROM information_schema.columns
 WHERE table_name = 'bank_statements' 
   AND column_name = 'file_url';
 
+ 
