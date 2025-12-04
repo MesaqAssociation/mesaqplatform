@@ -5,6 +5,7 @@ import MonthlyFeeSettings from './MonthlyFeeSettings'
 import FineSettings from './FineSettings'
 import UserSettings from './UserSettings'
 import ExportData from './ExportData'
+import PaymentKeywords from './PaymentKeywords'
 
 export default function SettingsClient({ 
   user, 
@@ -63,6 +64,14 @@ export default function SettingsClient({
                 initialEnabled={finesEnabled}
                 initialAmount={fineAmount}
               />
+            </div>
+
+            <div className="border rounded-lg p-6">
+              <h2 className="text-lg font-medium mb-4">Payment Keywords</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Manage keywords for automatic payment classification. Payments with these keywords in their description will be marked as "Special Payment"
+              </p>
+              <PaymentKeywords />
             </div>
 
             <div className="border rounded-lg p-6">

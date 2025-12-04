@@ -1093,7 +1093,31 @@ export default function FinanceClient({
                 </tr>
               </thead>
               <tbody>
-                {transactions.length === 0 ? (
+                {loadingTransactions ? (
+                  // Grey shimmers while loading
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`skeleton-${i}`} className="border-b">
+                      <td className="py-3 px-2">
+                        <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="h-4 w-48 bg-muted animate-pulse rounded"></div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="h-6 w-24 bg-muted animate-pulse rounded-full"></div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="h-6 w-32 bg-muted animate-pulse rounded"></div>
+                      </td>
+                      <td className="py-3 px-2 text-right">
+                        <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto"></div>
+                      </td>
+                    </tr>
+                  ))
+                ) : transactions.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No transactions yet

@@ -68,12 +68,6 @@ export function NavUser({
               {t("settings")}
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/logs">
-              <IconActivity className="mr-2 size-4" />
-              {t("activityLogs")}
-            </Link>
-          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>

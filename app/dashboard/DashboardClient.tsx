@@ -50,10 +50,25 @@ type Props = {
   unpaidBalances: UnpaidBalance[]
 }
 
+type ReviewPayment = {
+  id: string
+  transaction_date: string
+  transaction_name: string
+  description: string
+  amount: number
+  category: string
+  matched_member_id: string
+  member_name: string
+  member_id: number
+  account_name: string
+}
+
 export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts, unpaidBalances }: Props) {
   const { t } = useI18n()
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
+  const [reviewPayments, setReviewPayments] = useState<ReviewPayment[]>([])
+  const [loadingReviewPayments, setLoadingReviewPayments] = useState(true)
 
   useEffect(() => {
     // Filter transactions by selected account and limit to 3
@@ -64,6 +79,24 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
       setAccountTransactions(recentTransactions.slice(0, 3))
     }
   }, [selectedAccountId, recentTransactions])
+
+  useEffect(() => {
+    // Load payments needing review
+    const loadReviewPayments = async () => {
+      try {
+        const res = await fetch('/api/finance/review-payments')
+        if (res.ok) {
+          const data = await res.json()
+          setReviewPayments(data.payments || [])
+        }
+      } catch (err) {
+        console.error('Failed to load review payments:', err)
+      } finally {
+        setLoadingReviewPayments(false)
+      }
+    }
+    loadReviewPayments()
+  }, [])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -279,6 +312,65 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
 
       </div>
+
+      {/* Need Review Section - Special Payments */}
+      {!loadingReviewPayments && reviewPayments.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-500/10 p-3 rounded-lg">
+                <IconAlertCircle className="size-6 text-yellow-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Payments Need Review</h2>
+                <p className="text-xs text-muted-foreground">Special payments that may need to be reclassified</p>
+              </div>
+            </div>
+            <Link href="/finance" className="text-sm text-primary hover:underline">
+              View All Transactions
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3">
+            {reviewPayments.slice(0, 10).map((payment) => (
+              <div 
+                key={payment.id}
+                className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{payment.member_name}</p>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                      Special Payment
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDate(payment.transaction_date)} • {payment.transaction_name}
+                  </p>
+                  {payment.description && (
+                    <p className="text-xs text-muted-foreground mt-1 truncate max-w-md">
+                      {payment.description}
+                    </p>
+                  )}
+                </div>
+                <div className="text-sm font-bold ml-4 flex-shrink-0 text-green-500">
+                  +${Math.abs(payment.amount).toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {reviewPayments.length > 10 && (
+            <Link 
+              href="/finance" 
+              className="flex items-center justify-center gap-1 py-2 mt-3 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <span>See all {reviewPayments.length} payments</span>
+              <IconArrowRight className="size-3" />
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Unpaid Balances Card - Full Width */}
       {unpaidBalances.length > 0 && (
