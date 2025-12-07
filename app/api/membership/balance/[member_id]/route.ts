@@ -79,12 +79,12 @@ export async function GET(
     const paymentMap = new Map()
     payments.forEach(p => {
       const monthKey = new Date(p.payment_month).toISOString().split('T')[0]
-      paymentMap.set(monthKey, parseFloat(p.total_amount))
+      paymentMap.set(monthKey, parseFloat(p.total_amount || 0))
     })
 
     // Calculate membership balance
     let runningBalance = 0
-    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount), 0)
+    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0)
     const expectedPayments = months.length
     
     // Running balance = total paid - total expected
@@ -113,7 +113,7 @@ export async function GET(
       ORDER BY t.transaction_date DESC
     `, [member.id])
 
-    const totalSpecialPayments = specialTxns.reduce((sum, txn) => sum + parseFloat(txn.amount), 0)
+    const totalSpecialPayments = specialTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
 
     return NextResponse.json({
       membershipBalance: {
