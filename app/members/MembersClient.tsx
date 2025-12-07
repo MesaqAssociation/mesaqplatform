@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 type Member = {
   id: string
-  member_id: number
+  member_id: string
   phone: string
   name: string | null
   email: string | null
