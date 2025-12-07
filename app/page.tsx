@@ -67,32 +67,106 @@ export default function LoginPage() {
     )
   }
 
+  // Gallery images available (17 images, mesaq6 is missing)
+  const galleryImages = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+
   return (
-    <main className="min-h-dvh grid place-items-center p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex justify-center mb-4">
-            <Image src="/crop-logo.webp" alt="Mesaq" width={120} height={120} className="rounded-lg" />
-          </div>
-          <CardTitle className="text-center">Sign in to Mesaq</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
-            <div className="space-y-2">
-              <Label htmlFor="identifier">Phone or Name</Label>
-              <Input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="0456789012 or John Smith" required autoComplete="off" />
+    <main className="min-h-dvh relative overflow-hidden">
+      {/* Gallery Background - Creative Mosaic */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/90 to-background/95 backdrop-blur-sm z-10"></div>
+        
+        {/* Top Left Cluster */}
+        <div className="absolute top-0 left-0 w-1/3 h-1/2 opacity-20">
+          <Image src="/gallery/mesaq1.webp" alt="" fill className="object-cover" />
+        </div>
+        <div className="absolute top-1/4 left-1/4 w-1/5 h-1/4 opacity-15">
+          <Image src="/gallery/mesaq2.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        
+        {/* Top Right Cluster */}
+        <div className="absolute top-0 right-0 w-1/4 h-1/3 opacity-20">
+          <Image src="/gallery/mesaq3.webp" alt="" fill className="object-cover" />
+        </div>
+        <div className="absolute top-1/3 right-1/5 w-1/6 h-1/5 opacity-15">
+          <Image src="/gallery/mesaq4.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        
+        {/* Middle Clusters */}
+        <div className="absolute top-1/2 left-1/6 w-1/5 h-1/4 opacity-10">
+          <Image src="/gallery/mesaq5.webp" alt="" fill className="object-cover rounded-full" />
+        </div>
+        <div className="absolute top-2/3 right-1/3 w-1/6 h-1/5 opacity-15">
+          <Image src="/gallery/mesaq7.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        
+        {/* Bottom Left Cluster */}
+        <div className="absolute bottom-0 left-0 w-1/3 h-2/5 opacity-20">
+          <Image src="/gallery/mesaq8.webp" alt="" fill className="object-cover" />
+        </div>
+        <div className="absolute bottom-1/4 left-1/5 w-1/6 h-1/5 opacity-10">
+          <Image src="/gallery/mesaq9.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        
+        {/* Bottom Right Cluster */}
+        <div className="absolute bottom-0 right-0 w-1/4 h-1/3 opacity-20">
+          <Image src="/gallery/mesaq10.webp" alt="" fill className="object-cover" />
+        </div>
+        <div className="absolute bottom-1/3 right-1/6 w-1/5 h-1/4 opacity-15">
+          <Image src="/gallery/mesaq11.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        
+        {/* Scattered Accents */}
+        <div className="absolute top-1/3 left-2/3 w-1/8 h-1/6 opacity-8">
+          <Image src="/gallery/mesaq12.webp" alt="" fill className="object-cover rounded-full" />
+        </div>
+        <div className="absolute top-2/3 left-1/3 w-1/7 h-1/6 opacity-12">
+          <Image src="/gallery/mesaq13.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        <div className="absolute bottom-1/2 right-1/4 w-1/8 h-1/7 opacity-10">
+          <Image src="/gallery/mesaq14.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        <div className="absolute top-1/5 right-2/5 w-1/9 h-1/8 opacity-8">
+          <Image src="/gallery/mesaq15.webp" alt="" fill className="object-cover rounded-full" />
+        </div>
+        <div className="absolute bottom-2/5 left-2/5 w-1/8 h-1/7 opacity-10">
+          <Image src="/gallery/mesaq16.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        <div className="absolute top-3/5 right-1/5 w-1/7 h-1/6 opacity-12">
+          <Image src="/gallery/mesaq17.webp" alt="" fill className="object-cover rounded-lg" />
+        </div>
+        <div className="absolute bottom-1/5 right-2/5 w-1/9 h-1/8 opacity-8">
+          <Image src="/gallery/mesaq18.webp" alt="" fill className="object-cover rounded-full" />
+        </div>
+      </div>
+
+      {/* Login Card - Centered with backdrop blur */}
+      <div className="min-h-dvh grid place-items-center p-6 relative z-20">
+        <Card className="w-full max-w-md backdrop-blur-sm bg-card/95 shadow-2xl border-2">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <Image src="/crop-logo.webp" alt="Mesaq" width={120} height={120} className="rounded-lg shadow-lg" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
-            </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <CardTitle className="text-center text-2xl">Sign in to Mesaq</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
+              <div className="space-y-2">
+                <Label htmlFor="identifier">Phone or Name</Label>
+                <Input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="0456789012 or John Smith" required autoComplete="off" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
+              </div>
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <Button className="w-full" type="submit" disabled={loading}>
+                {loading ? 'Signing in...' : 'Sign in'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   )
 }

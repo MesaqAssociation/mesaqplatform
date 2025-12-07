@@ -257,30 +257,31 @@ export async function POST(req: NextRequest) {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
         
-        // Get all payment keywords for special payment detection
-        let keywords: string[] = []
+        // Get all payment keywords with their payment types
+        let keywords: Array<{ keyword: string, paymentType: string }> = []
         try {
-          const { rows: keywordRows } = await pool.query("SELECT keyword FROM payment_keywords")
-          keywords = keywordRows.map(r => r.keyword.toLowerCase())
+          const { rows: keywordRows } = await pool.query("SELECT keyword, payment_type FROM payment_keywords")
+          keywords = keywordRows.map(r => ({ keyword: r.keyword.toLowerCase(), paymentType: r.payment_type }))
         } catch (kwErr) {
           console.log('⚠️ Keywords table not found, skipping keyword check')
         }
         
-        // SIMPLIFIED CLASSIFICATION LOGIC
+        // SMART CLASSIFICATION LOGIC
         let category = 'Special Payment' // Default
         
         // 1. Check if matched to a member (banking name or member ID in description)
         if (match && match.memberId) {
           console.log(`✓ Matched to member: ${match.memberName}`)
           
-          // 2. Check for special payment keywords
+          // 2. Check for payment keywords (can force Special or Membership)
+          let keywordMatch: { keyword: string, paymentType: string } | null = null
           if (txn.description) {
             const descLower = txn.description.toLowerCase()
-            const hasKeyword = keywords.some(kw => descLower.includes(kw))
+            keywordMatch = keywords.find(kw => descLower.includes(kw.keyword)) || null
             
-            if (hasKeyword) {
-              category = 'Special Payment'
-              console.log(`✓ Keyword found → Special Payment`)
+            if (keywordMatch) {
+              category = keywordMatch.paymentType
+              console.log(`✓ Keyword "${keywordMatch.keyword}" found → ${keywordMatch.paymentType}`)
             } else {
               // 3. Check if amount is a multiple of monthly fee (40, 80, 120, etc)
               const paymentAmount = Math.abs(amount)

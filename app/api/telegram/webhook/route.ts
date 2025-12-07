@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       const userId = message.from.id
       const userName = message.from.first_name || 'User'
 
-      console.log(`Document received from ${userName} (${userId}):`, document.file_name)
+      console.log(`📎 Document received from ${userName} (${userId}):`, document.file_name)
 
       // Check if it's a PDF
       if (document.mime_type !== 'application/pdf') {
@@ -38,27 +38,46 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Send processing message
+      // Send immediate processing confirmation and respond to Telegram
+      // Process the document asynchronously without blocking
+      sendTelegramMessage(chatId, '📄 Bank statement received! Processing...')
+      
+      // Process document in background (don't await)
+      processDocument(document, chatId, userName).catch(err => {
+        console.error('Background document processing error:', err)
+        sendTelegramMessage(chatId, '❌ Error processing document. Please try again or contact support.')
+      })
+      
+      // Return immediately so Telegram can send more documents
+      return NextResponse.json({ ok: true, message: 'Processing started' })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Telegram webhook error:', err)
+    return NextResponse.json({ ok: true }) // Always return ok to Telegram
+  }
+}
+
+// Process document asynchronously
+async function processDocument(document: any, chatId: number, userName: string) {
+  try {
+    console.log(`🔄 [${document.file_name}] Starting background processing...`)
+    
+    // Download the PDF file
+    const telegramFileUrl = await getTelegramFileUrl(document.file_id)
+    const pdfBuffer = await downloadFile(telegramFileUrl)
+
+    // Parse the PDF
+    const parsed = await parseBankStatementPDF(pdfBuffer)
+
+    if (parsed.transactions.length === 0) {
       await sendTelegramMessage(
         chatId,
-        '📄 Bank statement received! Processing...'
+        '❌ No transactions found in the PDF. Please ensure it\'s a valid bank statement.'
       )
-
-      try {
-        // Download the PDF file
-        const telegramFileUrl = await getTelegramFileUrl(document.file_id)
-        const pdfBuffer = await downloadFile(telegramFileUrl)
-
-        // Parse the PDF
-        const parsed = await parseBankStatementPDF(pdfBuffer)
-
-        if (parsed.transactions.length === 0) {
-          await sendTelegramMessage(
-            chatId,
-            '❌ No transactions found in the PDF. Please ensure it\'s a valid bank statement.'
-          )
-          return NextResponse.json({ ok: true })
-        }
+      return
+    }
 
         // Get the default financial account (or create one)
         let accountId: string
@@ -288,76 +307,13 @@ export async function POST(req: NextRequest) {
 
         await sendTelegramMessage(chatId, responseMessage)
 
-        // Auto-detect membership payments
-        try {
-          // Get monthly fee from system settings (same as above)
-          const { rows: feeRows2 } = await pool.query(
-            "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
-          )
-          const monthlyFee = parseFloat(feeRows2[0]?.value || '40.00')
-
-          const { rows: members } = await pool.query(`
-            SELECT id, banking_name, name, date_joined
-            FROM users
-            WHERE banking_name IS NOT NULL AND date_joined IS NOT NULL
-          `)
-
-          let paymentsDetected = 0
-
-          for (const member of members) {
-            const { rows: matchingTransactions } = await pool.query(`
-              SELECT id, transaction_date
-              FROM transactions
-              WHERE 
-                transaction_type = 'credit'
-                AND ABS(amount) = $1
-                AND (LOWER(description) LIKE LOWER($2) OR LOWER(description) LIKE LOWER($3))
-                AND transaction_date >= $4
-                AND id = ANY($5::uuid[])
-            `, [
-              monthlyFee,
-              `%${member.banking_name}%`,
-              `%${member.name}%`,
-              member.date_joined,
-              insertedCount.map(t => t.id)
-            ])
-
-            for (const txn of matchingTransactions) {
-              const paymentMonth = new Date(txn.transaction_date)
-              paymentMonth.setDate(1)
-              const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
-
-              await pool.query(`
-                INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
-                VALUES ($1, $2, $3, $4, $5, 'paid')
-                ON CONFLICT (user_id, payment_month) DO NOTHING
-              `, [member.id, paymentMonthStr, monthlyFee, txn.id, txn.transaction_date])
-
-              paymentsDetected++
-            }
-          }
-
-          // Silently detect payments without notification
-        } catch (err) {
-          console.error('Failed to auto-detect payments:', err)
-        }
-
-      } catch (err: any) {
-        console.error('Error processing bank statement:', err)
-        await sendTelegramMessage(
-          chatId,
-          `❌ Error processing bank statement: ${err.message || 'Unknown error'}`
-        )
-      }
-
-      return NextResponse.json({ ok: true })
-    }
-
-    // Silently ignore all other messages (text, /start, etc.)
-    return NextResponse.json({ ok: true })
+    console.log(`✅ [${document.file_name}] Processing complete!`)
   } catch (err: any) {
-    console.error('Telegram webhook error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error(`❌ [${document.file_name}] Error processing:`, err)
+    await sendTelegramMessage(
+      chatId,
+      `❌ Error processing bank statement: ${err.message || 'Unknown error'}`
+    )
   }
 }
 

@@ -46,10 +46,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const { rows } = await pool.query(`
-      SELECT k.id, k.keyword, k.description, k.created_at, u.name as created_by_name
+      SELECT k.id, k.keyword, k.payment_type, k.created_at, u.name as created_by_name
       FROM payment_keywords k
       LEFT JOIN users u ON k.created_by = u.id
-      ORDER BY k.keyword ASC
+      ORDER BY k.payment_type, k.keyword ASC
     `)
 
     return NextResponse.json({ keywords: rows })
@@ -77,17 +77,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { keyword, description } = body
+    const { keyword, paymentType } = body
 
     if (!keyword || !keyword.trim()) {
       return NextResponse.json({ error: 'Keyword is required' }, { status: 400 })
     }
 
+    if (!paymentType || !['Special Payment', 'Membership Payment'].includes(paymentType)) {
+      return NextResponse.json({ error: 'Valid payment type is required' }, { status: 400 })
+    }
+
     const { rows } = await pool.query(`
-      INSERT INTO payment_keywords (keyword, description, created_by)
+      INSERT INTO payment_keywords (keyword, payment_type, created_by)
       VALUES ($1, $2, $3)
-      RETURNING id, keyword, description, created_at
-    `, [keyword.trim().toLowerCase(), description || null, auth.userId])
+      RETURNING id, keyword, payment_type, created_at
+    `, [keyword.trim().toLowerCase(), paymentType, auth.userId])
 
     return NextResponse.json({ keyword: rows[0] })
   } catch (err: any) {

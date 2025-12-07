@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Keyword = {
   id: string
   keyword: string
-  description: string | null
+  payment_type: 'Special Payment' | 'Membership Payment'
   created_at: string
   created_by_name: string | null
 }
@@ -19,7 +20,7 @@ export default function PaymentKeywords() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [loading, setLoading] = useState(true)
   const [newKeyword, setNewKeyword] = useState('')
-  const [newDescription, setNewDescription] = useState('')
+  const [newPaymentType, setNewPaymentType] = useState<'Special Payment' | 'Membership Payment'>('Special Payment')
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function PaymentKeywords() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keyword: newKeyword.trim(),
-          description: newDescription.trim() || null,
+          paymentType: newPaymentType,
         }),
       })
 
@@ -63,7 +64,7 @@ export default function PaymentKeywords() {
         showToast('Keyword added successfully', 'success')
         setKeywords([...keywords, data.keyword])
         setNewKeyword('')
-        setNewDescription('')
+        setNewPaymentType('Special Payment')
       } else {
         showToast(data.error || 'Failed to add keyword', 'error')
       }
@@ -102,7 +103,12 @@ export default function PaymentKeywords() {
       <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
         <p className="text-sm text-blue-900 dark:text-blue-100">
           <strong>How it works:</strong> When a payment description contains any of these keywords, 
-          it will automatically be classified as a "Special Payment" (not counted toward membership fees).
+          it will automatically be classified based on the selected type.
+        </p>
+        <p className="text-xs text-blue-700 dark:text-blue-200 mt-2">
+          • <strong>Special Payment:</strong> Not counted toward membership fees (meals, events, donations)
+          <br />
+          • <strong>Membership Payment:</strong> Counted toward membership fees (membership, monthly, dues)
         </p>
       </div>
 
@@ -119,14 +125,16 @@ export default function PaymentKeywords() {
           />
         </div>
         <div className="flex-1">
-          <Label htmlFor="description">Description (optional)</Label>
-          <Input
-            id="description"
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            placeholder="e.g., Payment for meals"
-            onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
-          />
+          <Label htmlFor="payment-type">Payment Type</Label>
+          <Select value={newPaymentType} onValueChange={(val) => setNewPaymentType(val as 'Special Payment' | 'Membership Payment')}>
+            <SelectTrigger id="payment-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Special Payment">Special Payment</SelectItem>
+              <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-end">
           <Button onClick={handleAdd} disabled={adding || !newKeyword.trim()}>
@@ -149,10 +157,16 @@ export default function PaymentKeywords() {
               className="flex items-center justify-between p-3 border border-border rounded-lg"
             >
               <div className="flex-1">
-                <p className="font-medium">{kw.keyword}</p>
-                {kw.description && (
-                  <p className="text-sm text-muted-foreground">{kw.description}</p>
-                )}
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{kw.keyword}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    kw.payment_type === 'Special Payment' 
+                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                  }`}>
+                    {kw.payment_type}
+                  </span>
+                </div>
               </div>
               <Button
                 variant="ghost"
