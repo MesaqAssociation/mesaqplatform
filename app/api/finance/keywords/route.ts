@@ -55,7 +55,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ keywords: rows })
   } catch (err: any) {
     console.error('Get keywords error:', err)
-    return NextResponse.json({ error: 'Failed to fetch keywords' }, { status: 500 })
+    
+    // If table doesn't exist yet, return empty array
+    if (err.code === '42P01') {
+      return NextResponse.json({ keywords: [], message: 'Keywords table not created yet. Please run supabase-payment-keywords.sql' })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to fetch keywords',
+      details: err.message 
+    }, { status: 500 })
   }
 }
 

@@ -48,7 +48,7 @@ type Member = {
   name: string
   email: string
   phone: string
-  member_id?: number
+  member_id?: string
   banking_name?: string
 }
 

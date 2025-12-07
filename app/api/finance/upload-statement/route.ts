@@ -257,73 +257,100 @@ export async function POST(req: NextRequest) {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
         
-        // Get all payment keywords
-        const { rows: keywordRows } = await pool.query(
-          "SELECT keyword FROM payment_keywords"
-        )
-        const keywords = keywordRows.map(r => r.keyword.toLowerCase())
+        // Get all payment keywords for special payment detection
+        let keywords: string[] = []
+        try {
+          const { rows: keywordRows } = await pool.query("SELECT keyword FROM payment_keywords")
+          keywords = keywordRows.map(r => r.keyword.toLowerCase())
+        } catch (kwErr) {
+          console.log('⚠️ Keywords table not found, skipping keyword check')
+        }
         
-        // Smart categorization logic
+        // SIMPLIFIED CLASSIFICATION LOGIC
         let category = 'Special Payment' // Default
         
-        // Rule 1: Check if description contains any keywords → Special Payment
-        if (txn.description) {
-          const descLower = txn.description.toLowerCase()
-          const hasKeyword = keywords.some(kw => descLower.includes(kw))
-          if (hasKeyword) {
-            category = 'Special Payment'
-            console.log(`✓ Keyword found in description: "${txn.description}" → Special Payment`)
-          } else if (match && match.memberId) {
-            // Rule 2: Calculate member's balance deficit and check if payment covers it
-            try {
-              const { rows: balanceRows } = await pool.query(`
-                WITH months_owed AS (
-                  SELECT 
-                    COUNT(DISTINCT DATE_TRUNC('month', gs::date)) as months
-                  FROM users u
-                  CROSS JOIN generate_series(
-                    GREATEST(u.date_joined::date, '2024-01-01'::date),
-                    CURRENT_DATE,
-                    '1 month'::interval
-                  ) gs
-                  WHERE u.id = $1
-                ),
-                months_paid AS (
-                  SELECT COUNT(*) as months
-                  FROM membership_payments
-                  WHERE user_id = $1 AND status = 'paid'
-                )
-                SELECT 
-                  (mo.months - COALESCE(mp.months, 0)) as months_behind
-                FROM months_owed mo
-                LEFT JOIN months_paid mp ON true
-              `, [match.memberId])
+        // 1. Check if matched to a member (banking name or member ID in description)
+        if (match && match.memberId) {
+          console.log(`✓ Matched to member: ${match.memberName}`)
+          
+          // 2. Check for special payment keywords
+          if (txn.description) {
+            const descLower = txn.description.toLowerCase()
+            const hasKeyword = keywords.some(kw => descLower.includes(kw))
+            
+            if (hasKeyword) {
+              category = 'Special Payment'
+              console.log(`✓ Keyword found → Special Payment`)
+            } else {
+              // 3. Check if amount is a multiple of monthly fee (40, 80, 120, etc)
+              const paymentAmount = Math.abs(amount)
+              const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
               
-              const monthsBehind = balanceRows[0]?.months_behind || 0
-              const amountOwed = monthsBehind * monthlyFee
-              
-              console.log(`Member ${match.memberName}: ${monthsBehind} months behind, owes $${amountOwed}, paying $${Math.abs(amount)}`)
-              
-              // If payment covers part or all of what they owe (within $10 tolerance), it's membership
-              if (monthsBehind > 0 && Math.abs(amount) <= amountOwed + 10) {
-                category = 'Membership Payment'
-                console.log(`✓ Payment covers deficit → Membership Payment`)
+              if (isMultiple) {
+                // 4. Calculate member's balance deficit
+                try {
+                  const { rows: balanceRows } = await pool.query(`
+                    WITH months_owed AS (
+                      SELECT 
+                        COUNT(DISTINCT DATE_TRUNC('month', gs::date)) as months
+                      FROM users u
+                      CROSS JOIN generate_series(
+                        GREATEST(u.date_joined::date, '2024-01-01'::date),
+                        CURRENT_DATE,
+                        '1 month'::interval
+                      ) gs
+                      WHERE u.id = $1
+                    ),
+                    months_paid AS (
+                      SELECT COUNT(*) as months
+                      FROM membership_payments
+                      WHERE user_id = $1 AND status = 'paid'
+                    )
+                    SELECT 
+                      (mo.months - COALESCE(mp.months, 0)) as months_behind
+                    FROM months_owed mo
+                    LEFT JOIN months_paid mp ON true
+                  `, [match.memberId])
+                  
+                  const monthsBehind = balanceRows[0]?.months_behind || 0
+                  const amountOwed = monthsBehind * monthlyFee
+                  
+                  console.log(`Member balance: ${monthsBehind} months behind, owes $${amountOwed}, paying $${paymentAmount}`)
+                  
+                  // 5. If payment matches their deficit (or covers it), it's membership
+                  if (monthsBehind > 0 && paymentAmount <= amountOwed + monthlyFee) {
+                    category = 'Membership Payment'
+                    console.log(`✓ Payment covers deficit → Membership Payment`)
+                  } else if (monthsBehind === 0 && isMultiple) {
+                    // Member is current, payment is multiple of fee → advance payment
+                    category = 'Membership Payment'
+                    console.log(`✓ Advance payment (multiple of fee) → Membership Payment`)
+                  } else {
+                    category = 'Special Payment'
+                    console.log(`✗ Payment doesn't match pattern → Special Payment`)
+                  }
+                } catch (balanceErr) {
+                  console.error('Failed to calculate member balance:', balanceErr)
+                  // Fallback: if multiple of fee, assume membership
+                  category = isMultiple ? 'Membership Payment' : 'Special Payment'
+                }
               } else {
+                // Not a multiple of monthly fee
                 category = 'Special Payment'
-                console.log(`✗ Payment doesn't match deficit → Special Payment`)
+                console.log(`✗ Not a multiple of $${monthlyFee} → Special Payment`)
               }
-            } catch (balanceErr) {
-              console.error('Failed to calculate member balance:', balanceErr)
-              // Fallback to simple amount check
-              category = Math.abs(amount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
             }
           } else {
-            // No match - fallback to amount-based
-            category = Math.abs(amount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
+            // No description, check if multiple of fee
+            const paymentAmount = Math.abs(amount)
+            const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
+            category = isMultiple ? 'Membership Payment' : 'Special Payment'
+            console.log(`No description, amount check: ${isMultiple ? 'Membership' : 'Special'} Payment`)
           }
         } else {
-          // No description - fallback to amount-based
-          category = Math.abs(amount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
+          // Not matched to any member
+          category = 'Special Payment'
+          console.log(`✗ No member match → Special Payment`)
         }
         
         const { rows: inserted } = await pool.query(

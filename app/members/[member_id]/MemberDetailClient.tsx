@@ -25,7 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 type Member = {
   id: string
-  member_id: number
+  member_id: string
   name: string
   email: string | null
   phone: string

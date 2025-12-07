@@ -8,7 +8,7 @@ import { IconCheck, IconX, IconAlertCircle, IconCurrencyDollar } from '@tabler/i
 type PaymentStatus = {
   member: {
     id: string
-    member_id: number
+    member_id: string
     name: string
     banking_name: string | null
     date_joined: string

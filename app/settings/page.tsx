@@ -65,9 +65,8 @@ export default async function SettingsPage() {
     }
   } catch (error) {
     console.error('Error fetching settings:', error)
-  } finally {
-    await pool.end()
   }
+  // Don't close the pool - it's shared across requests
   
   return (
     <MainLayout user={user}>

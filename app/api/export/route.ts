@@ -182,9 +182,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid format' }, { status: 400 })
   } catch (error: any) {
     console.error('Export error:', error)
+    
+    // Provide more detailed error information
+    let errorDetails = error.message
+    if (error.code === '42P01') {
+      errorDetails = `Table does not exist: ${error.message}`
+    }
+    
     return NextResponse.json({ 
       error: 'Failed to export data',
-      details: error.message 
+      details: errorDetails,
+      code: error.code
     }, { status: 500 })
   }
 }

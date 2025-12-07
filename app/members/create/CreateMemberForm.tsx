@@ -267,18 +267,18 @@ export default function CreateMemberForm() {
       <Separator />
 
       <div>
-        <Label htmlFor="member_id">Member ID (Number)</Label>
+        <Label htmlFor="member_id">Member ID (e.g., A01, A02, B01)</Label>
         <Input
           id="member_id"
-          type="number"
+          type="text"
           value={formData.member_id}
-          onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-          placeholder="e.g., 1, 2, 3..."
+          onChange={(e) => setFormData({ ...formData, member_id: e.target.value.toUpperCase() })}
+          placeholder="e.g., A01, A02, B01..."
           className="mt-1"
           autoComplete="off"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          💡 Unique number for this member. Used to match payments in bank statements.
+          💡 Unique ID for this member in format A01, A02, etc. Used to match payments in bank statements.
         </p>
       </div>
 

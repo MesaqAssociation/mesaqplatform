@@ -15,7 +15,7 @@ type Member = {
   name: string
   phone: string | null
   email: string
-  member_id: number
+  member_id: string
 }
 
 export default function MessagingClient() {

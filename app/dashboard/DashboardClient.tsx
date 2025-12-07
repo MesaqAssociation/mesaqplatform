@@ -37,7 +37,7 @@ type MemberStats = {
 
 type UnpaidBalance = {
   id: string
-  member_id: number
+  member_id: string
   name: string
   current_balance: number
 }
@@ -59,7 +59,7 @@ type ReviewPayment = {
   category: string
   matched_member_id: string
   member_name: string
-  member_id: number
+  member_id: string
   account_name: string
 }
 
