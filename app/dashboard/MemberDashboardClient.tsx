@@ -171,7 +171,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
                   </div>
                 ))}
                 <Link 
-                  href={`/members/${memberData.member_id}`}
+                  href={`/members/${userId}`}
                   className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
                 >
                   <span>View full history</span>
@@ -234,7 +234,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
       <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4">Quick Links</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href={`/members/${memberData.member_id}`} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
+          <Link href={`/members/${userId}`} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
             <IconUser className="size-6 mx-auto mb-2 text-primary" />
             <p className="text-sm font-medium">My Profile</p>
           </Link>

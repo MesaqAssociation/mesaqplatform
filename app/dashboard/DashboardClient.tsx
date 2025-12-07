@@ -390,7 +390,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {unpaidBalances.map((member) => (
               <Link 
-                href={`/members/${member.member_id}`}
+                href={`/members/${member.id}`}
                 key={member.id}
                 className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
               >

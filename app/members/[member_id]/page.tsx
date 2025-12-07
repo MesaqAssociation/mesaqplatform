@@ -24,11 +24,7 @@ export default async function MemberDetailPage({
 
   // Await params if it's a Promise (Next.js 15+)
   const resolvedParams = params instanceof Promise ? await params : params
-  const memberId = parseInt(resolvedParams.member_id)
-
-  if (isNaN(memberId)) {
-    redirect('/members')
-  }
+  const memberId = resolvedParams.member_id
 
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
@@ -36,9 +32,9 @@ export default async function MemberDetailPage({
   }) as Pool
 
   try {
-    // Fetch member details
+    // Fetch member details by ID (UUID)
     const { rows } = await pool.query(
-      'SELECT * FROM users WHERE member_id = $1',
+      'SELECT * FROM users WHERE id = $1',
       [memberId]
     )
 
