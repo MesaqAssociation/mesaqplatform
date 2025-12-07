@@ -52,7 +52,7 @@ export default async function SettingsPage() {
     const { rows: userRows } = await pool.query(`
       SELECT 
         id, member_id, name, email, phone, address, 
-        household_members, joined_date, created_at, role
+        household_members, date_joined, created_at, role
       FROM users 
       WHERE id = $1
     `, [userId])
@@ -62,6 +62,7 @@ export default async function SettingsPage() {
       console.log('✅ Loaded user data for:', fullUserData.name)
     } else {
       console.error('❌ No user found with id:', userId)
+      fullUserData = { id: userId } // Provide at least the ID to prevent null errors
     }
   } catch (error) {
     console.error('Error fetching settings:', error)

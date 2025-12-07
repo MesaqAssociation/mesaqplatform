@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, banking_name, member_id, date_joined, household_members) 
        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
        RETURNING id, member_id, name, email, phone, role`,
-      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', banking_name || null, member_id ? parseInt(member_id) : null, date_joined || null, household_members ? parseInt(household_members) : null]
+      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', banking_name || null, member_id || null, date_joined || null, household_members ? parseInt(household_members) : null]
     )
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {

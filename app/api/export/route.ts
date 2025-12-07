@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
             u.role,
             u.household_members,
             u.current_balance,
-            to_char(u.joined_date, 'YYYY-MM-DD') as joined_date,
+            to_char(u.date_joined, 'YYYY-MM-DD') as date_joined,
             to_char(u.created_at, 'YYYY-MM-DD') as created_at,
             NULL as payment_status,
             NULL as total_paid,
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
           ORDER BY u.name ASC
         `)
         data = members
-        headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'household_members', 'current_balance', 'joined_date', 'created_at', 'payment_status', 'total_paid', 'monthly_fee']
+        headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'household_members', 'current_balance', 'date_joined', 'created_at', 'payment_status', 'total_paid', 'monthly_fee']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`
         break
 
