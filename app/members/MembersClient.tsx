@@ -140,7 +140,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             {sortedMembers.map(m => (
             <tr 
               key={m.id} 
-              onClick={() => m.member_id && router.push(`/members/${m.member_id}`)}
+              onClick={() => router.push(`/members/${m.id}`)}
               className="border-t hover:bg-muted/50 transition-colors cursor-pointer"
             >
               <td className="py-3 px-2">
