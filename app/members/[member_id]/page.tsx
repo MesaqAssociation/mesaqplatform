@@ -80,8 +80,10 @@ export default async function MemberDetailPage({
     // Format dates to strings for client component
     const formattedMember = {
       ...member,
+      member_id: member.member_id || null,
       created_at: member.created_at ? new Date(member.created_at).toISOString() : null,
       date_joined: member.date_joined ? new Date(member.date_joined).toISOString().split('T')[0] : null,
+      household_members: member.household_members || 0,
     }
 
     const formattedAttendedEvents = attendedEvents.map(event => ({
