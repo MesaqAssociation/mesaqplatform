@@ -28,7 +28,7 @@ export async function GET(
   try {
     // Await params if it's a Promise (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params
-    const memberId = parseInt(resolvedParams.member_id)
+    const memberId = resolvedParams.member_id
     
     // Get monthly fee from system settings
     const { rows: settingsRows } = await pool.query(`
@@ -38,7 +38,7 @@ export async function GET(
 
     // Get member info
     const { rows: memberRows } = await pool.query(
-      'SELECT id, member_id, name, created_at, date_joined FROM users WHERE member_id = $1',
+      'SELECT id, member_id, name, created_at, date_joined FROM users WHERE id = $1',
       [memberId]
     )
 
@@ -48,11 +48,11 @@ export async function GET(
 
     const member = memberRows[0]
     
-    // Use created_at month as the start - ALL members should have paid by the 1st of the next month
-    const startDate = member.created_at ? new Date(member.created_at) : new Date()
+    // Use date_joined or created_at as the start
+    const startDate = member.date_joined ? new Date(member.date_joined) : (member.created_at ? new Date(member.created_at) : new Date())
     const currentDate = new Date()
     
-    // Generate list of months from created_at to current month
+    // Generate list of months from start to current month
     const months: Array<{ month: string, monthName: string }> = []
     let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
     const now = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
@@ -64,11 +64,11 @@ export async function GET(
       currentMonth.setMonth(currentMonth.getMonth() + 1)
     }
 
-    // Get all payments for this member
+    // Get all MEMBERSHIP payments for this member (only from membership_payments table)
     const { rows: payments } = await pool.query(`
       SELECT 
         payment_month,
-        SUM(amount) as total_amount
+        SUM(amount_paid) as total_amount
       FROM membership_payments
       WHERE user_id = $1
       GROUP BY payment_month
@@ -82,31 +82,13 @@ export async function GET(
       paymentMap.set(monthKey, parseFloat(p.total_amount))
     })
 
-    // Calculate monthly balances
-    // Balance represents credit (+) or debt (-)
-    // Each month: new_balance = old_balance + payment - monthly_fee
+    // Calculate membership balance
     let runningBalance = 0
-    const monthlyBalances = months.map(({ month, monthName }) => {
-      const startBalance = runningBalance
-      const payment = paymentMap.get(month) || 0
-      const expected = monthlyFee
-      
-      // Balance calculation: start + payment - expected
-      // Example: start=0, expected=40, paid=90 → end = 0 + 90 - 40 = +50 (credit)
-      runningBalance = startBalance + payment - expected
-      
-      return {
-        month,
-        monthName,
-        startBalance,
-        endBalance: runningBalance,
-        payment,
-        expected
-      }
-    })
-
-    // Reverse so most recent is first
-    monthlyBalances.reverse()
+    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount), 0)
+    const expectedPayments = months.length
+    
+    // Running balance = total paid - total expected
+    runningBalance = totalPaid - (expectedPayments * monthlyFee)
 
     // Calculate status
     let status: 'caught_up' | 'ahead' | 'behind' = 'caught_up'
@@ -116,20 +98,39 @@ export async function GET(
       status = 'behind'
     }
 
-    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount), 0)
-    const expectedPayments = months.length
+    // Get all SPECIAL PAYMENT transactions (category = 'Special Payment')
+    const { rows: specialTxns } = await pool.query(`
+      SELECT 
+        t.id,
+        to_char(t.transaction_date, 'YYYY-MM-DD') as date,
+        t.transaction_name as name,
+        t.description,
+        t.amount
+      FROM transactions t
+      WHERE t.matched_member_id = $1
+        AND t.category = 'Special Payment'
+        AND t.transaction_type = 'credit'
+      ORDER BY t.transaction_date DESC
+    `, [member.id])
+
+    const totalSpecialPayments = specialTxns.reduce((sum, txn) => sum + parseFloat(txn.amount), 0)
 
     return NextResponse.json({
-      currentBalance: runningBalance,
-      expectedPayments,
-      totalPaid,
-      monthlyFee,
-      monthlyBalances,
-      status
+      membershipBalance: {
+        currentBalance: runningBalance,
+        expectedPayments,
+        totalPaid,
+        monthlyFee,
+        status
+      },
+      specialPaymentBalance: {
+        totalSpecialPayments,
+        transactions: specialTxns
+      }
     })
   } catch (err: any) {
     console.error('Get balance error:', err)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Server error', details: err.message }, { status: 500 })
   }
 }
 
