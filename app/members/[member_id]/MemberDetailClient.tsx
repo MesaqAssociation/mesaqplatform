@@ -135,7 +135,7 @@ export default function MemberDetailClient({
 
   async function handleRoleChange(newRole: string) {
     try {
-      const res = await fetch(`/api/members/${member.member_id}/role`, {
+      const res = await fetch(`/api/members/${member.id}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -162,7 +162,7 @@ export default function MemberDetailClient({
 
     setDeleting(true)
     try {
-      const res = await fetch(`/api/members/${member.member_id}`, {
+      const res = await fetch(`/api/members/${member.id}`, {
         method: 'DELETE',
       })
 
