@@ -94,11 +94,10 @@ export async function GET(req: NextRequest) {
             u.current_balance,
             to_char(u.joined_date, 'YYYY-MM-DD') as joined_date,
             to_char(u.created_at, 'YYYY-MM-DD') as created_at,
-            cps.payment_status,
-            cps.total_paid,
-            cps.monthly_fee
+            NULL as payment_status,
+            NULL as total_paid,
+            NULL as monthly_fee
           FROM users u
-          LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
           ORDER BY u.name ASC
         `)
         data = members

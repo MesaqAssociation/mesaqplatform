@@ -43,11 +43,10 @@ export default async function MembersPage() {
       u.image, 
       u.role, 
       u.household_members,
-      cps.payment_status,
-      cps.total_paid,
-      cps.monthly_fee
+      NULL as payment_status,
+      NULL as total_paid,
+      NULL as monthly_fee
     FROM users u
-    LEFT JOIN current_month_payment_status cps ON u.id = cps.user_id
     ORDER BY u.name ASC 
     LIMIT 200
   `)

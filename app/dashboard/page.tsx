@@ -92,17 +92,8 @@ export default async function DashboardPage() {
     }
 
     try {
-      // Get current month payment status
-      const { rows } = await pool.query(`
-        SELECT 
-          payment_status,
-          total_paid,
-          monthly_fee,
-          payment_month
-        FROM current_month_payment_status
-        WHERE user_id = $1
-      `, [userId])
-      paymentStatus = rows[0] || null
+      // Payment status is now calculated from membership_payments, not a view
+      paymentStatus = null // We no longer use this view
     } catch (error) {
       console.error('Error fetching payment status:', error)
     }
