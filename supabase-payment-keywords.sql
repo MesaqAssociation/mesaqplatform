@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS payment_keywords (
   keyword TEXT NOT NULL UNIQUE,
   payment_type TEXT NOT NULL CHECK (payment_type IN ('Special Payment', 'Membership Payment')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  created_by UUID REFERENCES users(id)
+  created_by TEXT REFERENCES users(id)
 );
 
 -- Create index for fast keyword lookups
