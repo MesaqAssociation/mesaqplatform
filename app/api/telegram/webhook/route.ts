@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const update = await req.json()
     console.log('Telegram webhook received:', JSON.stringify(update, null, 2))
 
-    // Check if this is a document message
+    // Handle document messages (PDFs)
     if (update.message?.document) {
       const message = update.message
       const document = message.document
@@ -52,6 +52,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, message: 'Processing started' })
     }
 
+    // Handle text messages
+    if (update.message?.text) {
+      const chatId = update.message.chat.id
+      const text = update.message.text.trim()
+      const userName = update.message.from.first_name || 'User'
+
+      console.log(`💬 Text message from ${userName}: ${text}`)
+
+      // Handle /start command
+      if (text === '/start') {
+        await sendTelegramMessage(
+          chatId,
+          `👋 Welcome to Mesaq Association Bot!\n\n` +
+          `I can help you upload bank statements automatically.\n\n` +
+          `📄 Simply send me a PDF bank statement and I'll:\n` +
+          `• Extract all transactions\n` +
+          `• Match payments to members\n` +
+          `• Update the finance system\n\n` +
+          `Just send a PDF file to get started!`
+        )
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle any other text
+      await sendTelegramMessage(
+        chatId,
+        `📄 Please send me a PDF bank statement to process.\n\n` +
+        `I can only process PDF files at this time.`
+      )
+      return NextResponse.json({ ok: true })
+    }
+
+    // Silently ignore all other message types (stickers, photos, etc.)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('Telegram webhook error:', err)
