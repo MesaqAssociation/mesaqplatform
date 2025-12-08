@@ -22,6 +22,7 @@ import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers
 // BalanceCardNew removed per request (special balance hidden)
 import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type Member = {
   id: string
