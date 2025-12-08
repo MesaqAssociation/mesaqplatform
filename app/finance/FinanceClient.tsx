@@ -1385,22 +1385,22 @@ export default function FinanceClient({
               />
             </div>
             <div>
-              <Label htmlFor="account-number">Account Number (14 digits) *</Label>
+              <Label htmlFor="account-number">Account Number (6 digits) *</Label>
               <Input
                 id="account-number"
                 value={newAccountNumber}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, '')
-                  if (value.length <= 14) {
+                  if (value.length <= 6) {
                     setNewAccountNumber(value)
                   }
                 }}
-                placeholder="12345678901234"
+                placeholder="123456"
                 className="mt-1"
-                maxLength={14}
+                maxLength={6}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {newAccountNumber.length}/14 digits
+                {newAccountNumber.length}/6 digits
               </p>
             </div>
             <div>
@@ -1454,7 +1454,7 @@ export default function FinanceClient({
               </Button>
               <Button 
                 onClick={handleAddAccount} 
-                disabled={!newAccountName.trim() || newAccountNumber.length !== 14 || newAccountBSB.replace(/-/g, '').length !== 6 || loading}
+                disabled={!newAccountName.trim() || newAccountNumber.length !== 6 || newAccountBSB.replace(/-/g, '').length !== 6 || loading}
               >
                 {loading ? 'Adding...' : 'Add Account'}
               </Button>

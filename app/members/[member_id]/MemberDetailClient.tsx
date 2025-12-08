@@ -287,34 +287,46 @@ export default function MemberDetailClient({
         </Button>
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Profile */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <Avatar className="h-32 w-32 mb-4">
+      <div className="space-y-6">
+        {/* Top Profile Strip */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-24 w-24">
                   <AvatarImage src={member.image || '/placeholder-user.jpg'} alt={member.name} />
-                  <AvatarFallback className="text-4xl">{member.name?.[0] || 'U'}</AvatarFallback>
+                  <AvatarFallback className="text-3xl">{member.name?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
-                <h1 className="text-2xl font-semibold mb-2">{member.name}</h1>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 ${
-                  member.role === 'Manager' 
-                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                    : member.role === 'Public Officer' || member.role === 'Finance Officer' || member.role === 'Logistics Officer'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                }`}>
-                  {member.role}
-                </span>
-                <p className="text-sm text-muted-foreground">Member #{member.member_id}</p>
+                <div>
+                  <h1 className="text-2xl font-semibold mb-1">{member.name}</h1>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2 ${
+                    member.role === 'Manager' 
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                      : member.role === 'Public Officer' || member.role === 'Finance Officer' || member.role === 'Logistics Officer'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  }`}>
+                    {member.role}
+                  </span>
+                  <p className="text-sm text-muted-foreground">Member #{member.member_id}</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Balance summary */}
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Membership Balance</p>
+                <p className={`text-2xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                  ${Math.abs(Number(balance ?? 0)).toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {Number(balance ?? 0) < 0 ? 'Outstanding' : 'Credit'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Right Column - Details */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Contact Information */}
           <Card>
             <CardHeader>
