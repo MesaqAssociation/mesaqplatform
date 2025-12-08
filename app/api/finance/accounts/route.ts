@@ -66,10 +66,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Account name, number, and BSB are required' }, { status: 400 })
     }
 
-    // Validate account number format (14 digits)
+    // Validate account number format (6 digits)
     const cleanNumber = account_number.replace(/\s/g, '')
-    if (!/^\d{14}$/.test(cleanNumber)) {
-      return NextResponse.json({ error: 'Account number must be 14 digits' }, { status: 400 })
+    if (!/^\d{6}$/.test(cleanNumber)) {
+      return NextResponse.json({ error: 'Account number must be 6 digits' }, { status: 400 })
     }
 
     // Validate BSB format (6 digits, with or without dash)

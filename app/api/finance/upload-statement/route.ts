@@ -117,12 +117,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Get current account balance
-    const { rows: accounts } = await pool.query(
-      'SELECT current_balance FROM financial_accounts WHERE id = $1',
-      [finalAccountId]
-    )
-    let runningBalance = accounts[0]?.current_balance || 0
+    // Get current account balance (skip for donation accounts)
+    let runningBalance = 0
+    if (!isDonationAccount) {
+      const { rows: accounts } = await pool.query(
+        'SELECT current_balance FROM financial_accounts WHERE id = $1',
+        [finalAccountId]
+      )
+      runningBalance = accounts[0]?.current_balance || 0
+    }
 
     // Upload to R2 storage (if configured)
     let fileUrl: string | null = null
@@ -201,14 +204,14 @@ export async function POST(req: NextRequest) {
       if (txn.credit && txn.credit > 0) {
         amount = txn.credit
         txnType = 'credit'
-        runningBalance += amount
+        if (!isDonationAccount) runningBalance += amount
       } else if (txn.debit && txn.debit > 0) {
         amount = -txn.debit
         txnType = 'debit'
-        runningBalance -= txn.debit
+        if (!isDonationAccount) runningBalance -= txn.debit
       } else {
-        // If no debit/credit specified but we have a balance, calculate from balance change
-        if (txn.balance !== undefined && txn.balance !== null) {
+        // If no debit/credit specified but we have a balance, calculate from balance change (non-donation only)
+        if (!isDonationAccount && txn.balance !== undefined && txn.balance !== null) {
           const balanceChange = txn.balance - runningBalance
           if (balanceChange !== 0) {
             amount = balanceChange
@@ -267,10 +270,10 @@ export async function POST(req: NextRequest) {
         }
         
         // SMART CLASSIFICATION LOGIC
-        let category = 'Special Payment' // Default
+        let category = isDonationAccount ? 'Donation' : 'Special Payment' // Default
         
         // 1. Check if matched to a member (banking name or member ID in description)
-        if (match && match.memberId) {
+        if (!isDonationAccount && match && match.memberId) {
           console.log(`✓ Matched to member: ${match.memberName}`)
           
           // 2. Check for payment keywords (can force Special or Membership)
@@ -378,8 +381,8 @@ export async function POST(req: NextRequest) {
         if (inserted.length > 0) {
           insertedCount.push(inserted[0])
           
-          // Auto-detect membership payment if categorized to a member
-          if (category !== 'Misc' && txnType === 'credit') {
+          // Auto-detect membership payment if categorized to a member (skip donation accounts)
+          if (!isDonationAccount && category !== 'Misc' && txnType === 'credit') {
             await autoDetectMembershipPayment(
               pool,
               inserted[0].id,
@@ -413,24 +416,38 @@ export async function POST(req: NextRequest) {
       failedTransactions.forEach(f => console.log(`  - Date: ${f.date}, Name: ${f.name}, Error: ${f.error}`))
     }
 
-    // Update account balance to closing balance if available
-    if (parsed.closingBalance !== undefined) {
-      await pool.query(
-        'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-        [parsed.closingBalance, finalAccountId]
-      )
-      runningBalance = parsed.closingBalance
-    } else {
-      await pool.query(
-        'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-        [runningBalance, finalAccountId]
-      )
+    // Update account balance (skip donation accounts)
+    if (!isDonationAccount) {
+      if (parsed.closingBalance !== undefined) {
+        await pool.query(
+          'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+          [parsed.closingBalance, finalAccountId]
+        )
+        runningBalance = parsed.closingBalance
+      } else {
+        await pool.query(
+          'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+          [runningBalance, finalAccountId]
+        )
+      }
     }
 
     // Audit log removed - logs system no longer in use
 
-    // Auto-detect membership payments after upload
+    // Auto-detect membership payments after upload (skip donation accounts)
     try {
+      if (isDonationAccount) {
+        console.log('Donation account - skipping auto-detect membership payments')
+        return NextResponse.json({
+          success: true,
+          inserted: insertedCount.length,
+          skipped: skippedTransactions.length,
+          failed: failedTransactions.length,
+          failedDetails: failedTransactions,
+          newBalance: runningBalance,
+          message: `Successfully imported ${insertedCount.length} of ${parsed.transactions.length} transactions.${skippedTransactions.length > 0 ? ` ${skippedTransactions.length} skipped (no amount).` : ''}${failedTransactions.length > 0 ? ` ${failedTransactions.length} failed.` : ''} Donation account: balance not updated; categorized as Donation.`
+        })
+      }
       // Get monthly fee from system settings
       const { rows: feeRows } = await pool.query(
         "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"

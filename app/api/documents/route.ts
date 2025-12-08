@@ -92,31 +92,22 @@ export async function POST(req: NextRequest) {
     const description = formData.get('description') as string
     const file = formData.get('file') as File
 
-    if (!isR2Configured()) {
-      return NextResponse.json({ error: 'File storage not configured. Please contact admin.' }, { status: 400 })
-    }
-
     if (!title || !file) {
       return NextResponse.json({ error: 'Title and file are required' }, { status: 400 })
     }
 
-    // Read file buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // Upload to R2 (required for document uploads)
-    if (!isR2Configured()) {
-      return NextResponse.json({ 
-        error: 'File storage not configured. Please contact administrator to set up Cloudflare R2.' 
-      }, { status: 500 })
-    }
-    
-    let fileUrl: string
-    try {
-      fileUrl = await uploadToR2(buffer, file.name, file.type)
-    } catch (r2Error) {
-      console.error('R2 upload failed:', r2Error)
-      return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })
+    let fileUrl: string | null = null
+    if (isR2Configured()) {
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      try {
+        fileUrl = await uploadToR2(buffer, file.name, file.type || 'application/octet-stream')
+      } catch (r2Error) {
+        console.error('R2 upload failed:', r2Error)
+        return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })
+      }
+    } else {
+      console.warn('R2 not configured; saving document metadata without file_url')
     }
 
     // Save document record
