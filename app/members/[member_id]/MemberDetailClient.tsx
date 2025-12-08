@@ -116,7 +116,8 @@ export default function MemberDetailClient({
 
   // Group transactions by month
   // Show all transactions
-  const transactionsByMonth = transactions.reduce((acc, txn) => {
+  const transactionsByMonth = (transactions || []).reduce((acc, txn) => {
+    if (!txn.transaction_date) return acc
     const date = new Date(txn.transaction_date + 'T00:00:00')
     const monthKey = date.toISOString().slice(0, 7) // YYYY-MM format
     const monthName = date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
