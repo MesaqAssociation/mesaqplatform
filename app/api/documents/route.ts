@@ -78,9 +78,10 @@ export async function POST(req: NextRequest) {
   }
   
   const userRole = (userRows[0].role || '').toLowerCase()
-  if (!['admin', 'board', 'manager'].includes(userRole)) {
+  const allowedRoles = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer']
+  if (!allowedRoles.includes(userRole)) {
     return NextResponse.json({ 
-      error: 'Unauthorized - Admin only',
+      error: 'Unauthorized - Board members only',
       debug: `Your role: ${userRows[0].role}`
     }, { status: 403 })
   }

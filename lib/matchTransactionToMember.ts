@@ -30,9 +30,14 @@ export async function matchTransactionToMember(
     return null
   }
   
-  // Step 1: Check description for member_id (integer only, not part of phone numbers)
+  // Get all members with member_id
   const { rows: membersWithId } = await pool.query(
     `SELECT id, name, member_id FROM users WHERE member_id IS NOT NULL`
+  )
+  
+  // Get all members (for phone and banking name matching)
+  const { rows: allMembers } = await pool.query(
+    `SELECT id, name, phone, banking_name FROM users WHERE phone IS NOT NULL OR banking_name IS NOT NULL`
   )
   
   const descriptionLower = description.toLowerCase()

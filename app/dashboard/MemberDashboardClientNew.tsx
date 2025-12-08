@@ -60,28 +60,40 @@ export default function MemberDashboardClient({ initialData }: Props) {
       const balanceRes = await fetch(`/api/membership/balance/${memberData.id}`)
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json()
+        console.log('Balance data:', balanceData)
         setBalance(balanceData)
+      } else {
+        console.error('Balance fetch failed:', balanceRes.status)
       }
 
       // Fetch payment status
       const statusRes = await fetch(`/api/membership/status/${memberData.id}`)
       if (statusRes.ok) {
         const statusData = await statusRes.json()
+        console.log('Status data:', statusData)
         setPaymentStatus(statusData.status)
+      } else {
+        console.error('Status fetch failed:', statusRes.status)
       }
 
       // Fetch recent transactions
       const txRes = await fetch(`/api/finance/transactions?memberId=${memberData.id}&limit=5`)
       if (txRes.ok) {
         const txData = await txRes.json()
+        console.log('Transactions data:', txData)
         setRecentTransactions(txData.transactions || [])
+      } else {
+        console.error('Transactions fetch failed:', txRes.status)
       }
 
       // Fetch upcoming events
       const eventsRes = await fetch(`/api/events/list?limit=5&upcoming=true`)
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json()
+        console.log('Events data:', eventsData)
         setUpcomingEvents(eventsData.events || [])
+      } else {
+        console.error('Events fetch failed:', eventsRes.status)
       }
     } catch (err) {
       console.error('Error loading dashboard:', err)
