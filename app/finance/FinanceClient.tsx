@@ -906,7 +906,7 @@ export default function FinanceClient({
           <CardContent className="pt-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{uploadStatus}</p>
+                <p className="text-sm font-medium">Uploading...</p>
                 <p className="text-sm text-muted-foreground">{uploadProgress}%</p>
               </div>
               <Progress value={uploadProgress} className="w-full" />
