@@ -284,15 +284,18 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                 id="description"
                 value={description}
                 onChange={(e) => {
-                  if (e.target.value.length <= 500) {
+                  if (e.target.value.length <= 50) {
                     setDescription(e.target.value)
                   }
                 }}
                 placeholder="Brief description of the document"
                 className="mt-1"
                 rows={3}
-                maxLength={500}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right mt-1">
+                {description.length}/50 characters
+              </p>
             </div>
             <div>
               <Label>File *</Label>
