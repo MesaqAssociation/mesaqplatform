@@ -15,6 +15,7 @@ type SidebarProps = {
     name: string
     email: string | null
     image: string | null
+    role?: string
   } | null
 }
 
@@ -23,7 +24,12 @@ export function Sidebar({ user }: SidebarProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const { t } = useI18n()
 
-  const NAV_ITEMS = [
+  // Determine if user is admin/board
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+
+  // Define navigation items based on role
+  const NAV_ITEMS = isAdminOrBoard ? [
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
     { title: t("members"), url: "/members", icon: IconUsers },
     { title: t("finance"), url: "/finance", icon: IconCash },
@@ -38,6 +44,19 @@ export function Sidebar({ user }: SidebarProps) {
     },
     { title: "Documents", url: "/documents", icon: IconFileText },
     { title: "Messaging", url: "/messaging", icon: IconSend },
+  ] : [
+    // Regular members only see limited items
+    { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
+    { 
+      title: t("events"), 
+      url: "/events", 
+      icon: IconCalendarEvent,
+      children: [
+        { title: t("meetings"), url: '/meetings' },
+        { title: t("events"), url: '/events' },
+      ]
+    },
+    { title: "Documents", url: "/documents", icon: IconFileText },
   ]
 
   return (
@@ -130,7 +149,7 @@ export function Sidebar({ user }: SidebarProps) {
   )
 }
 
-export function MainLayout({ children, user }: { children: React.ReactNode; user?: { name: string; email: string | null; image: string | null } | null }) {
+export function MainLayout({ children, user }: { children: React.ReactNode; user?: { name: string; email: string | null; image: string | null; role?: string } | null }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar user={user} />

@@ -18,8 +18,9 @@ export default async function MessagingPage() {
   const user = await getUserFromToken()
 
   // Only admins/board can access messaging
-  const isAdmin = user && ['admin', 'board', 'Manager'].includes(user.role)
-  if (!isAdmin) {
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+  if (!isAdminOrBoard) {
     redirect('/dashboard')
   }
 

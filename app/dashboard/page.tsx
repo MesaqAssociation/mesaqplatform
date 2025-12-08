@@ -101,7 +101,7 @@ export default async function DashboardPage() {
     }
 
     return (
-      <MainLayout user={user}>
+      <MainLayout user={{ ...user, role: user?.role }}>
         <MemberDashboardClient
           memberData={memberData}
           recentTransactions={memberTransactions}
@@ -209,7 +209,7 @@ export default async function DashboardPage() {
   }
   
   return (
-    <MainLayout user={user}>
+    <MainLayout user={{ ...user, role: user?.role }}>
       <DashboardClient 
         memberStats={memberStats}
         recentTransactions={recentTransactions}

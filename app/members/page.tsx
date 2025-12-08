@@ -20,6 +20,13 @@ export default async function MembersPage() {
   
   const user = await getUserFromToken()
   
+  // Restrict members page to admins/board only
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+  if (!isAdminOrBoard) {
+    redirect('/dashboard')
+  }
+  
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,

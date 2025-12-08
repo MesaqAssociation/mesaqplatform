@@ -5,11 +5,12 @@ import { IconCash, IconCalendarEvent, IconUser, IconArrowRight, IconAlertCircle 
 import Link from 'next/link'
 
 type MemberData = {
+  id: string
   name: string
   current_balance: number
-  member_id: number
+  member_id: string | null
   household_members: number
-  joined_date: string
+  date_joined: string
 }
 
 type Transaction = {
@@ -81,7 +82,9 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Welcome, {memberData.name}!</h1>
-        <p className="text-muted-foreground">Member #{memberData.member_id}</p>
+        {memberData.member_id && (
+          <p className="text-muted-foreground">Member #{memberData.member_id}</p>
+        )}
       </div>
 
       {/* Member Stats Cards */}
@@ -171,7 +174,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
                   </div>
                 ))}
                 <Link 
-                  href={`/members/${userId}`}
+                  href={`/members/${memberData.id}`}
                   className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
                 >
                   <span>View full history</span>
@@ -234,7 +237,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
       <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4">Quick Links</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href={`/members/${userId}`} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
+          <Link href={`/members/${memberData.id}`} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
             <IconUser className="size-6 mx-auto mb-2 text-primary" />
             <p className="text-sm font-medium">My Profile</p>
           </Link>
