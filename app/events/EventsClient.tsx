@@ -20,7 +20,12 @@ type Event = {
   completed_at?: string
 }
 
-export default function EventsClient({ initial }: { initial: Event[] }) {
+type Props = {
+  initial: Event[]
+  userRole?: string
+}
+
+export default function EventsClient({ initial, userRole }: Props) {
   // Format time to 12-hour
   function formatTime(time: string) {
     const [hours, minutes] = time.split(':')

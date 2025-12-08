@@ -24,7 +24,7 @@ export default async function MembersPage() {
   const userRole = (user?.role || '').toLowerCase()
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
   if (!isAdminOrBoard) {
-    redirect('/dashboard')
+    redirect('/access-denied')
   }
   
   const pool = new (require('pg').Pool)({

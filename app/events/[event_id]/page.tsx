@@ -20,6 +20,10 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
   
   const user = await getUserFromToken()
   
+  // Check if user is admin/board
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+  
   let event: any = null
   
   try {
@@ -60,7 +64,7 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
   const backUrl = event.event_type === 'Meeting' ? '/meetings' : '/events'
 
   return (
-    <MainLayout user={user}>
+    <MainLayout user={{ ...user, role: user?.role }}>
       <div className="p-6 max-w-4xl">
         <Link href={backUrl}>
           <Button variant="ghost" className="mb-4">
@@ -79,10 +83,14 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
                 )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <Link href={`/events/${event.id}/complete`}>
-                  <Button variant="outline">Mark as Completed</Button>
-                </Link>
-                <Button variant="destructive">Delete</Button>
+                {isAdminOrBoard && (
+                  <>
+                    <Link href={`/events/${event.id}/complete`}>
+                      <Button variant="outline">Mark as Completed</Button>
+                    </Link>
+                    <Button variant="destructive">Delete</Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

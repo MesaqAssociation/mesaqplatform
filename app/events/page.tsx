@@ -18,8 +18,8 @@ export default async function EventsPage() {
   const user = await getUserFromToken()
 
   return (
-    <MainLayout user={user}>
-      <EventsClientWrapper />
+    <MainLayout user={{ ...user, role: user?.role }}>
+      <EventsClientWrapper userRole={user?.role} />
     </MainLayout>
   )
 }

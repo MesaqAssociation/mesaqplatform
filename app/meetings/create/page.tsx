@@ -20,6 +20,13 @@ export default async function CreateMeetingPage() {
   
   const user = await getUserFromToken()
   
+  // Only admins/board can create meetings
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+  if (!isAdminOrBoard) {
+    redirect('/access-denied')
+  }
+  
   return (
     <MainLayout user={user}>
       <div className="p-6 max-w-3xl">

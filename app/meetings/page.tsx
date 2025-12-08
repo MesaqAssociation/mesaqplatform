@@ -18,8 +18,8 @@ export default async function MeetingsPage() {
   const user = await getUserFromToken()
 
   return (
-    <MainLayout user={user}>
-      <MeetingsClientWrapper />
+    <MainLayout user={{ ...user, role: user?.role }}>
+      <MeetingsClientWrapper userRole={user?.role} />
     </MainLayout>
   )
 }

@@ -47,14 +47,15 @@ export async function matchTransactionToMember(
       const letter = alphaMatch[1].toUpperCase()
       const number = alphaMatch[2]
       
-      // PRIORITY 1: Check for letter+number variations (A25, A025, etc.)
+      // Only check for EXACT letter+number variations (no number-only to avoid false positives)
+      // A50 variations: A50, A050, A0050
       const letterVariations = [
-        `${letter}${number}`,
-        `${letter}0${number}`,
-        `${letter}00${number}`,
-        `${letter}${number.padStart(2, '0')}`,
-        `${letter}${number.padStart(3, '0')}`,
-        `${letter}${number.padStart(4, '0')}`
+        `${letter}${number}`, // A50
+        `${letter}0${number}`, // A050
+        `${letter}00${number}`, // A0050
+        `${letter}${number.padStart(2, '0')}`, // A50
+        `${letter}${number.padStart(3, '0')}`, // A050
+        `${letter}${number.padStart(4, '0')}` // A0050
       ]
       
       for (const variant of letterVariations) {
@@ -66,33 +67,6 @@ export async function matchTransactionToMember(
             memberName: member.name,
             matchType: 'member_id',
             confidence: 'high'
-          }
-        }
-      }
-      
-      // PRIORITY 2: Check for number-only (50, 050) BUT with stricter validation
-      // Only match if it's NOT part of a phone number or larger number
-      const numberVariations = [
-        number,
-        `0${number}`,
-        `00${number}`,
-        number.padStart(2, '0'),
-        number.padStart(3, '0')
-      ]
-      
-      for (const numVariant of numberVariations) {
-        // Use word boundaries for number-only matching to avoid false positives
-        const regex = new RegExp(`\\b${numVariant}\\b`, 'i')
-        if (regex.test(description)) {
-          // Extra validation: Make sure it's not part of a phone number
-          const phonePattern = /0[2-9]\d{8}/
-          if (!phonePattern.test(description)) {
-            return {
-              memberId: member.id,
-              memberName: member.name,
-              matchType: 'member_id',
-              confidence: 'high'
-            }
           }
         }
       }
@@ -209,7 +183,7 @@ export async function batchMatchTransactions(
       return null
     }
     
-    // Step 1: Check for member_id in description (prioritize letter+number format)
+    // Step 1: Check for member_id in description (letter+number only)
     for (const [memberId, member] of memberIdMap.entries()) {
       const memberIdStr = String(memberId).trim()
       
@@ -219,7 +193,7 @@ export async function batchMatchTransactions(
         const letter = alphaMatch[1].toUpperCase()
         const number = alphaMatch[2]
         
-        // PRIORITY 1: Check for letter+number variations (A25, A025, etc.)
+        // Only check for letter+number variations (no number-only)
         const letterVariations = [
           `${letter}${number}`,
           `${letter}0${number}`,
@@ -238,32 +212,6 @@ export async function batchMatchTransactions(
               memberName: member.name,
               matchType: 'member_id' as const,
               confidence: 'high' as const
-            }
-          }
-        }
-        
-        // PRIORITY 2: Check for number-only (50, 050) with validation
-        const numberVariations = [
-          number,
-          `0${number}`,
-          `00${number}`,
-          number.padStart(2, '0'),
-          number.padStart(3, '0')
-        ]
-        
-        for (const numVariant of numberVariations) {
-          // Use word boundaries for number-only to avoid false positives
-          const regex = new RegExp(`\\b${numVariant}\\b`, 'i')
-          if (regex.test(txn.description)) {
-            // Extra validation: Not part of phone number
-            const phonePattern = /0[2-9]\d{8}/
-            if (!phonePattern.test(txn.description)) {
-              return {
-                memberId: member.id,
-                memberName: member.name,
-                matchType: 'member_id' as const,
-                confidence: 'high' as const
-              }
             }
           }
         }

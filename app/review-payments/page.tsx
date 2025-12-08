@@ -42,7 +42,7 @@ export default async function ReviewPaymentsPage() {
   // Only admins, board, and managers can access this page
   const allowedRoles = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer']
   if (!allowedRoles.includes(userRole)) {
-    redirect('/dashboard')
+    redirect('/access-denied')
   }
 
   return (

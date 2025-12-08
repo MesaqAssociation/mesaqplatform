@@ -22,9 +22,15 @@ type Event = {
   completed_at?: string
 }
 
-export default function MeetingsClientWrapper() {
+type Props = {
+  userRole?: string
+}
+
+export default function MeetingsClientWrapper({ userRole }: Props) {
   const [meetings, setMeetings] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes((userRole || '').toLowerCase())
 
   useEffect(() => {
     loadMeetings()
@@ -48,9 +54,11 @@ export default function MeetingsClientWrapper() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Meetings</h1>
-        <Link href="/meetings/create">
-          <Button>Create New</Button>
-        </Link>
+        {isAdminOrBoard && (
+          <Link href="/meetings/create">
+            <Button>Create New</Button>
+          </Link>
+        )}
       </div>
       
       {loading ? (
@@ -67,9 +75,8 @@ export default function MeetingsClientWrapper() {
           ))}
         </div>
       ) : (
-        <EventsClient initial={meetings} />
+        <EventsClient initial={meetings} userRole={userRole} />
       )}
     </div>
   )
 }
-
