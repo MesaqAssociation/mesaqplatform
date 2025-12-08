@@ -39,9 +39,20 @@ export async function matchTransactionToMember(
   
   // Check for member_id as a standalone number (not part of longer numbers like phone numbers)
   for (const member of membersWithId) {
-    const memberId = String(member.member_id)
+    const memberId = String(member.member_id).trim()
+    
+    // Normalize member ID: A90 = A090
+    const normalizedMemberId = memberId.match(/^[A-Z](\d+)$/i) 
+      ? memberId.charAt(0).toUpperCase() + memberId.slice(1).padStart(3, '0')
+      : memberId
+    
+    // Also check for the non-padded version (e.g., A90 should match if description has A90 or A090)
+    const shortMemberId = memberId.match(/^[A-Z]0+(\d+)$/i)
+      ? memberId.charAt(0).toUpperCase() + memberId.match(/^[A-Z]0+(\d+)$/i)![1]
+      : memberId
+    
     // Use word boundaries to avoid matching member_id 23 in phone number 1234
-    const regex = new RegExp(`\\b${memberId}\\b`, 'i')
+    const regex = new RegExp(`\\b(${memberId}|${normalizedMemberId}|${shortMemberId})\\b`, 'i')
     if (regex.test(description)) {
       return {
         memberId: member.id,
@@ -153,7 +164,19 @@ export async function batchMatchTransactions(
     
     // Step 1: Check for member_id in description (with word boundaries)
     for (const [memberId, member] of memberIdMap.entries()) {
-      const regex = new RegExp(`\\b${memberId}\\b`, 'i')
+      const memberIdStr = String(memberId).trim()
+      
+      // Normalize member ID: A90 = A090
+      const normalizedMemberId = memberIdStr.match(/^[A-Z](\d+)$/i) 
+        ? memberIdStr.charAt(0).toUpperCase() + memberIdStr.slice(1).padStart(3, '0')
+        : memberIdStr
+      
+      // Also check for the non-padded version
+      const shortMemberId = memberIdStr.match(/^[A-Z]0+(\d+)$/i)
+        ? memberIdStr.charAt(0).toUpperCase() + memberIdStr.match(/^[A-Z]0+(\d+)$/i)![1]
+        : memberIdStr
+      
+      const regex = new RegExp(`\\b(${memberIdStr}|${normalizedMemberId}|${shortMemberId})\\b`, 'i')
       if (regex.test(txn.description)) {
         return {
           memberId: member.id,
