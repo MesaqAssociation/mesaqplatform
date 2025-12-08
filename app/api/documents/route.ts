@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File
 
     if (!isR2Configured()) {
-      return NextResponse.json({ error: 'File storage not configured. Please contact admin.' }, { status: 500 })
+      return NextResponse.json({ error: 'File storage not configured. Please contact admin.' }, { status: 400 })
     }
 
     if (!title || !file) {

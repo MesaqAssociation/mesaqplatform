@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown, IconCheck } from '@tabler/icons-react'
-import BalanceCardNew from './BalanceCardNew'
+// BalanceCardNew removed per request (special balance hidden)
 import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
@@ -373,8 +373,7 @@ export default function MemberDetailClient({
             </CardContent>
           </Card>
 
-          {/* Balance */}
-          <BalanceCardNew memberId={member.id} />
+          {/* Balance removed per request; use review-payments page for adjustments */}
 
           {/* Member Transactions */}
           <Card>

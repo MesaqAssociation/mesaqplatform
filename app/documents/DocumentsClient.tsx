@@ -118,7 +118,7 @@ export default function DocumentsClient({ user }: { user: User | null }) {
         setUploadComplete(false)
         loadDocuments()
       } else {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         showToast(data.error || 'Failed to upload document', 'error')
         // Reset upload state on error
         setUploadProgress(0)

@@ -48,6 +48,7 @@ export function Sidebar({ user }: SidebarProps) {
     // Regular members only see limited items
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
     { title: t("members"), url: "/members", icon: IconUsers },
+    { title: "Payments", url: "/payments", icon: IconCash },
     { 
       title: t("events"), 
       url: "/events", 

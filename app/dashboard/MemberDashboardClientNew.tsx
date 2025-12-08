@@ -325,11 +325,13 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
         </CardContent>
       </Card>
 
-      {/* Profile Link */}
-      <Link href={`/members/${memberData.id}`} className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
-        <p className="text-sm font-medium">View Full Profile</p>
-        <p className="text-xs text-muted-foreground mt-1">See payment history, attended events, and more</p>
-      </Link>
+      {/* Profile Link - admins only */}
+      {isAdmin && (
+        <Link href={`/members/${memberData.id}`} className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors text-center">
+          <p className="text-sm font-medium">View Full Profile</p>
+          <p className="text-xs text-muted-foreground mt-1">See payment history, attended events, and more</p>
+        </Link>
+      )}
     </div>
   )
 }
