@@ -53,15 +53,18 @@ export default async function MembersPage() {
       mp.total_paid,
       fee.monthly_fee
     FROM users u
-    CROSS JOIN (
-      SELECT CAST(value AS FLOAT) as monthly_fee FROM system_settings WHERE key = 'monthly_membership_fee' LIMIT 1
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(
+        (SELECT CAST(value AS FLOAT) FROM system_settings WHERE key = 'monthly_membership_fee' LIMIT 1),
+        40.0
+      ) as monthly_fee
     ) fee
     LEFT JOIN (
       SELECT user_id, SUM(amount) as total_paid
       FROM membership_payments
       GROUP BY user_id
     ) mp ON mp.user_id = u.id
-    CROSS JOIN (
+    CROSS JOIN LATERAL (
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(
         date_trunc('month', COALESCE(u.date_joined, u.created_at, CURRENT_DATE)),
