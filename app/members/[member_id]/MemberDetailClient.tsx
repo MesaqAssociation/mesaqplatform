@@ -420,7 +420,11 @@ export default function MemberDetailClient({
             </CardHeader>
             <CardContent>
               {balanceLoading ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-32" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
               ) : (
                 <div className="space-y-1">
                   <p className={`text-3xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>

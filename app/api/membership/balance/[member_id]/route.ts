@@ -64,15 +64,21 @@ export async function GET(
       currentMonth.setMonth(currentMonth.getMonth() + 1)
     }
 
-    // Get all MEMBERSHIP payments for this member (only from membership_payments table)
+    // Get all MEMBERSHIP payments for this member (only true membership payments)
+    // Join to transactions (if present) and keep only category = 'Membership Payment'
     const { rows: payments } = await pool.query(`
       SELECT 
-        payment_month,
-        SUM(amount) as total_amount
-      FROM membership_payments
-      WHERE user_id = $1
-      GROUP BY payment_month
-      ORDER BY payment_month
+        mp.payment_month,
+        SUM(mp.amount) as total_amount
+      FROM membership_payments mp
+      LEFT JOIN transactions t ON t.id = mp.transaction_id
+      WHERE mp.user_id = $1
+        AND (
+          mp.transaction_id IS NULL
+          OR (t.category = 'Membership Payment')
+        )
+      GROUP BY mp.payment_month
+      ORDER BY mp.payment_month
     `, [member.id])
 
     // Build payment map
