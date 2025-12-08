@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   const allowedRoles = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer']
   if (!allowedRoles.includes(userRole)) {
     return NextResponse.json({ 
-      error: 'Unauthorized - Board members only',
+      error: 'Unauthorized - Admin/Board only',
       debug: `Your role: ${userRows[0].role}`
     }, { status: 403 })
   }
@@ -91,6 +91,10 @@ export async function POST(req: NextRequest) {
     const title = formData.get('title') as string
     const description = formData.get('description') as string
     const file = formData.get('file') as File
+
+    if (!isR2Configured()) {
+      return NextResponse.json({ error: 'File storage not configured. Please contact admin.' }, { status: 500 })
+    }
 
     if (!title || !file) {
       return NextResponse.json({ error: 'Title and file are required' }, { status: 400 })

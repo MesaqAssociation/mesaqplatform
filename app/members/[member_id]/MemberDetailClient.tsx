@@ -63,12 +63,14 @@ export default function MemberDetailClient({
   member, 
   attendedEvents, 
   allEvents,
-  transactions 
+  transactions,
+  isAdmin
 }: { 
   member: Member
   attendedEvents: Event[]
   allEvents: Event[]
   transactions: Transaction[]
+  isAdmin: boolean
 }) {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>(attendedEvents || [])
@@ -100,6 +102,7 @@ export default function MemberDetailClient({
   const sortedMonths = Object.keys(transactionsByMonth).sort((a, b) => b.localeCompare(a))
 
   async function addEvent(eventId: string) {
+    if (!isAdmin) return
     setLoading(true)
     try {
       const res = await fetch('/api/members/events', {
@@ -121,6 +124,7 @@ export default function MemberDetailClient({
   }
 
   async function removeEvent(eventId: string) {
+    if (!isAdmin) return
     try {
       await fetch('/api/members/events', {
         method: 'DELETE',
@@ -134,6 +138,7 @@ export default function MemberDetailClient({
   }
 
   async function handleRoleChange(newRole: string) {
+    if (!isAdmin) return
     try {
       const res = await fetch(`/api/members/${member.id}/role`, {
         method: 'PATCH',
@@ -155,6 +160,7 @@ export default function MemberDetailClient({
   }
 
   async function handleDelete() {
+    if (!isAdmin) return
     if (confirmText.toLowerCase() !== 'confirm') {
       showToast('Please type "confirm" to delete', 'error')
       return
@@ -489,13 +495,15 @@ export default function MemberDetailClient({
                           {formatDate(event.event_date)} • {event.event_type}
                         </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeEvent(event.id)}
-                      >
-                        Remove
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeEvent(event.id)}
+                        >
+                          Remove
+                        </Button>
+                      )}
                     </div>
                   ))
                 )}
@@ -504,48 +512,52 @@ export default function MemberDetailClient({
           </Card>
 
           {/* Role Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Role Management</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="role">Change Role</Label>
-                <Select value={currentRole} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Community Member">Community Member</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
-                    <SelectItem value="Public Officer">Public Officer</SelectItem>
-                    <SelectItem value="Finance Officer">Finance Officer</SelectItem>
-                    <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Role Management</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="role">Change Role</Label>
+                  <Select value={currentRole} onValueChange={handleRoleChange}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Community Member">Community Member</SelectItem>
+                      <SelectItem value="Manager">Manager</SelectItem>
+                      <SelectItem value="Public Officer">Public Officer</SelectItem>
+                      <SelectItem value="Finance Officer">Finance Officer</SelectItem>
+                      <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Danger Zone */}
-          <Card className="border-red-200 dark:border-red-900">
-            <CardHeader>
-              <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account. This action cannot be undone.</p>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="w-full"
-                >
-                  <IconTrash className="mr-2 size-4" />
-                  Delete Member
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {isAdmin && (
+            <Card className="border-red-200 dark:border-red-900">
+              <CardHeader>
+                <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account. This action cannot be undone.</p>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="w-full"
+                  >
+                    <IconTrash className="mr-2 size-4" />
+                    Delete Member
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

@@ -30,6 +30,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
     const { name, email, phone, address, household_members } = body
+    const household = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
 
     // Validation
     if (!name || !name.trim()) {
@@ -55,9 +56,9 @@ export async function PATCH(req: NextRequest) {
     `, [
       name.trim(),
       email?.trim() || null,
-      phone.trim(),
+      phone?.trim() || null,
       address?.trim() || null,
-      household_members ? parseInt(household_members) : 1,
+      household,
       userId
     ])
 

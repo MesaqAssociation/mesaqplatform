@@ -21,10 +21,17 @@ export default async function MemberDetailPage({
   }
   
   const user = await getUserFromToken()
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdmin = ['admin','board','manager','head','finance officer','logistics officer','public officer'].includes(userRole)
 
   // Await params if it's a Promise (Next.js 15+)
   const resolvedParams = params instanceof Promise ? await params : params
   const memberId = resolvedParams.member_id
+
+  // If not admin, only allow viewing own profile
+  if (!isAdmin && user?.id !== memberId) {
+    redirect('/access-denied')
+  }
 
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
@@ -103,6 +110,7 @@ export default async function MemberDetailPage({
           attendedEvents={formattedAttendedEvents}
           allEvents={formattedAllEvents}
           transactions={transactions}
+          isAdmin={isAdmin}
         />
       </MainLayout>
     )
