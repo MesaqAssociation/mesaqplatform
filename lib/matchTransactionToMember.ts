@@ -57,11 +57,19 @@ export async function matchTransactionToMember(
       variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
       variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
       variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+      
+      // Add number-only variations: 50, 050 for A50
+      variations.add(number) // e.g., 50
+      variations.add(`0${number}`) // e.g., 050
+      variations.add(`00${number}`) // e.g., 0050
+      variations.add(number.padStart(2, '0')) // e.g., 50
+      variations.add(number.padStart(3, '0')) // e.g., 050
     }
     
-    // Check if any variation exists in the description
+    // Check if any variation exists in the description (no word boundaries - match anywhere)
     for (const variant of variations) {
-      const regex = new RegExp(`\\b${variant}\\b`, 'i')
+      // Use case-insensitive search without word boundaries
+      const regex = new RegExp(variant, 'i')
       if (regex.test(description)) {
         return {
           memberId: member.id,
@@ -172,7 +180,7 @@ export async function batchMatchTransactions(
       return null
     }
     
-    // Step 1: Check for member_id in description (with word boundaries)
+    // Step 1: Check for member_id in description (anywhere in text, not just standalone)
     for (const [memberId, member] of memberIdMap.entries()) {
       const memberIdStr = String(memberId).trim()
       
@@ -192,11 +200,18 @@ export async function batchMatchTransactions(
         variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
         variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
         variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+        
+        // Add number-only variations: 50, 050 for A50
+        variations.add(number) // e.g., 50
+        variations.add(`0${number}`) // e.g., 050
+        variations.add(`00${number}`) // e.g., 0050
+        variations.add(number.padStart(2, '0')) // e.g., 50
+        variations.add(number.padStart(3, '0')) // e.g., 050
       }
       
-      // Check if any variation exists in the description
+      // Check if any variation exists in the description (anywhere, not just standalone)
       for (const variant of variations) {
-        const regex = new RegExp(`\\b${variant}\\b`, 'i')
+        const regex = new RegExp(variant, 'i')
         if (regex.test(txn.description)) {
           return {
             memberId: member.id,

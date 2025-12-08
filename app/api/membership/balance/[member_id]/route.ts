@@ -86,7 +86,7 @@ export async function GET(
     let runningBalance = 0
     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0)
     const expectedPayments = months.length
-    
+      
     // Running balance = total paid - total expected
     runningBalance = totalPaid - (expectedPayments * monthlyFee)
 
@@ -117,11 +117,11 @@ export async function GET(
 
     return NextResponse.json({
       membershipBalance: {
-        currentBalance: runningBalance,
-        expectedPayments,
-        totalPaid,
-        monthlyFee,
-        status
+      currentBalance: runningBalance,
+      expectedPayments,
+      totalPaid,
+      monthlyFee,
+      status
       },
       specialPaymentBalance: {
         totalSpecialPayments,

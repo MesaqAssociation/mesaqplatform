@@ -389,8 +389,8 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                 <p className="text-xs text-muted-foreground">Special payments that may need to be reclassified</p>
               </div>
             </div>
-            <Link href="/finance" className="text-sm text-primary hover:underline">
-              View All Transactions
+            <Link href="/review-payments" className="text-sm text-primary hover:underline">
+              Review All Payments
             </Link>
           </div>
           

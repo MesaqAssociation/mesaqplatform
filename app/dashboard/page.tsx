@@ -40,17 +40,19 @@ export default async function DashboardPage() {
       // Get member data
       const { rows: memberRows } = await pool.query(`
         SELECT 
+          id,
           name, 
           current_balance, 
           member_id, 
           household_members, 
-          joined_date
+          date_joined
         FROM users
         WHERE id = $1
       `, [userId])
-      memberData = memberRows[0] || {}
+      memberData = memberRows[0] || { id: userId, name: 'Member', current_balance: 0, member_id: null, household_members: 1, date_joined: new Date() }
     } catch (error) {
       console.error('Error fetching member data:', error)
+      memberData = { id: userId, name: 'Member', current_balance: 0, member_id: null, household_members: 1, date_joined: new Date() }
     }
 
     try {
