@@ -18,8 +18,11 @@ export async function PATCH(req: NextRequest) {
   
   let userId: string
   try {
-    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
-    userId = decoded.sub
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
+    userId = decoded.userId || decoded.sub
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

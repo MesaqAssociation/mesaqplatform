@@ -20,24 +20,18 @@ export default async function MembersPage() {
   
   const user = await getUserFromToken()
   
-  // Restrict members page to admins/board only
-  const userRole = (user?.role || '').toLowerCase()
-  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
-  if (!isAdminOrBoard) {
-    redirect('/access-denied')
-  }
-  
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
   
   // Check if user is admin
-  const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
   
   let rows: any[]
   
-  if (isAdmin) {
+  if (isAdminOrBoard) {
     // Admins see full details
     const result = await pool.query(`
     SELECT 
@@ -82,8 +76,8 @@ export default async function MembersPage() {
   }
   
   return (
-    <MainLayout user={user}>
-      <MembersPageWrapper initial={rows} isAdmin={isAdmin} />
+    <MainLayout user={{ ...user, role: user?.role }}>
+      <MembersPageWrapper initial={rows} isAdmin={isAdminOrBoard} />
     </MainLayout>
   )
 }

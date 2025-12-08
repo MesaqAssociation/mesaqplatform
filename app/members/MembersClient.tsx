@@ -140,8 +140,8 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             {sortedMembers.map(m => (
             <tr 
               key={m.id} 
-              onClick={() => router.push(`/members/${m.id}`)}
-              className="border-t hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => isAdmin && router.push(`/members/${m.id}`)}
+              className={`border-t hover:bg-muted/50 transition-colors ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
             >
               <td className="py-3 px-2">
                 <div className="flex items-center gap-3">
@@ -152,6 +152,8 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
                   <span className="font-medium">{m.name || '-'}</span>
                 </div>
               </td>
+              {isAdmin && (
+                <>
               <td className="py-3 px-2 text-muted-foreground">{m.email || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
@@ -169,6 +171,8 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               <td className="py-3 px-2">
                 {getPaymentStatusBadge(m)}
               </td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>

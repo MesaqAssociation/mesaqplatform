@@ -70,7 +70,7 @@ export default async function SettingsPage() {
   // Don't close the pool - it's shared across requests
   
   return (
-    <MainLayout user={user}>
+    <MainLayout user={{ ...user, role: user?.role }}>
       <SettingsClient 
         user={user} 
         fullUserData={fullUserData}

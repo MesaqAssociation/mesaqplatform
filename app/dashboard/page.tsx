@@ -5,7 +5,7 @@ import { MainLayout } from '@/components/Sidebar'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import DashboardClient from './DashboardClient'
-import MemberDashboardClient from './MemberDashboardClient'
+import MemberDashboardClientNew from './MemberDashboardClientNew'
 
 export default async function DashboardPage() {
   const token = cookies().get('auth_token')?.value
@@ -102,11 +102,8 @@ export default async function DashboardPage() {
 
     return (
       <MainLayout user={{ ...user, role: user?.role }}>
-        <MemberDashboardClient
-          memberData={memberData}
-          recentTransactions={memberTransactions}
-          upcomingEvents={upcomingEvents}
-          paymentStatus={paymentStatus}
+        <MemberDashboardClientNew
+          initialData={memberData}
         />
       </MainLayout>
     )
