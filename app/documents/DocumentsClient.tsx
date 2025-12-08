@@ -229,15 +229,34 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                   )}
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => window.open(doc.file_url, '_blank')}
-                  >
-                    <IconDownload className="mr-2 size-4" />
-                    Download
-                  </Button>
+                  {doc.file_url ? (
+                    <a
+                      href={doc.file_url}
+                      download={doc.file_name}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1"
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <IconDownload className="mr-2 size-4" />
+                        Download
+                      </Button>
+                    </a>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => showToast('File URL missing for this document', 'error')}
+                    >
+                      <IconDownload className="mr-2 size-4" />
+                      Download
+                    </Button>
+                  )}
                   {isAdmin && (
                     <Button
                       size="sm"
