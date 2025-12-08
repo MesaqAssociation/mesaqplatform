@@ -29,8 +29,30 @@ export default function MemberDashboardClient({ initialData }: Props) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadDashboardData()
+    // Fetch initial member data first
+    fetchMemberData().then(() => {
+      // Then load dashboard data
+      loadDashboardData()
+    })
   }, [])
+
+  const fetchMemberData = async () => {
+    try {
+      const res = await fetch('/api/user/profile')
+      if (res.ok) {
+        const data = await res.json()
+        setMemberData({
+          id: data.id,
+          name: data.name || 'Member',
+          member_id: data.member_id || null,
+          household_members: data.household_members || 1,
+          date_joined: data.date_joined || new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      console.error('Error loading member data:', err)
+    }
+  }
 
   const loadDashboardData = async () => {
     try {
@@ -85,7 +107,7 @@ export default function MemberDashboardClient({ initialData }: Props) {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Welcome, {memberData.name}!</h1>
+        <h1 className="text-3xl font-bold">Welcome {memberData.name}</h1>
         {memberData.member_id && (
           <p className="text-muted-foreground">Member #{memberData.member_id}</p>
         )}

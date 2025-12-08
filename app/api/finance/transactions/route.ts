@@ -18,8 +18,9 @@ async function verifyAuth(): Promise<{ userId: string } | null> {
   }
   
   try {
-    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
-    return { userId: decoded.sub }
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
+    const userId = decoded.userId || decoded.sub
+    return userId ? { userId } : null
   } catch {
     return null
   }
@@ -36,6 +37,42 @@ export async function GET(req: NextRequest) {
     const accountId = searchParams.get('accountId')
     const year = searchParams.get('year')
     const month = searchParams.get('month')
+    const memberId = searchParams.get('memberId')
+    const limit = searchParams.get('limit')
+
+    // If memberId is provided, return member's transactions
+    if (memberId) {
+      const { rows: transactions } = await pool.query(`
+        SELECT 
+          t.id,
+          t.account_id,
+          to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
+          t.transaction_name,
+          t.description,
+          t.category,
+          t.amount,
+          t.transaction_type,
+          t.reference,
+          t.balance_after,
+          t.created_by,
+          t.source,
+          t.matched_member_id,
+          t.statement_id,
+          t.created_at,
+          u.name as creator_name,
+          m.name as matched_member_name
+        FROM transactions t 
+        LEFT JOIN users u ON t.created_by = u.id 
+        LEFT JOIN users m ON t.matched_member_id = m.id
+        WHERE t.matched_member_id = $1
+        ORDER BY t.transaction_date DESC, t.created_at DESC
+        ${limit ? `LIMIT ${parseInt(limit)}` : ''}
+      `, [memberId])
+
+      return NextResponse.json({ 
+        transactions
+      })
+    }
 
     if (!accountId || !year || !month) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })

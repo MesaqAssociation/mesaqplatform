@@ -28,7 +28,7 @@ export async function GET(
   try {
     // Await params if it's a Promise (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params
-    const memberId = parseInt(resolvedParams.member_id)
+    const memberId = resolvedParams.member_id // UUID string
     
     // Get monthly fee from system settings
     const { rows: settingsRows } = await pool.query(`
@@ -36,9 +36,9 @@ export async function GET(
     `)
     const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
 
-    // Get member info
+    // Get member info by UUID
     const { rows: memberRows } = await pool.query(
-      'SELECT id, member_id, name, banking_name, date_joined FROM users WHERE member_id = $1',
+      'SELECT id, member_id, name, banking_name, date_joined FROM users WHERE id = $1',
       [memberId]
     )
 

@@ -37,29 +37,27 @@ export async function matchTransactionToMember(
   
   const descriptionLower = description.toLowerCase()
   
-  // Check for member_id (prioritize letter+number format like A25)
+  // STEP 1: Check for member_id in description (with zero-padding variations)
   for (const member of membersWithId) {
     const memberId = String(member.member_id).trim()
     
-    // Handle alphanumeric IDs like A90, A040, etc.
-    const alphaMatch = memberId.match(/^([A-Z]+)0*(\d+)$/i)
+    // Handle alphanumeric IDs like A05, A5, A005
+    const alphaMatch = memberId.match(/^([A-Z]+)(\d+)$/i)
     if (alphaMatch) {
       const letter = alphaMatch[1].toUpperCase()
       const number = alphaMatch[2]
       
-      // Only check for EXACT letter+number variations (no number-only to avoid false positives)
-      // A50 variations: A50, A050, A0050
-      const letterVariations = [
-        `${letter}${number}`, // A50
-        `${letter}0${number}`, // A050
-        `${letter}00${number}`, // A0050
-        `${letter}${number.padStart(2, '0')}`, // A50
-        `${letter}${number.padStart(3, '0')}`, // A050
-        `${letter}${number.padStart(4, '0')}` // A0050
-      ]
+      // Generate variations with different zero-padding
+      // A5 → [A5, A05, A005]
+      // A50 → [A50, A050, A0050]
+      const variations = new Set<string>()
+      variations.add(`${letter}${number}`) // Original
+      variations.add(`${letter}${number.padStart(2, '0')}`) // 2 digits
+      variations.add(`${letter}${number.padStart(3, '0')}`) // 3 digits
+      variations.add(`${letter}${number.padStart(4, '0')}`) // 4 digits
       
-      for (const variant of letterVariations) {
-        // Case-insensitive, matches anywhere in text
+      for (const variant of variations) {
+        // Match anywhere in description (case-insensitive)
         const regex = new RegExp(variant, 'i')
         if (regex.test(description)) {
           return {
@@ -71,7 +69,7 @@ export async function matchTransactionToMember(
         }
       }
     } else {
-      // For non-alphanumeric member IDs, use word boundary
+      // For non-alphanumeric member IDs, exact match with word boundary
       const regex = new RegExp(`\\b${memberId}\\b`, 'i')
       if (regex.test(description)) {
         return {
@@ -79,6 +77,35 @@ export async function matchTransactionToMember(
           memberName: member.name,
           matchType: 'member_id',
           confidence: 'high'
+        }
+      }
+    }
+  }
+  
+  // STEP 2: Check for phone number in description
+  for (const member of allMembers) {
+    if (member.phone) {
+      // Remove all non-digits from phone
+      const cleanPhone = member.phone.replace(/\D/g, '')
+      // Try matching last 9 digits (Australian mobile without 0)
+      if (cleanPhone.length >= 9) {
+        const last9 = cleanPhone.slice(-9)
+        if (description.includes(last9)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'phone',
+            confidence: 'high'
+          }
+        }
+      }
+      // Try matching full number
+      if (description.includes(cleanPhone)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'phone',
+          confidence: 'medium'
         }
       }
     }
@@ -183,28 +210,24 @@ export async function batchMatchTransactions(
       return null
     }
     
-    // Step 1: Check for member_id in description (letter+number only)
+    // Step 1: Check for member_id in description (with zero-padding)
     for (const [memberId, member] of memberIdMap.entries()) {
       const memberIdStr = String(memberId).trim()
       
-      // Handle alphanumeric IDs like A90, A040, etc.
-      const alphaMatch = memberIdStr.match(/^([A-Z]+)0*(\d+)$/i)
+      // Handle alphanumeric IDs like A05, A5, A005
+      const alphaMatch = memberIdStr.match(/^([A-Z]+)(\d+)$/i)
       if (alphaMatch) {
         const letter = alphaMatch[1].toUpperCase()
         const number = alphaMatch[2]
         
-        // Only check for letter+number variations (no number-only)
-        const letterVariations = [
-          `${letter}${number}`,
-          `${letter}0${number}`,
-          `${letter}00${number}`,
-          `${letter}${number.padStart(2, '0')}`,
-          `${letter}${number.padStart(3, '0')}`,
-          `${letter}${number.padStart(4, '0')}`
-        ]
+        // Generate all zero-padding variations
+        const variations = new Set<string>()
+        variations.add(`${letter}${number}`)
+        variations.add(`${letter}${number.padStart(2, '0')}`)
+        variations.add(`${letter}${number.padStart(3, '0')}`)
+        variations.add(`${letter}${number.padStart(4, '0')}`)
         
-        for (const variant of letterVariations) {
-          // Case-insensitive, matches anywhere in text
+        for (const variant of variations) {
           const regex = new RegExp(variant, 'i')
           if (regex.test(txn.description)) {
             return {
@@ -224,6 +247,32 @@ export async function batchMatchTransactions(
             memberName: member.name,
             matchType: 'member_id' as const,
             confidence: 'high' as const
+          }
+        }
+      }
+    }
+    
+    // Step 2: Check for phone number in description
+    for (const member of allMembers) {
+      if (member.phone) {
+        const cleanPhone = member.phone.replace(/\D/g, '')
+        if (cleanPhone.length >= 9) {
+          const last9 = cleanPhone.slice(-9)
+          if (txn.description.includes(last9)) {
+            return {
+              memberId: member.id,
+              memberName: member.name,
+              matchType: 'phone' as const,
+              confidence: 'high' as const
+            }
+          }
+        }
+        if (txn.description.includes(cleanPhone)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'phone' as const,
+            confidence: 'medium' as const
           }
         }
       }

@@ -21,89 +21,27 @@ export default async function DashboardPage() {
   
   const user = await getUserFromToken()
   
-  // Check if user is admin/board
-  const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
+  // Check if user is admin/board/officer
+  const userRole = (user?.role || '').toLowerCase()
+  const isAdmin = ['admin', 'board', 'manager', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
   
   const pool = new (require('pg').Pool)({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
-  // If regular member, show member-specific dashboard
+  // If regular member, show member-specific dashboard (no server-side data)
   if (!isAdmin) {
-    let memberData: any = {}
-    let memberTransactions: any[] = []
-    let upcomingEvents: any[] = []
-    let paymentStatus: any = null
-
-    try {
-      // Get member data
-      const { rows: memberRows } = await pool.query(`
-        SELECT 
-          id,
-          name, 
-          current_balance, 
-          member_id, 
-          household_members, 
-          date_joined
-        FROM users
-        WHERE id = $1
-      `, [userId])
-      memberData = memberRows[0] || { id: userId, name: 'Member', current_balance: 0, member_id: null, household_members: 1, date_joined: new Date() }
-    } catch (error) {
-      console.error('Error fetching member data:', error)
-      memberData = { id: userId, name: 'Member', current_balance: 0, member_id: null, household_members: 1, date_joined: new Date() }
-    }
-
-    try {
-      // Get member's recent transactions
-      const { rows } = await pool.query(`
-        SELECT 
-          t.id,
-          t.transaction_date,
-          t.transaction_name,
-          t.amount,
-          t.transaction_type
-        FROM transactions t
-        WHERE t.matched_member_id = $1
-        ORDER BY t.transaction_date DESC
-        LIMIT 10
-      `, [userId])
-      memberTransactions = rows
-    } catch (error) {
-      console.error('Error fetching member transactions:', error)
-    }
-
-    try {
-      // Get upcoming events
-      const { rows } = await pool.query(`
-        SELECT 
-          id,
-          title,
-          event_date,
-          start_time,
-          event_type
-        FROM events
-        WHERE event_date >= CURRENT_DATE
-        ORDER BY event_date ASC, start_time ASC
-        LIMIT 5
-      `)
-      upcomingEvents = rows
-    } catch (error) {
-      console.error('Error fetching events:', error)
-    }
-
-    try {
-      // Payment status is now calculated from membership_payments, not a view
-      paymentStatus = null // We no longer use this view
-    } catch (error) {
-      console.error('Error fetching payment status:', error)
-    }
-
     return (
       <MainLayout user={{ ...user, role: user?.role }}>
         <MemberDashboardClientNew
-          initialData={memberData}
+          initialData={{
+            id: userId,
+            name: user?.name || 'Member',
+            member_id: null,
+            household_members: 1,
+            date_joined: new Date().toISOString()
+          }}
         />
       </MainLayout>
     )
