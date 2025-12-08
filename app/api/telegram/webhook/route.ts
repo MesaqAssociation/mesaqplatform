@@ -19,98 +19,35 @@ export async function POST(req: NextRequest) {
     const update = await req.json()
     console.log('Telegram webhook received:', JSON.stringify(update, null, 2))
 
-    // Handle document messages (PDFs)
+    // Only handle PDF documents
     if (update.message?.document) {
       const message = update.message
       const document = message.document
       const chatId = message.chat.id
-      const userId = message.from.id
       const userName = message.from.first_name || 'User'
 
-      console.log(`📎 Document received from ${userName} (${userId}):`, document.file_name)
+      console.log(`📎 Document received from ${userName}:`, document.file_name)
 
       // Check if it's a PDF
       if (document.mime_type !== 'application/pdf') {
-        await sendTelegramMessage(
-          chatId,
-          '❌ Please send a PDF file. Only PDF bank statements are supported.'
-        )
         return NextResponse.json({ ok: true })
       }
 
-      // Send immediate processing confirmation and respond to Telegram
-      // Process the document asynchronously without blocking
-      sendTelegramMessage(chatId, '📄 Bank statement received! Processing...')
-      
-      // Process document in background (don't await)
-      processDocument(document, chatId, userName).catch(err => {
-        console.error('Background document processing error:', err)
-        sendTelegramMessage(chatId, '❌ Error processing document. Please try again or contact support.')
-      })
-      
-      // Return immediately so Telegram can send more documents
-      return NextResponse.json({ ok: true, message: 'Processing started' })
-    }
+      // Send processing message
+      await sendTelegramMessage(chatId, '📄 Processing...')
 
-    // Handle text messages
-    if (update.message?.text) {
-      const chatId = update.message.chat.id
-      const text = update.message.text.trim()
-      const userName = update.message.from.first_name || 'User'
+      try {
+        // Download the PDF file
+        const telegramFileUrl = await getTelegramFileUrl(document.file_id)
+        const pdfBuffer = await downloadFile(telegramFileUrl)
 
-      console.log(`💬 Text message from ${userName}: ${text}`)
+        // Parse the PDF
+        const parsed = await parseBankStatementPDF(pdfBuffer)
 
-      // Handle /start command
-      if (text === '/start') {
-        await sendTelegramMessage(
-          chatId,
-          `👋 Welcome to Mesaq Association Bot!\n\n` +
-          `I can help you upload bank statements automatically.\n\n` +
-          `📄 Simply send me a PDF bank statement and I'll:\n` +
-          `• Extract all transactions\n` +
-          `• Match payments to members\n` +
-          `• Update the finance system\n\n` +
-          `Just send a PDF file to get started!`
-        )
-        return NextResponse.json({ ok: true })
-      }
-
-      // Handle any other text
-      await sendTelegramMessage(
-        chatId,
-        `📄 Please send me a PDF bank statement to process.\n\n` +
-        `I can only process PDF files at this time.`
-      )
-      return NextResponse.json({ ok: true })
-    }
-
-    // Silently ignore all other message types (stickers, photos, etc.)
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error('Telegram webhook error:', err)
-    return NextResponse.json({ ok: true }) // Always return ok to Telegram
-  }
-}
-
-// Process document asynchronously
-async function processDocument(document: any, chatId: number, userName: string) {
-  try {
-    console.log(`🔄 [${document.file_name}] Starting background processing...`)
-    
-    // Download the PDF file
-    const telegramFileUrl = await getTelegramFileUrl(document.file_id)
-    const pdfBuffer = await downloadFile(telegramFileUrl)
-
-    // Parse the PDF
-    const parsed = await parseBankStatementPDF(pdfBuffer)
-
-    if (parsed.transactions.length === 0) {
-      await sendTelegramMessage(
-        chatId,
-        '❌ No transactions found in the PDF. Please ensure it\'s a valid bank statement.'
-      )
-      return
-    }
+        if (parsed.transactions.length === 0) {
+          await sendTelegramMessage(chatId, '❌ No transactions found.')
+          return NextResponse.json({ ok: true })
+        }
 
         // Get the default financial account (or create one)
         let accountId: string
@@ -340,13 +277,20 @@ async function processDocument(document: any, chatId: number, userName: string) 
 
         await sendTelegramMessage(chatId, responseMessage)
 
-    console.log(`✅ [${document.file_name}] Processing complete!`)
-  } catch (err: any) {
-    console.error(`❌ [${document.file_name}] Error processing:`, err)
-    await sendTelegramMessage(
-      chatId,
-      `❌ Error processing bank statement: ${err.message || 'Unknown error'}`
-    )
+        await sendTelegramMessage(chatId, `✅ Processed ${insertedCount.length} transactions.`)
+      } catch (err: any) {
+        console.error('Error processing bank statement:', err)
+        await sendTelegramMessage(chatId, '❌ Error processing.')
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
+    // Silently ignore all other messages
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Telegram webhook error:', err)
+    return NextResponse.json({ ok: true })
   }
 }
 
