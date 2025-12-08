@@ -406,13 +406,13 @@ export default function FinanceClient({
         loadTransactions()
       } else {
         setUploadProgress(null)
-        setUploadStatus('')
+        setLoading(false)
         showToast(`Error: ${data.error}`, 'error')
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)
       setUploadProgress(null)
-      setUploadStatus('')
+      setLoading(false)
       showToast('Failed to upload statement. Please try again.', 'error')
     } finally {
       setLoading(false)

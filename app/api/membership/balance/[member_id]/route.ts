@@ -68,7 +68,7 @@ export async function GET(
     const { rows: payments } = await pool.query(`
       SELECT 
         payment_month,
-        SUM(amount_paid) as total_amount
+        SUM(amount) as total_amount
       FROM membership_payments
       WHERE user_id = $1
       GROUP BY payment_month
