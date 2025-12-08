@@ -37,12 +37,9 @@ export async function matchTransactionToMember(
   
   const descriptionLower = description.toLowerCase()
   
-  // Check for member_id as a standalone number (not part of longer numbers like phone numbers)
+  // Check for member_id (prioritize letter+number format like A25)
   for (const member of membersWithId) {
     const memberId = String(member.member_id).trim()
-    
-    // Create all possible variations of the member ID
-    const variations = new Set<string>([memberId])
     
     // Handle alphanumeric IDs like A90, A040, etc.
     const alphaMatch = memberId.match(/^([A-Z]+)0*(\d+)$/i)
@@ -50,26 +47,58 @@ export async function matchTransactionToMember(
       const letter = alphaMatch[1].toUpperCase()
       const number = alphaMatch[2]
       
-      // Add variations: A40, A040, A0040, etc.
-      variations.add(`${letter}${number}`) // e.g., A40
-      variations.add(`${letter}0${number}`) // e.g., A040
-      variations.add(`${letter}00${number}`) // e.g., A0040
-      variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
-      variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
-      variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+      // PRIORITY 1: Check for letter+number variations (A25, A025, etc.)
+      const letterVariations = [
+        `${letter}${number}`,
+        `${letter}0${number}`,
+        `${letter}00${number}`,
+        `${letter}${number.padStart(2, '0')}`,
+        `${letter}${number.padStart(3, '0')}`,
+        `${letter}${number.padStart(4, '0')}`
+      ]
       
-      // Add number-only variations: 50, 050 for A50
-      variations.add(number) // e.g., 50
-      variations.add(`0${number}`) // e.g., 050
-      variations.add(`00${number}`) // e.g., 0050
-      variations.add(number.padStart(2, '0')) // e.g., 50
-      variations.add(number.padStart(3, '0')) // e.g., 050
-    }
-    
-    // Check if any variation exists in the description (no word boundaries - match anywhere)
-    for (const variant of variations) {
-      // Use case-insensitive search without word boundaries
-      const regex = new RegExp(variant, 'i')
+      for (const variant of letterVariations) {
+        // Case-insensitive, matches anywhere in text
+        const regex = new RegExp(variant, 'i')
+        if (regex.test(description)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'member_id',
+            confidence: 'high'
+          }
+        }
+      }
+      
+      // PRIORITY 2: Check for number-only (50, 050) BUT with stricter validation
+      // Only match if it's NOT part of a phone number or larger number
+      const numberVariations = [
+        number,
+        `0${number}`,
+        `00${number}`,
+        number.padStart(2, '0'),
+        number.padStart(3, '0')
+      ]
+      
+      for (const numVariant of numberVariations) {
+        // Use word boundaries for number-only matching to avoid false positives
+        const regex = new RegExp(`\\b${numVariant}\\b`, 'i')
+        if (regex.test(description)) {
+          // Extra validation: Make sure it's not part of a phone number
+          const phonePattern = /0[2-9]\d{8}/
+          if (!phonePattern.test(description)) {
+            return {
+              memberId: member.id,
+              memberName: member.name,
+              matchType: 'member_id',
+              confidence: 'high'
+            }
+          }
+        }
+      }
+    } else {
+      // For non-alphanumeric member IDs, use word boundary
+      const regex = new RegExp(`\\b${memberId}\\b`, 'i')
       if (regex.test(description)) {
         return {
           memberId: member.id,
@@ -180,12 +209,9 @@ export async function batchMatchTransactions(
       return null
     }
     
-    // Step 1: Check for member_id in description (anywhere in text, not just standalone)
+    // Step 1: Check for member_id in description (prioritize letter+number format)
     for (const [memberId, member] of memberIdMap.entries()) {
       const memberIdStr = String(memberId).trim()
-      
-      // Create all possible variations of the member ID
-      const variations = new Set<string>([memberIdStr])
       
       // Handle alphanumeric IDs like A90, A040, etc.
       const alphaMatch = memberIdStr.match(/^([A-Z]+)0*(\d+)$/i)
@@ -193,25 +219,57 @@ export async function batchMatchTransactions(
         const letter = alphaMatch[1].toUpperCase()
         const number = alphaMatch[2]
         
-        // Add variations: A40, A040, A0040, etc.
-        variations.add(`${letter}${number}`) // e.g., A40
-        variations.add(`${letter}0${number}`) // e.g., A040
-        variations.add(`${letter}00${number}`) // e.g., A0040
-        variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
-        variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
-        variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+        // PRIORITY 1: Check for letter+number variations (A25, A025, etc.)
+        const letterVariations = [
+          `${letter}${number}`,
+          `${letter}0${number}`,
+          `${letter}00${number}`,
+          `${letter}${number.padStart(2, '0')}`,
+          `${letter}${number.padStart(3, '0')}`,
+          `${letter}${number.padStart(4, '0')}`
+        ]
         
-        // Add number-only variations: 50, 050 for A50
-        variations.add(number) // e.g., 50
-        variations.add(`0${number}`) // e.g., 050
-        variations.add(`00${number}`) // e.g., 0050
-        variations.add(number.padStart(2, '0')) // e.g., 50
-        variations.add(number.padStart(3, '0')) // e.g., 050
-      }
-      
-      // Check if any variation exists in the description (anywhere, not just standalone)
-      for (const variant of variations) {
-        const regex = new RegExp(variant, 'i')
+        for (const variant of letterVariations) {
+          // Case-insensitive, matches anywhere in text
+          const regex = new RegExp(variant, 'i')
+          if (regex.test(txn.description)) {
+            return {
+              memberId: member.id,
+              memberName: member.name,
+              matchType: 'member_id' as const,
+              confidence: 'high' as const
+            }
+          }
+        }
+        
+        // PRIORITY 2: Check for number-only (50, 050) with validation
+        const numberVariations = [
+          number,
+          `0${number}`,
+          `00${number}`,
+          number.padStart(2, '0'),
+          number.padStart(3, '0')
+        ]
+        
+        for (const numVariant of numberVariations) {
+          // Use word boundaries for number-only to avoid false positives
+          const regex = new RegExp(`\\b${numVariant}\\b`, 'i')
+          if (regex.test(txn.description)) {
+            // Extra validation: Not part of phone number
+            const phonePattern = /0[2-9]\d{8}/
+            if (!phonePattern.test(txn.description)) {
+              return {
+                memberId: member.id,
+                memberName: member.name,
+                matchType: 'member_id' as const,
+                confidence: 'high' as const
+              }
+            }
+          }
+        }
+      } else {
+        // For non-alphanumeric member IDs, use word boundary
+        const regex = new RegExp(`\\b${memberIdStr}\\b`, 'i')
         if (regex.test(txn.description)) {
           return {
             memberId: member.id,
