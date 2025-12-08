@@ -104,7 +104,10 @@ export default function MemberDetailClient({
   }, [member.id])
 
   // Group transactions by month
-  const transactionsByMonth = transactions.reduce((acc, txn) => {
+  // Show only membership/payment transactions (exclude Special/Donation/Uncategorized)
+  const memberTransactions = transactions.filter(txn => (txn.category || '').toLowerCase() === 'membership payment')
+
+  const transactionsByMonth = memberTransactions.reduce((acc, txn) => {
     const date = new Date(txn.transaction_date + 'T00:00:00')
     const monthKey = date.toISOString().slice(0, 7) // YYYY-MM format
     const monthName = date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
