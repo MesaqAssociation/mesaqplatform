@@ -95,6 +95,7 @@ export default function FinanceClient({
   const [newTransactionDescription, setNewTransactionDescription] = useState('')
   const [newTransactionAmount, setNewTransactionAmount] = useState('')
   const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
+  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Special Payment'>('Membership Payment')
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
@@ -539,6 +540,7 @@ export default function FinanceClient({
           amount,
           transactionType: newTransactionType,
           matchedMemberId: newTransactionMemberId,
+          category: newTransactionCategory,
         }),
       })
 
@@ -566,6 +568,7 @@ export default function FinanceClient({
         setNewTransactionDescription('')
         setNewTransactionAmount('')
         setNewTransactionType('credit')
+        setNewTransactionCategory('Membership Payment')
         setNewTransactionMemberId(null)
         setNewTransactionMemberName('')
       } else {
@@ -1539,6 +1542,19 @@ export default function FinanceClient({
                 </Select>
               </div>
             </div>
+
+          <div>
+            <Label htmlFor="txn-category">Category *</Label>
+            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Special Payment') => setNewTransactionCategory(value)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                <SelectItem value="Special Payment">Special Payment</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
             <div>
               <Label htmlFor="txn-name">Transaction Name *</Label>

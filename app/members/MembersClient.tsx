@@ -100,7 +100,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
     <div className="space-y-4">
       {/* Filter Controls - Only show for admins */}
       {isAdmin && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <label htmlFor="sort" className="text-sm font-medium">
             Sort by:
           </label>
@@ -115,6 +115,9 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               <SelectItem value="unpaid-first">Unpaid First</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
+            Refresh
+          </Button>
         </div>
       )}
 

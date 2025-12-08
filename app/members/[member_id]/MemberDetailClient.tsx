@@ -508,7 +508,7 @@ export default function MemberDetailClient({
                   <Skeleton className="h-3 w-48" />
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1 transition-opacity duration-300">
                   <p className={`text-3xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
                     ${Math.abs(Number(balance ?? 0)).toFixed(2)}
                   </p>
