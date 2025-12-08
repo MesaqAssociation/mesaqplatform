@@ -11,6 +11,8 @@ export default async function ReviewPaymentsPage() {
   }
   
   let user: any
+  let userRole: string = 'member'
+  
   try {
     const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
     const userId = decoded.userId || decoded.sub
@@ -19,14 +21,27 @@ export default async function ReviewPaymentsPage() {
       redirect('/')
     }
     
-    user = { id: userId, role: decoded.role || 'member' }
-  } catch {
+    // Get user role from database
+    const { Pool } = require('pg')
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
+    
+    const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId])
+    if (rows.length > 0) {
+      userRole = (rows[0].role || 'member').toLowerCase()
+    }
+    
+    user = { id: userId, role: userRole }
+  } catch (err) {
+    console.error('Auth error:', err)
     redirect('/')
   }
 
-  // Only admins and board can access this page
-  const userRole = (user.role || '').toLowerCase()
-  if (!['admin', 'board', 'manager'].includes(userRole)) {
+  // Only admins, board, and managers can access this page
+  const allowedRoles = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer']
+  if (!allowedRoles.includes(userRole)) {
     redirect('/dashboard')
   }
 

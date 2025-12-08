@@ -48,7 +48,7 @@ export default function ReviewPaymentsClient() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: paymentId,
+          transactionId: paymentId,
           category: 'Membership Payment',
         }),
       })
@@ -58,7 +58,9 @@ export default function ReviewPaymentsClient() {
         // Remove from list
         setPayments(prev => prev.filter(p => p.id !== paymentId))
       } else {
-        showToast('Failed to reclassify payment', 'error')
+        const data = await res.json()
+        console.error('Reclassify error:', data)
+        showToast(data.error || 'Failed to reclassify payment', 'error')
       }
     } catch (err) {
       console.error('Failed to reclassify:', err)

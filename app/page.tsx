@@ -69,46 +69,32 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-dvh relative overflow-hidden">
-      {/* Gallery Background - Visible Images */}
-      <div className="absolute inset-0 bg-slate-100 dark:bg-slate-900">
-        {/* Large Background Images - Higher opacity, no overlay on top */}
-        <div className="absolute top-0 left-0 w-2/5 h-3/5 opacity-50">
+      {/* Gallery Background - Fully Visible */}
+      <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800">
+        {/* Large Corner Images - Similar sizes, fully visible */}
+        <div className="absolute top-0 left-0 w-1/3 h-1/2">
           <img src="/gallery/mesaq1.webp" alt="" className="w-full h-full object-cover" loading="eager" />
         </div>
-        <div className="absolute top-0 right-0 w-2/5 h-3/5 opacity-50">
+        <div className="absolute top-0 right-0 w-1/3 h-1/2">
           <img src="/gallery/mesaq3.webp" alt="" className="w-full h-full object-cover" loading="eager" />
         </div>
-        <div className="absolute bottom-0 left-0 w-2/5 h-2/5 opacity-50">
+        <div className="absolute bottom-0 left-0 w-1/3 h-1/2">
           <img src="/gallery/mesaq8.webp" alt="" className="w-full h-full object-cover" loading="eager" />
         </div>
-        <div className="absolute bottom-0 right-0 w-2/5 h-2/5 opacity-50">
+        <div className="absolute bottom-0 right-0 w-1/3 h-1/2">
           <img src="/gallery/mesaq10.webp" alt="" className="w-full h-full object-cover" loading="eager" />
         </div>
         
-        {/* Medium Images */}
-        <div className="absolute top-1/4 left-1/3 w-1/4 h-1/3 opacity-40 rounded-lg overflow-hidden">
+        {/* Center Images - Similar medium size */}
+        <div className="absolute top-1/4 left-1/3 w-1/3 h-1/4 rounded-lg overflow-hidden">
           <img src="/gallery/mesaq5.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute top-1/2 right-1/4 w-1/4 h-1/4 opacity-40 rounded-lg overflow-hidden">
-          <img src="/gallery/mesaq7.webp" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="absolute bottom-1/3 left-1/4 w-1/5 h-1/4 opacity-35 rounded-lg overflow-hidden">
+        <div className="absolute bottom-1/4 right-1/3 w-1/3 h-1/4 rounded-lg overflow-hidden">
           <img src="/gallery/mesaq11.webp" alt="" className="w-full h-full object-cover" />
         </div>
         
-        {/* Small Accent Images */}
-        <div className="absolute top-1/5 right-1/3 w-32 h-40 opacity-35 rounded-lg overflow-hidden">
-          <img src="/gallery/mesaq2.webp" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="absolute top-2/3 left-1/2 w-36 h-36 opacity-30 rounded-full overflow-hidden">
-          <img src="/gallery/mesaq12.webp" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="absolute bottom-1/4 right-1/3 w-32 h-32 opacity-30 rounded-lg overflow-hidden">
-          <img src="/gallery/mesaq13.webp" alt="" className="w-full h-full object-cover" />
-        </div>
-        
-        {/* Gradient Overlay - AFTER images so it's on top */}
-        <div className="absolute inset-0 bg-gradient-to-br from-background/75 via-background/70 to-background/80"></div>
+        {/* Gradient Overlay - Light for readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/60 via-background/50 to-background/60"></div>
       </div>
 
       {/* Login Card - Centered with backdrop blur */}
