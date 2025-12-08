@@ -184,6 +184,7 @@ export async function batchMatchTransactions(
   const { rows: members } = await pool.query(
     `SELECT id, name, member_id, phone, banking_name FROM users WHERE member_id IS NOT NULL OR phone IS NOT NULL OR banking_name IS NOT NULL`
   )
+  const allMembers = members
   
   // Create lookup maps
   const memberIdMap = new Map<number, { id: string; name: string }>()

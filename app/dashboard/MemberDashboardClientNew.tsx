@@ -143,11 +143,17 @@ export default function MemberDashboardClient({ initialData }: Props) {
               </>
             ) : (
               <div className="space-y-2">
-                <p className={`text-3xl font-bold ${(balance?.membershipBalance || 0) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                  ${Math.abs(balance?.membershipBalance || 0).toFixed(2)}
-                </p>
+                {(() => {
+                  const currentBalance = Number(balance?.membershipBalance?.currentBalance ?? 0)
+                  const isNegative = currentBalance < 0
+                  return (
+                    <p className={`text-3xl font-bold ${isNegative ? 'text-red-500' : 'text-green-500'}`}>
+                      ${Math.abs(currentBalance).toFixed(2)}
+                    </p>
+                  )
+                })()}
                 <p className="text-sm text-muted-foreground">
-                  {(balance?.membershipBalance || 0) < 0 ? 'Outstanding balance' : 'Credit balance'}
+                  {(Number(balance?.membershipBalance?.currentBalance ?? 0)) < 0 ? 'Outstanding balance' : 'Credit balance'}
                 </p>
               </div>
             )}
@@ -170,9 +176,16 @@ export default function MemberDashboardClient({ initialData }: Props) {
               </>
             ) : (
               <div className="space-y-2">
-                <p className={`text-lg font-semibold ${paymentStatus === 'PAID' ? 'text-green-500' : 'text-red-500'}`}>
-                  {paymentStatus || 'Unknown'}
-                </p>
+                {(() => {
+                  const statusRaw = paymentStatus || balance?.membershipBalance?.status
+                  const status = statusRaw ? String(statusRaw).toUpperCase() : 'UNKNOWN'
+                  const isPaid = ['PAID', 'AHEAD', 'CURRENT'].includes(status)
+                  return (
+                    <p className={`text-lg font-semibold ${isPaid ? 'text-green-500' : 'text-red-500'}`}>
+                      {status}
+                    </p>
+                  )
+                })()}
               </div>
             )}
           </CardContent>
@@ -232,9 +245,9 @@ export default function MemberDashboardClient({ initialData }: Props) {
                       <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
                     </div>
                     {tx.transaction_type === 'credit' ? (
-                      <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
+                      <span className="text-green-500">+${Math.abs(Number(tx.amount) || 0).toFixed(2)}</span>
                     ) : (
-                      <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
+                      <span className="text-red-500">-${Math.abs(Number(tx.amount) || 0).toFixed(2)}</span>
                     )}
                   </div>
                 </div>
