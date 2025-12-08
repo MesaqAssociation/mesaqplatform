@@ -81,7 +81,6 @@ export default function FinanceClient({
   const [loading, setLoading] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(true)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
-  const [uploadStatus, setUploadStatus] = useState<string>('')
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [showTransactionDialog, setShowTransactionDialog] = useState(false)
   
@@ -370,32 +369,19 @@ export default function FinanceClient({
 
     setLoading(true)
     setUploadProgress(0)
-    setUploadStatus('📄 Uploading PDF...')
     
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('accountId', selectedAccountId || '')
 
-      // Simulate upload progress with detailed steps
-      const progressSteps = [
-        { progress: 10, status: '📤 Uploading file...' },
-        { progress: 20, status: '📖 Reading PDF...' },
-        { progress: 30, status: '🔍 Parsing transactions...' },
-        { progress: 50, status: '💾 Saving to database...' },
-        { progress: 70, status: '📱 Step 1: Matching phone numbers...' },
-        { progress: 80, status: '🏦 Step 2: Matching banking names...' },
-        { progress: 90, status: '🤖 Step 3: AI matching (if needed)...' },
-      ]
-
-      let currentStep = 0
+      // Simple progress bar (no status messages)
       const progressInterval = setInterval(() => {
-        if (currentStep < progressSteps.length) {
-          setUploadProgress(progressSteps[currentStep].progress)
-          setUploadStatus(progressSteps[currentStep].status)
-          currentStep++
-        }
-      }, 800)
+        setUploadProgress(prev => {
+          if (prev === null || prev >= 95) return prev
+          return prev + 5
+        })
+      }, 100)
       
       const res = await fetch('/api/finance/upload-statement', {
         method: 'POST',
@@ -404,72 +390,20 @@ export default function FinanceClient({
 
       clearInterval(progressInterval)
       setUploadProgress(100)
-      setUploadStatus('✅ Complete!')
 
       const data = await res.json()
 
       if (res.ok) {
+        showToast(`✅ Uploaded ${data.transactionsImported || 0} transactions successfully!`, 'success')
+        
+        // Clear upload state and hide progress
         setTimeout(() => {
-          let message = `Success! ${data.message}<br><br>Transactions imported: ${data.transactionsImported}/${data.totalFound}`
-          
-          // Show skipped transactions
-          if (data.skippedDetails && data.skippedDetails.length > 0) {
-            message += `<br><br><strong style="color: #f59e0b;">⚠️ Skipped Transactions (${data.skippedDetails.length}):</strong>`
-            data.skippedDetails.slice(0, 5).forEach((s: any) => {
-              message += `<br>• <strong>${s.date}</strong> - ${s.name?.substring(0, 50) || 'No name'}`
-              message += `<br>  <em style="color: #6b7280;">Reason: ${s.reason}</em>`
-            })
-            if (data.skippedDetails.length > 5) {
-              message += `<br>• ... and ${data.skippedDetails.length - 5} more`
-            }
-          }
-          
-          // Show failed transactions
-          if (data.failedDetails && data.failedDetails.length > 0) {
-            message += `<br><br><strong style="color: #ef4444;">❌ Failed Transactions (${data.failedDetails.length}):</strong>`
-            data.failedDetails.slice(0, 5).forEach((f: any) => {
-              message += `<br>• <strong>${f.date}</strong> - ${f.name?.substring(0, 50) || 'Unknown'}`
-              message += `<br>  <em style="color: #6b7280;">Error: ${f.error}</em>`
-            })
-            if (data.failedDetails.length > 5) {
-              message += `<br>• ... and ${data.failedDetails.length - 5} more`
-            }
-          }
-          
-          showToast(message, data.failed > 0 || data.skipped > 0 ? 'error' : 'success')
-          
-          // Log detailed info to console for debugging
-          console.log('=== Bank Statement Upload Results ===')
-          console.log(`Total found: ${data.totalFound}`)
-          console.log(`Imported: ${data.transactionsImported}`)
-          console.log(`Skipped: ${data.skipped}`)
-          console.log(`Failed: ${data.failed}`)
-          
-          if (data.skippedDetails && data.skippedDetails.length > 0) {
-            console.log('\n📋 All Skipped Transactions:')
-            data.skippedDetails.forEach((s: any, i: number) => {
-              console.log(`${i + 1}. Date: ${s.date}`)
-              console.log(`   Name: ${s.name}`)
-              console.log(`   Description: ${s.description || '-'}`)
-              console.log(`   Reason: ${s.reason}`)
-              console.log('')
-            })
-          }
-          
-          if (data.failedDetails && data.failedDetails.length > 0) {
-            console.log('\n❌ All Failed Transactions:')
-            data.failedDetails.forEach((f: any, i: number) => {
-              console.log(`${i + 1}. Date: ${f.date}`)
-              console.log(`   Name: ${f.name}`)
-              console.log(`   Description: ${f.description || '-'}`)
-              console.log(`   Error: ${f.error}`)
-              console.log('')
-            })
-          }
-          
-          // Reload transactions immediately to show new imports
-          loadTransactions()
+          setUploadProgress(null)
+          setLoading(false)
         }, 500)
+
+        // Load transactions immediately
+        loadTransactions()
       } else {
         setUploadProgress(null)
         setUploadStatus('')

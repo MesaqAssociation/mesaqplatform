@@ -125,6 +125,12 @@ export async function POST(req: NextRequest) {
         const failedTransactions: any[] = []
         const skippedTransactions: any[] = []
 
+        // Get monthly fee from settings for classification
+        const { rows: feeRows } = await pool.query(
+          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+        )
+        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+
         for (let idx = 0; idx < parsed.transactions.length; idx++) {
           const txn = parsed.transactions[idx]
           const match = memberMatches[idx]
@@ -173,13 +179,15 @@ export async function POST(req: NextRequest) {
               continue
             }
 
-            // Determine category based on member match
-            const category = match ? match.memberName : 'Misc'
+            // Auto-classify based on monthly fee
+            const paymentAmount = Math.abs(amount)
+            const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
+            const category = isMultiple ? 'Membership Payment' : 'Special Payment'
             
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
-               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference, category, statement_id) 
-               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8, $9, $10)
+               (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, source, reference, category, statement_id, matched_member_id) 
+               VALUES ($1, $2::date, $3, $4, $5, $6, $7, 'telegram_bot', $8, $9, $10, $11)
                ON CONFLICT DO NOTHING
                RETURNING id, transaction_date, transaction_name, description, category`,
               [
@@ -192,18 +200,19 @@ export async function POST(req: NextRequest) {
                 txn.balance || runningBalance,
                 txn.reference,
                 category,
-                statementId
+                statementId,
+                match ? match.memberId : null
               ]
             )
             if (inserted.length > 0) {
               insertedCount.push(inserted[0])
               
-              // Auto-detect membership payment if categorized to a member
-              if (category !== 'Misc' && txnType === 'credit') {
+              // Auto-detect membership payment if it's a membership category
+              if (category === 'Membership Payment' && txnType === 'credit' && match && match.memberId) {
                 await autoDetectMembershipPayment(
                   pool,
                   inserted[0].id,
-                  category,
+                  match.memberName,
                   amount,
                   txn.date
                 )
@@ -235,19 +244,7 @@ export async function POST(req: NextRequest) {
 
         // Audit log removed - logs system no longer in use
 
-        // Get monthly fee from settings
-        const { rows: feeRows } = await pool.query(
-          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
-        )
-        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
-
-        // Find unexplained payments (CREDIT transactions that are NOT exactly the monthly fee)
-        const unexplainedPayments = parsed.transactions.filter(txn => {
-          const amount = Math.abs(txn.credit || 0)
-          return txn.type === 'credit' && amount > 0 && amount !== monthlyFee
-        })
-
-        // Send success message
+        // Send completion message with summary
         let responseMessage = `✅ Bank statement processed successfully!\n\n`
         responseMessage += `📊 Summary:\n\n`
         responseMessage += `• Total transactions found: ${parsed.transactions.length}\n`
@@ -258,26 +255,7 @@ export async function POST(req: NextRequest) {
           responseMessage += `\n🏦 Account: ${parsed.accountNumber}`
         }
 
-        // Add unexplained payments section
-        if (unexplainedPayments.length > 0) {
-          responseMessage += `\n\n⚠️ Unexplained Payments: ${unexplainedPayments.length}\n\n`
-          responseMessage += `These payments are not exactly $${monthlyFee.toFixed(2)}:\n\n`
-          
-          unexplainedPayments.forEach(txn => {
-            const amount = Math.abs(txn.credit || 0)
-            responseMessage += `• $${amount.toFixed(2)} - ${txn.description || txn.name || 'No description'}\n`
-          })
-          
-          responseMessage += `\n💡 These may be:\n`
-          responseMessage += `• Special event payments\n`
-          responseMessage += `• Donations\n`
-          responseMessage += `• Other contributions\n\n`
-          responseMessage += `Please attribute these to members or provide a reason in the finance page.`
-        }
-
         await sendTelegramMessage(chatId, responseMessage)
-
-        await sendTelegramMessage(chatId, `✅ Processed ${insertedCount.length} transactions.`)
       } catch (err: any) {
         console.error('Error processing bank statement:', err)
         await sendTelegramMessage(chatId, '❌ Error processing.')

@@ -2,8 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useI18n } from '@/components/I18nProvider'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
 import Link from 'next/link'
+import { showToast } from '@/lib/toast'
 
 type Transaction = {
   id: number
@@ -69,6 +75,9 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
   const [reviewPayments, setReviewPayments] = useState<ReviewPayment[]>([])
   const [loadingReviewPayments, setLoadingReviewPayments] = useState(true)
+  const [selectedReviewPayment, setSelectedReviewPayment] = useState<ReviewPayment | null>(null)
+  const [showReviewDialog, setShowReviewDialog] = useState(false)
+  const [updatingCategory, setUpdatingCategory] = useState(false)
 
   useEffect(() => {
     // Filter transactions by selected account and limit to 3
@@ -97,6 +106,37 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
     }
     loadReviewPayments()
   }, [])
+
+  const handleUpdateCategory = async (newCategory: string) => {
+    if (!selectedReviewPayment) return
+
+    setUpdatingCategory(true)
+    try {
+      const res = await fetch('/api/finance/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedReviewPayment.id,
+          category: newCategory,
+        }),
+      })
+
+      if (res.ok) {
+        showToast(`✅ Reclassified as ${newCategory}`, 'success')
+        // Remove from review list
+        setReviewPayments(prev => prev.filter(p => p.id !== selectedReviewPayment.id))
+        setShowReviewDialog(false)
+        setSelectedReviewPayment(null)
+      } else {
+        showToast('Failed to update category', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to update category:', err)
+      showToast('Failed to update category', 'error')
+    } finally {
+      setUpdatingCategory(false)
+    }
+  }
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -314,6 +354,29 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
       </div>
 
       {/* Need Review Section - Special Payments */}
+      {loadingReviewPayments && (
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <Skeleton className="h-12 w-12 rounded-lg" />
+            <div className="flex-1">
+              <Skeleton className="h-5 w-48 mb-2" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between py-3 px-4 border border-border rounded-lg">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!loadingReviewPayments && reviewPayments.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -333,9 +396,13 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           
           <div className="grid grid-cols-1 gap-3">
             {reviewPayments.slice(0, 10).map((payment) => (
-              <div 
+              <button 
                 key={payment.id}
-                className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  setSelectedReviewPayment(payment)
+                  setShowReviewDialog(true)
+                }}
+                className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left w-full"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -356,7 +423,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                 <div className="text-sm font-bold ml-4 flex-shrink-0 text-green-500">
                   +${Math.abs(payment.amount).toFixed(2)}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
           
@@ -371,6 +438,62 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           )}
         </div>
       )}
+
+      {/* Review Payment Dialog */}
+      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review Payment</DialogTitle>
+            <DialogDescription>
+              Reclassify this payment if needed
+            </DialogDescription>
+          </DialogHeader>
+          {selectedReviewPayment && (
+            <div className="space-y-4">
+              <div className="p-4 border border-border rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Member</span>
+                  <span className="text-sm font-medium">{selectedReviewPayment.member_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Date</span>
+                  <span className="text-sm font-medium">{formatDate(selectedReviewPayment.transaction_date)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount</span>
+                  <span className="text-sm font-bold text-green-500">+${Math.abs(selectedReviewPayment.amount).toFixed(2)}</span>
+                </div>
+                {selectedReviewPayment.description && (
+                  <div className="pt-2 border-t border-border">
+                    <span className="text-sm text-muted-foreground">Description:</span>
+                    <p className="text-sm mt-1">{selectedReviewPayment.description}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Change Category</label>
+                <Select 
+                  defaultValue="Special Payment"
+                  onValueChange={handleUpdateCategory}
+                  disabled={updatingCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Special Payment">Special Payment</SelectItem>
+                    <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only Membership Payment counts towards membership balance
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Unpaid Balances Card - Full Width */}
       {unpaidBalances.length > 0 && (

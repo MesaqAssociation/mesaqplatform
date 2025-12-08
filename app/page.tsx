@@ -67,9 +67,6 @@ export default function LoginPage() {
     )
   }
 
-  // Gallery images available (17 images, mesaq6 is missing)
-  const galleryImages = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-
   return (
     <main className="min-h-dvh relative overflow-hidden">
       {/* Gallery Background - Creative Mosaic */}
@@ -78,65 +75,65 @@ export default function LoginPage() {
         
         {/* Top Left Cluster */}
         <div className="absolute top-0 left-0 w-1/3 h-1/2 opacity-20">
-          <Image src="/gallery/mesaq1.webp" alt="" fill className="object-cover" />
+          <Image src="/gallery/mesaq1.webp" alt="" fill className="object-cover" priority unoptimized />
         </div>
         <div className="absolute top-1/4 left-1/4 w-1/5 h-1/4 opacity-15">
-          <Image src="/gallery/mesaq2.webp" alt="" fill className="object-cover rounded-lg" />
+          <Image src="/gallery/mesaq2.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
         
         {/* Top Right Cluster */}
         <div className="absolute top-0 right-0 w-1/4 h-1/3 opacity-20">
-          <Image src="/gallery/mesaq3.webp" alt="" fill className="object-cover" />
+          <Image src="/gallery/mesaq3.webp" alt="" fill className="object-cover" unoptimized />
         </div>
         <div className="absolute top-1/3 right-1/5 w-1/6 h-1/5 opacity-15">
-          <Image src="/gallery/mesaq4.webp" alt="" fill className="object-cover rounded-lg" />
+          <Image src="/gallery/mesaq4.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
         
         {/* Middle Clusters */}
         <div className="absolute top-1/2 left-1/6 w-1/5 h-1/4 opacity-10">
-          <Image src="/gallery/mesaq5.webp" alt="" fill className="object-cover rounded-full" />
+          <Image src="/gallery/mesaq5.webp" alt="" fill className="object-cover rounded-full" unoptimized />
         </div>
         <div className="absolute top-2/3 right-1/3 w-1/6 h-1/5 opacity-15">
-          <Image src="/gallery/mesaq7.webp" alt="" fill className="object-cover rounded-lg" />
+          <Image src="/gallery/mesaq7.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
         
         {/* Bottom Left Cluster */}
         <div className="absolute bottom-0 left-0 w-1/3 h-2/5 opacity-20">
-          <Image src="/gallery/mesaq8.webp" alt="" fill className="object-cover" />
+          <Image src="/gallery/mesaq8.webp" alt="" fill className="object-cover" unoptimized />
         </div>
         <div className="absolute bottom-1/4 left-1/5 w-1/6 h-1/5 opacity-10">
-          <Image src="/gallery/mesaq9.webp" alt="" fill className="object-cover rounded-lg" />
+          <Image src="/gallery/mesaq9.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
         
         {/* Bottom Right Cluster */}
         <div className="absolute bottom-0 right-0 w-1/4 h-1/3 opacity-20">
-          <Image src="/gallery/mesaq10.webp" alt="" fill className="object-cover" />
+          <Image src="/gallery/mesaq10.webp" alt="" fill className="object-cover" unoptimized />
         </div>
         <div className="absolute bottom-1/3 right-1/6 w-1/5 h-1/4 opacity-15">
-          <Image src="/gallery/mesaq11.webp" alt="" fill className="object-cover rounded-lg" />
+          <Image src="/gallery/mesaq11.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
         
         {/* Scattered Accents */}
-        <div className="absolute top-1/3 left-2/3 w-1/8 h-1/6 opacity-8">
-          <Image src="/gallery/mesaq12.webp" alt="" fill className="object-cover rounded-full" />
+        <div className="absolute top-1/3 left-2/3 w-24 h-32 opacity-10">
+          <Image src="/gallery/mesaq12.webp" alt="" fill className="object-cover rounded-full" unoptimized />
         </div>
-        <div className="absolute top-2/3 left-1/3 w-1/7 h-1/6 opacity-12">
-          <Image src="/gallery/mesaq13.webp" alt="" fill className="object-cover rounded-lg" />
+        <div className="absolute top-2/3 left-1/3 w-32 h-28 opacity-15">
+          <Image src="/gallery/mesaq13.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
-        <div className="absolute bottom-1/2 right-1/4 w-1/8 h-1/7 opacity-10">
-          <Image src="/gallery/mesaq14.webp" alt="" fill className="object-cover rounded-lg" />
+        <div className="absolute bottom-1/2 right-1/4 w-28 h-24 opacity-10">
+          <Image src="/gallery/mesaq14.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
-        <div className="absolute top-1/5 right-2/5 w-1/9 h-1/8 opacity-8">
-          <Image src="/gallery/mesaq15.webp" alt="" fill className="object-cover rounded-full" />
+        <div className="absolute top-1/5 right-2/5 w-20 h-24 opacity-8">
+          <Image src="/gallery/mesaq15.webp" alt="" fill className="object-cover rounded-full" unoptimized />
         </div>
-        <div className="absolute bottom-2/5 left-2/5 w-1/8 h-1/7 opacity-10">
-          <Image src="/gallery/mesaq16.webp" alt="" fill className="object-cover rounded-lg" />
+        <div className="absolute bottom-2/5 left-2/5 w-28 h-24 opacity-10">
+          <Image src="/gallery/mesaq16.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
-        <div className="absolute top-3/5 right-1/5 w-1/7 h-1/6 opacity-12">
-          <Image src="/gallery/mesaq17.webp" alt="" fill className="object-cover rounded-lg" />
+        <div className="absolute top-3/5 right-1/5 w-32 h-28 opacity-12">
+          <Image src="/gallery/mesaq17.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
-        <div className="absolute bottom-1/5 right-2/5 w-1/9 h-1/8 opacity-8">
-          <Image src="/gallery/mesaq18.webp" alt="" fill className="object-cover rounded-full" />
+        <div className="absolute bottom-1/5 right-2/5 w-20 h-24 opacity-8">
+          <Image src="/gallery/mesaq18.webp" alt="" fill className="object-cover rounded-lg" unoptimized />
         </div>
       </div>
 
