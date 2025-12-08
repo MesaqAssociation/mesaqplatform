@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -81,6 +81,27 @@ export default function MemberDetailClient({
   const [deleting, setDeleting] = useState(false)
   const [openTransactionMonth, setOpenTransactionMonth] = useState<string | null>(null)
   const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
+  const [balance, setBalance] = useState<number | null>(null)
+  const [balanceLoading, setBalanceLoading] = useState(true)
+
+  useEffect(() => {
+    const loadBalance = async () => {
+      try {
+        const res = await fetch(`/api/membership/balance/${member.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          // Use membershipBalance.currentBalance and ignore special/donation
+          const current = Number(data?.membershipBalance?.currentBalance ?? 0)
+          setBalance(current)
+        }
+      } catch (err) {
+        console.error('Failed to load balance', err)
+      } finally {
+        setBalanceLoading(false)
+      }
+    }
+    loadBalance()
+  }, [member.id])
 
   // Group transactions by month
   const transactionsByMonth = transactions.reduce((acc, txn) => {
@@ -176,6 +197,7 @@ export default function MemberDetailClient({
         showToast('Member deleted successfully', 'success')
         setTimeout(() => {
           router.push('/members')
+          router.refresh()
         }, 1500)
       } else {
         const data = await res.json()
@@ -373,7 +395,34 @@ export default function MemberDetailClient({
             </CardContent>
           </Card>
 
-          {/* Balance removed per request; use review-payments page for adjustments */}
+          {/* Balance (membership only; excludes special payments & donations) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconCreditCard className="size-5" />
+                Balance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {balanceLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className={`text-3xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    ${Math.abs(Number(balance ?? 0)).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {Number(balance ?? 0) < 0 ? 'Outstanding balance' : 'Credit balance'}
+                  </p>
+                  {!isAdmin && (
+                    <p className="text-xs text-muted-foreground">
+                      For adjustments, please contact admin/board.
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Member Transactions */}
           <Card>
