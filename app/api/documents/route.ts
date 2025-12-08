@@ -96,19 +96,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Title and file are required' }, { status: 400 })
     }
 
-    if (!isR2Configured()) {
-      return NextResponse.json({ error: 'File storage not configured. Please contact admin.' }, { status: 400 })
-    }
-
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
     let fileUrl: string
-    try {
-      fileUrl = await uploadToR2(buffer, file.name, file.type || 'application/octet-stream')
-    } catch (r2Error) {
-      console.error('R2 upload failed:', r2Error)
-      return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })
+    if (isR2Configured()) {
+      try {
+        fileUrl = await uploadToR2(buffer, file.name, file.type || 'application/octet-stream')
+      } catch (r2Error) {
+        console.error('R2 upload failed:', r2Error)
+        return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })
+      }
+    } else {
+      // Fallback: store as data URL (same approach used for profile pictures fallback)
+      const base64 = buffer.toString('base64')
+      fileUrl = `data:${file.type || 'application/octet-stream'};base64,${base64}`
+      console.warn('R2 not configured; stored document as data URL in file_url')
     }
 
     // Save document record
