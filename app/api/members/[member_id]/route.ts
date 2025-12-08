@@ -21,8 +21,8 @@ export async function DELETE(
   
   let userId: string
   try {
-    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
-    userId = decoded.sub
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
+    userId = decoded.userId || decoded.sub
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -30,15 +30,19 @@ export async function DELETE(
   try {
     // Await params if it's a Promise
     const resolvedParams = params instanceof Promise ? await params : params
-    const memberId = parseInt(resolvedParams.member_id)
+    const memberId = resolvedParams.member_id // UUID string
 
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    // Only admins/board/officers can delete
+    const { rows: roleRows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId])
+    const role = (roleRows[0]?.role || '').toLowerCase()
+    const canDelete = ['admin','board','manager','head','finance officer','logistics officer','public officer'].includes(role)
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     // Get member info before deleting
     const { rows: memberRows } = await pool.query(
-      'SELECT id, name, email, phone FROM users WHERE member_id = $1',
+      'SELECT id, name, email, phone FROM users WHERE id = $1',
       [memberId]
     )
 
@@ -49,7 +53,7 @@ export async function DELETE(
     const member = memberRows[0]
 
     // Delete member (cascade will handle related records)
-    await pool.query('DELETE FROM users WHERE member_id = $1', [memberId])
+    await pool.query('DELETE FROM users WHERE id = $1', [memberId])
 
     // Audit log removed - logs system no longer in use
 
