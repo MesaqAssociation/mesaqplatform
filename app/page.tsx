@@ -68,72 +68,52 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh relative overflow-hidden">
-      {/* Gallery Background - Creative Mosaic */}
-      <div className="absolute inset-0 -z-10 bg-background">
-        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/90 to-background/95 z-10"></div>
+    <main className="min-h-dvh relative overflow-hidden bg-background">
+      {/* Gallery Background - Simplified Grid */}
+      <div className="absolute inset-0 -z-10">
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/85 to-background/90 z-10"></div>
         
-        {/* Top Left Cluster */}
-        <div className="absolute top-0 left-0 w-1/3 h-1/2 opacity-20">
+        {/* Large Background Images */}
+        <div className="absolute top-0 left-0 w-2/5 h-3/5 opacity-30">
           <img src="/gallery/mesaq1.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute top-1/4 left-1/4 w-1/5 h-1/4 opacity-15">
-          <img src="/gallery/mesaq2.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        
-        {/* Top Right Cluster */}
-        <div className="absolute top-0 right-0 w-1/4 h-1/3 opacity-20">
+        <div className="absolute top-0 right-0 w-2/5 h-3/5 opacity-30">
           <img src="/gallery/mesaq3.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute top-1/3 right-1/5 w-1/6 h-1/5 opacity-15">
-          <img src="/gallery/mesaq4.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        
-        {/* Middle Clusters */}
-        <div className="absolute top-1/2 left-1/6 w-1/5 h-1/4 opacity-10">
-          <img src="/gallery/mesaq5.webp" alt="" className="w-full h-full object-cover rounded-full" />
-        </div>
-        <div className="absolute top-2/3 right-1/3 w-1/6 h-1/5 opacity-15">
-          <img src="/gallery/mesaq7.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        
-        {/* Bottom Left Cluster */}
-        <div className="absolute bottom-0 left-0 w-1/3 h-2/5 opacity-20">
+        <div className="absolute bottom-0 left-0 w-2/5 h-2/5 opacity-30">
           <img src="/gallery/mesaq8.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute bottom-1/4 left-1/5 w-1/6 h-1/5 opacity-10">
-          <img src="/gallery/mesaq9.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        
-        {/* Bottom Right Cluster */}
-        <div className="absolute bottom-0 right-0 w-1/4 h-1/3 opacity-20">
+        <div className="absolute bottom-0 right-0 w-2/5 h-2/5 opacity-30">
           <img src="/gallery/mesaq10.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute bottom-1/3 right-1/6 w-1/5 h-1/4 opacity-15">
-          <img src="/gallery/mesaq11.webp" alt="" className="w-full h-full object-cover rounded-lg" />
+        
+        {/* Medium Images */}
+        <div className="absolute top-1/4 left-1/3 w-1/4 h-1/3 opacity-25 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq5.webp" alt="" className="w-full h-full object-cover" />
+        </div>
+        <div className="absolute top-1/2 right-1/4 w-1/4 h-1/4 opacity-25 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq7.webp" alt="" className="w-full h-full object-cover" />
+        </div>
+        <div className="absolute bottom-1/3 left-1/4 w-1/5 h-1/4 opacity-20 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq11.webp" alt="" className="w-full h-full object-cover" />
         </div>
         
-        {/* Scattered Accents */}
-        <div className="absolute top-1/3 left-2/3 w-24 h-32 opacity-10">
-          <img src="/gallery/mesaq12.webp" alt="" className="w-full h-full object-cover rounded-full" />
+        {/* Small Accent Images */}
+        <div className="absolute top-1/5 right-1/3 w-32 h-40 opacity-20 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq2.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute top-2/3 left-1/3 w-32 h-28 opacity-15">
-          <img src="/gallery/mesaq13.webp" alt="" className="w-full h-full object-cover rounded-lg" />
+        <div className="absolute top-2/3 left-1/2 w-36 h-36 opacity-20 rounded-full overflow-hidden">
+          <img src="/gallery/mesaq12.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute bottom-1/2 right-1/4 w-28 h-24 opacity-10">
-          <img src="/gallery/mesaq14.webp" alt="" className="w-full h-full object-cover rounded-lg" />
+        <div className="absolute bottom-1/4 right-1/3 w-32 h-32 opacity-20 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq13.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute top-1/5 right-2/5 w-20 h-24 opacity-8">
-          <img src="/gallery/mesaq15.webp" alt="" className="w-full h-full object-cover rounded-full" />
+        <div className="absolute top-1/3 left-1/6 w-28 h-36 opacity-15 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq15.webp" alt="" className="w-full h-full object-cover" />
         </div>
-        <div className="absolute bottom-2/5 left-2/5 w-28 h-24 opacity-10">
-          <img src="/gallery/mesaq16.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        <div className="absolute top-3/5 right-1/5 w-32 h-28 opacity-12">
-          <img src="/gallery/mesaq17.webp" alt="" className="w-full h-full object-cover rounded-lg" />
-        </div>
-        <div className="absolute bottom-1/5 right-2/5 w-20 h-24 opacity-8">
-          <img src="/gallery/mesaq18.webp" alt="" className="w-full h-full object-cover rounded-lg" />
+        <div className="absolute bottom-1/2 right-1/5 w-32 h-28 opacity-15 rounded-lg overflow-hidden">
+          <img src="/gallery/mesaq17.webp" alt="" className="w-full h-full object-cover" />
         </div>
       </div>
 

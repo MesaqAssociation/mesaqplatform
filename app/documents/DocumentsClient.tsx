@@ -279,7 +279,7 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               />
             </div>
             <div>
-              <Label htmlFor="description">Description (optional) {description.length}/500</Label>
+              <Label htmlFor="description">Description (optional) {description.length}/50</Label>
               <Textarea
                 id="description"
                 value={description}

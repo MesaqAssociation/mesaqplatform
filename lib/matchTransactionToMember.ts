@@ -41,24 +41,34 @@ export async function matchTransactionToMember(
   for (const member of membersWithId) {
     const memberId = String(member.member_id).trim()
     
-    // Normalize member ID: A90 = A090
-    const normalizedMemberId = memberId.match(/^[A-Z](\d+)$/i) 
-      ? memberId.charAt(0).toUpperCase() + memberId.slice(1).padStart(3, '0')
-      : memberId
+    // Create all possible variations of the member ID
+    const variations = new Set<string>([memberId])
     
-    // Also check for the non-padded version (e.g., A90 should match if description has A90 or A090)
-    const shortMemberId = memberId.match(/^[A-Z]0+(\d+)$/i)
-      ? memberId.charAt(0).toUpperCase() + memberId.match(/^[A-Z]0+(\d+)$/i)![1]
-      : memberId
+    // Handle alphanumeric IDs like A90, A040, etc.
+    const alphaMatch = memberId.match(/^([A-Z]+)0*(\d+)$/i)
+    if (alphaMatch) {
+      const letter = alphaMatch[1].toUpperCase()
+      const number = alphaMatch[2]
+      
+      // Add variations: A40, A040, A0040, etc.
+      variations.add(`${letter}${number}`) // e.g., A40
+      variations.add(`${letter}0${number}`) // e.g., A040
+      variations.add(`${letter}00${number}`) // e.g., A0040
+      variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
+      variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
+      variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+    }
     
-    // Use word boundaries to avoid matching member_id 23 in phone number 1234
-    const regex = new RegExp(`\\b(${memberId}|${normalizedMemberId}|${shortMemberId})\\b`, 'i')
-    if (regex.test(description)) {
-      return {
-        memberId: member.id,
-        memberName: member.name,
-        matchType: 'member_id',
-        confidence: 'high'
+    // Check if any variation exists in the description
+    for (const variant of variations) {
+      const regex = new RegExp(`\\b${variant}\\b`, 'i')
+      if (regex.test(description)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'member_id',
+          confidence: 'high'
+        }
       }
     }
   }
@@ -166,23 +176,34 @@ export async function batchMatchTransactions(
     for (const [memberId, member] of memberIdMap.entries()) {
       const memberIdStr = String(memberId).trim()
       
-      // Normalize member ID: A90 = A090
-      const normalizedMemberId = memberIdStr.match(/^[A-Z](\d+)$/i) 
-        ? memberIdStr.charAt(0).toUpperCase() + memberIdStr.slice(1).padStart(3, '0')
-        : memberIdStr
+      // Create all possible variations of the member ID
+      const variations = new Set<string>([memberIdStr])
       
-      // Also check for the non-padded version
-      const shortMemberId = memberIdStr.match(/^[A-Z]0+(\d+)$/i)
-        ? memberIdStr.charAt(0).toUpperCase() + memberIdStr.match(/^[A-Z]0+(\d+)$/i)![1]
-        : memberIdStr
+      // Handle alphanumeric IDs like A90, A040, etc.
+      const alphaMatch = memberIdStr.match(/^([A-Z]+)0*(\d+)$/i)
+      if (alphaMatch) {
+        const letter = alphaMatch[1].toUpperCase()
+        const number = alphaMatch[2]
+        
+        // Add variations: A40, A040, A0040, etc.
+        variations.add(`${letter}${number}`) // e.g., A40
+        variations.add(`${letter}0${number}`) // e.g., A040
+        variations.add(`${letter}00${number}`) // e.g., A0040
+        variations.add(`${letter}${number.padStart(2, '0')}`) // e.g., A40
+        variations.add(`${letter}${number.padStart(3, '0')}`) // e.g., A040
+        variations.add(`${letter}${number.padStart(4, '0')}`) // e.g., A0040
+      }
       
-      const regex = new RegExp(`\\b(${memberIdStr}|${normalizedMemberId}|${shortMemberId})\\b`, 'i')
-      if (regex.test(txn.description)) {
-        return {
-          memberId: member.id,
-          memberName: member.name,
-          matchType: 'member_id' as const,
-          confidence: 'high' as const
+      // Check if any variation exists in the description
+      for (const variant of variations) {
+        const regex = new RegExp(`\\b${variant}\\b`, 'i')
+        if (regex.test(txn.description)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'member_id' as const,
+            confidence: 'high' as const
+          }
         }
       }
     }
