@@ -120,7 +120,6 @@ export default function DocumentsClient({ user }: { user: User | null }) {
       } else {
         const data = await res.json().catch(() => ({}))
         showToast(data.error || 'Failed to upload document', 'error')
-        // Reset upload state on error
         setUploadProgress(0)
         setUploadComplete(false)
         setFile(null)
@@ -128,7 +127,6 @@ export default function DocumentsClient({ user }: { user: User | null }) {
     } catch (err) {
       console.error('Upload error:', err)
       showToast('Failed to upload document', 'error')
-      // Reset upload state on error
       setUploadProgress(0)
       setUploadComplete(false)
       setFile(null)
@@ -366,20 +364,13 @@ export default function DocumentsClient({ user }: { user: User | null }) {
               </Button>
               <Button 
                 onClick={handleUpload} 
-                disabled={!title || !file || uploading || !uploadComplete && uploadProgress > 0}
+                disabled={!title || !file || uploading || (!uploadComplete && uploadProgress > 0)}
               >
                 {uploading ? (
-                  uploadComplete ? (
-                    <>
-                      <IconUpload className="mr-2 size-4" />
-                      Complete!
-                    </>
-                  ) : (
-                    <>
-                      <IconUpload className="mr-2 size-4 animate-pulse" />
-                      Uploading...
-                    </>
-                  )
+                  <>
+                    <IconUpload className="mr-2 size-4 animate-pulse" />
+                    Uploading...
+                  </>
                 ) : (
                   <>
                     <IconUpload className="mr-2 size-4" />
