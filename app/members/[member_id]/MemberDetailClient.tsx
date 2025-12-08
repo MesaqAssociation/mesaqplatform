@@ -23,6 +23,7 @@ import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers
 import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 
 type Member = {
   id: string
@@ -84,6 +85,15 @@ export default function MemberDetailClient({
   const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
+  const [editMode, setEditMode] = useState(false)
+  const [draft, setDraft] = useState({
+    name: member.name || '',
+    email: member.email || '',
+    phone: member.phone || '',
+    address: member.address || '',
+    banking_name: member.banking_name || '',
+    household_members: member.household_members || 1,
+  })
 
   useEffect(() => {
     const loadBalance = async () => {
@@ -105,10 +115,8 @@ export default function MemberDetailClient({
   }, [member.id])
 
   // Group transactions by month
-  // Show only membership/payment transactions (exclude Special/Donation/Uncategorized)
-  const memberTransactions = transactions.filter(txn => (txn.category || '').toLowerCase() === 'membership payment')
-
-  const transactionsByMonth = memberTransactions.reduce((acc, txn) => {
+  // Show all transactions
+  const transactionsByMonth = transactions.reduce((acc, txn) => {
     const date = new Date(txn.transaction_date + 'T00:00:00')
     const monthKey = date.toISOString().slice(0, 7) // YYYY-MM format
     const monthName = date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
@@ -273,6 +281,28 @@ export default function MemberDetailClient({
 
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
 
+  const handleSaveInfo = async () => {
+    if (!isAdmin) return
+    try {
+      const res = await fetch(`/api/members/${member.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update member', 'error')
+        return
+      }
+      showToast('Member updated', 'success')
+      setEditMode(false)
+      router.refresh()
+    } catch (err) {
+      console.error('Update member failed', err)
+      showToast('Failed to update member', 'error')
+    }
+  }
+
   // Safety check
   if (!member) {
     return (
@@ -302,7 +332,15 @@ export default function MemberDetailClient({
                   <AvatarFallback className="text-3xl">{member.name?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h1 className="text-2xl font-semibold mb-1">{member.name}</h1>
+                  {editMode ? (
+                    <Input
+                      value={draft.name}
+                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                      className="text-xl font-semibold"
+                    />
+                  ) : (
+                    <h1 className="text-2xl font-semibold mb-1">{member.name}</h1>
+                  )}
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2 ${
                     member.role === 'Manager' 
                       ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
@@ -334,14 +372,35 @@ export default function MemberDetailClient({
           {/* Contact Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Contact Information</CardTitle>
+                {isAdmin && (
+                  <div className="flex gap-2">
+                    {!editMode && (
+                      <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>Edit</Button>
+                    )}
+                    {editMode && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1 }) }}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleSaveInfo}>Save</Button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <IconMail className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{member.email || '-'}</p>
+                  {editMode ? (
+                    <Input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+                  ) : (
+                    <p className="font-medium">{member.email || '-'}</p>
+                  )}
                 </div>
               </div>
               <Separator />
@@ -349,7 +408,11 @@ export default function MemberDetailClient({
                 <IconPhone className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{member.phone}</p>
+                  {editMode ? (
+                    <Input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+                  ) : (
+                    <p className="font-medium">{member.phone}</p>
+                  )}
                 </div>
               </div>
               <Separator />
@@ -357,7 +420,11 @@ export default function MemberDetailClient({
                 <IconMapPin className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="font-medium">{member.address || '-'}</p>
+                  {editMode ? (
+                    <Textarea value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} rows={2} />
+                  ) : (
+                    <p className="font-medium">{member.address || '-'}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -373,7 +440,16 @@ export default function MemberDetailClient({
                 <IconUsers className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Household Members</p>
-                  <p className="font-medium">{member.household_members || 1}</p>
+                  {editMode ? (
+                    <Input
+                      type="number"
+                      value={draft.household_members}
+                      onChange={(e) => setDraft({ ...draft, household_members: Number(e.target.value) || 1 })}
+                      className="max-w-[120px]"
+                    />
+                  ) : (
+                    <p className="font-medium">{member.household_members || 1}</p>
+                  )}
                 </div>
               </div>
               <Separator />
@@ -389,7 +465,11 @@ export default function MemberDetailClient({
                 <IconCreditCard className="size-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Banking Name</p>
-                  <p className="font-medium">{member.banking_name || '-'}</p>
+                  {editMode ? (
+                    <Input value={draft.banking_name} onChange={(e) => setDraft({ ...draft, banking_name: e.target.value })} />
+                  ) : (
+                    <p className="font-medium">{member.banking_name || '-'}</p>
+                  )}
                 </div>
               </div>
               <Separator />

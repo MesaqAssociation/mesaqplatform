@@ -44,6 +44,7 @@ export default async function MembersPage() {
       u.image, 
       u.role, 
       u.household_members,
+      u.current_balance as current_balance,
       NULL as payment_status,
       NULL as total_paid,
       NULL as monthly_fee
@@ -65,6 +66,7 @@ export default async function MembersPage() {
         NULL as address,
         NULL as role,
         NULL as household_members,
+      NULL as current_balance,
         NULL as payment_status,
         NULL as total_paid,
         NULL as monthly_fee

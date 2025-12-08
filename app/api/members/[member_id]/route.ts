@@ -66,3 +66,70 @@ export async function DELETE(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ member_id: string }> | { member_id: string } }
+) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
+  let userId: string
+  try {
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as any
+    userId = decoded.userId || decoded.sub
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Await params if it's a Promise
+  const resolvedParams = params instanceof Promise ? await params : params
+  const memberId = resolvedParams.member_id // UUID string
+
+  try {
+    // Only admins/board/officers can update
+    const { rows: roleRows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId])
+    const role = (roleRows[0]?.role || '').toLowerCase()
+    const canEdit = ['admin','board','manager','head','finance officer','logistics officer','public officer'].includes(role)
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const { name, email, phone, address, banking_name, household_members } = body
+
+    const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
+
+    const { rows } = await pool.query(`
+      UPDATE users
+      SET 
+        name = COALESCE($1, name),
+        email = $2,
+        phone = $3,
+        address = $4,
+        banking_name = $5,
+        household_members = $6
+      WHERE id = $7
+      RETURNING id, name, email, phone, address, banking_name, household_members
+    `, [
+      name?.trim() || null,
+      email?.trim() || null,
+      phone?.trim() || null,
+      address?.trim() || null,
+      banking_name?.trim() || null,
+      hh,
+      memberId
+    ])
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, member: rows[0] })
+  } catch (err: any) {
+    console.error('Update member error:', err)
+    return NextResponse.json({ error: 'Failed to update member', details: err.message }, { status: 500 })
+  }
+}
+

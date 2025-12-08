@@ -17,6 +17,7 @@ type Member = {
   image: string | null
   role: string | null
   household_members: number | null
+  current_balance?: number | null
   payment_status: string | null
   total_paid: number | null
   monthly_fee: number | null
@@ -38,14 +39,9 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
   }
 
   const getPaymentStatusBadge = (member: Member) => {
-    const { payment_status } = member
-    
-    // Don't show badge for N/A (not joined yet)
+    const { payment_status, current_balance } = member
     if (payment_status === 'N/A') return null
-    
-    // Only show PAID or UNPAID
-    const isPaid = payment_status === 'PAID'
-    
+    const isPaid = payment_status === 'PAID' || (payment_status === null && (current_balance ?? 0) >= 0)
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
         isPaid 
