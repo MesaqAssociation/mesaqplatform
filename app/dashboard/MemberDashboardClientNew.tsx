@@ -17,9 +17,10 @@ type MemberData = {
 
 type Props = {
   initialData: MemberData
+  isAdmin?: boolean
 }
 
-export default function MemberDashboardClient({ initialData }: Props) {
+export default function MemberDashboardClient({ initialData, isAdmin = false }: Props) {
   const { t } = useI18n()
   const [memberData, setMemberData] = useState(initialData)
   const [balance, setBalance] = useState<{ membershipBalance: number; specialPaymentBalance: number } | null>(null)
@@ -29,11 +30,7 @@ export default function MemberDashboardClient({ initialData }: Props) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Fetch initial member data first
-    fetchMemberData().then(() => {
-      // Then load dashboard data
-      loadDashboardData()
-    })
+    loadAll()
   }, [])
 
   const fetchMemberData = async () => {
@@ -54,10 +51,28 @@ export default function MemberDashboardClient({ initialData }: Props) {
     }
   }
 
-  const loadDashboardData = async () => {
+  const loadAll = async () => {
     try {
-      // Fetch balance
-      const balanceRes = await fetch(`/api/membership/balance/${memberData.id}`)
+      // Load profile first for reliable memberId
+      const profile = await fetch('/api/user/profile').then(r => r.ok ? r.json() : null)
+      const memberId = profile?.id || memberData.id
+      if (profile) {
+        setMemberData({
+          id: profile.id,
+          name: profile.name || 'Member',
+          member_id: profile.member_id || null,
+          household_members: profile.household_members || 1,
+          date_joined: profile.date_joined || new Date().toISOString()
+        })
+      }
+
+      const [balanceRes, statusRes, txRes, eventsRes] = await Promise.all([
+        fetch(`/api/membership/balance/${memberId}`),
+        fetch(`/api/membership/status/${memberId}`),
+        fetch(`/api/finance/transactions?memberId=${memberId}&limit=5`),
+        fetch(`/api/events/list?limit=5&upcoming=true`),
+      ])
+
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json()
         console.log('Balance data:', balanceData)
@@ -66,8 +81,6 @@ export default function MemberDashboardClient({ initialData }: Props) {
         console.error('Balance fetch failed:', balanceRes.status)
       }
 
-      // Fetch payment status
-      const statusRes = await fetch(`/api/membership/status/${memberData.id}`)
       if (statusRes.ok) {
         const statusData = await statusRes.json()
         console.log('Status data:', statusData)
@@ -76,8 +89,6 @@ export default function MemberDashboardClient({ initialData }: Props) {
         console.error('Status fetch failed:', statusRes.status)
       }
 
-      // Fetch recent transactions
-      const txRes = await fetch(`/api/finance/transactions?memberId=${memberData.id}&limit=5`)
       if (txRes.ok) {
         const txData = await txRes.json()
         console.log('Transactions data:', txData)
@@ -86,8 +97,6 @@ export default function MemberDashboardClient({ initialData }: Props) {
         console.error('Transactions fetch failed:', txRes.status)
       }
 
-      // Fetch upcoming events
-      const eventsRes = await fetch(`/api/events/list?limit=5&upcoming=true`)
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json()
         console.log('Events data:', eventsData)
@@ -220,9 +229,11 @@ export default function MemberDashboardClient({ initialData }: Props) {
               </div>
               <h2 className="text-lg font-semibold">Recent Payments</h2>
             </div>
-            <Link href={`/members/${memberData.id}`} className="text-sm text-primary hover:underline">
-              View all
-            </Link>
+            {isAdmin && (
+              <Link href={`/members/${memberData.id}`} className="text-sm text-primary hover:underline">
+                View all
+              </Link>
+            )}
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -252,13 +263,15 @@ export default function MemberDashboardClient({ initialData }: Props) {
                   </div>
                 </div>
               ))}
-              <Link 
-                href={`/members/${memberData.id}`}
-                className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                <span>View full history</span>
-                <IconArrowRight className="size-3" />
-              </Link>
+              {isAdmin && (
+                <Link 
+                  href={`/members/${memberData.id}`}
+                  className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <span>View full history</span>
+                  <IconArrowRight className="size-3" />
+                </Link>
+              )}
             </>
           )}
         </CardContent>

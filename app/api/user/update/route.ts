@@ -49,8 +49,7 @@ export async function PATCH(req: NextRequest) {
         email = $2,
         phone = $3,
         address = $4,
-        household_members = $5,
-        updated_at = NOW()
+        household_members = $5
       WHERE id = $6
       RETURNING id, name, email, phone, address, household_members
     `, [

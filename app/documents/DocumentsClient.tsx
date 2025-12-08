@@ -41,7 +41,7 @@ export default function DocumentsClient({ user }: { user: User | null }) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadComplete, setUploadComplete] = useState(false)
 
-  const isAdmin = user && ['admin', 'board', 'Manager'].includes(user.role)
+  const isAdmin = user && ['admin', 'board', 'Manager', 'head', 'Finance Officer', 'Logistics Officer', 'Public Officer'].includes(user.role)
 
   useEffect(() => {
     loadDocuments()

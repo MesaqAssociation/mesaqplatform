@@ -42,6 +42,7 @@ export default async function DashboardPage() {
             household_members: 1,
             date_joined: new Date().toISOString()
           }}
+          isAdmin={false}
         />
       </MainLayout>
     )
