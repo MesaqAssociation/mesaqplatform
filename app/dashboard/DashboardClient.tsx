@@ -429,7 +429,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           
           {reviewPayments.length > 10 && (
             <Link 
-              href="/finance" 
+              href="/review-payments" 
               className="flex items-center justify-center gap-1 py-2 mt-3 text-xs text-muted-foreground hover:text-primary transition-colors"
             >
               <span>See all {reviewPayments.length} payments</span>

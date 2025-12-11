@@ -24,6 +24,7 @@ import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { getInitials } from '@/lib/utils'
 
 type Member = {
   id: string
@@ -329,8 +330,8 @@ export default function MemberDetailClient({
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center gap-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={member.image || '/placeholder-user.jpg'} alt={member.name} />
-                  <AvatarFallback className="text-3xl">{member.name?.[0] || 'U'}</AvatarFallback>
+                  <AvatarImage src={member.image || undefined} alt={member.name} />
+                  <AvatarFallback className="text-3xl">{getInitials(member.name)}</AvatarFallback>
                 </Avatar>
                 <div>
                   {editMode ? (
@@ -357,12 +358,21 @@ export default function MemberDetailClient({
               {/* Balance summary */}
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Membership Balance</p>
-                <p className={`text-2xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  ${Math.abs(Number(balance ?? 0)).toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {Number(balance ?? 0) < 0 ? 'Outstanding' : 'Credit'}
-                </p>
+                {balanceLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-24 ml-auto mb-1" />
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-2xl font-bold ${Number(balance ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                      ${Math.abs(Number(balance ?? 0)).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {Number(balance ?? 0) < 0 ? 'Outstanding' : 'Credit'}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>

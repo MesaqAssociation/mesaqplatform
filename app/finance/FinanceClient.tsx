@@ -376,26 +376,55 @@ export default function FinanceClient({
       formData.append('file', file)
       formData.append('accountId', selectedAccountId || '')
 
-      // Simple progress bar (no status messages)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev === null || prev >= 95) return prev
-          return prev + 5
-        })
-      }, 100)
+      // Use XMLHttpRequest for accurate progress tracking
+      const xhr = new XMLHttpRequest()
       
-      const res = await fetch('/api/finance/upload-statement', {
-        method: 'POST',
-        body: formData,
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 90) // 0-90% for upload
+          setUploadProgress(percentComplete)
+        }
       })
 
-      clearInterval(progressInterval)
+      // Handle completion
+      const uploadPromise = new Promise<any>((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadProgress(95) // 95% for processing
+            try {
+              const data = JSON.parse(xhr.responseText)
+              resolve({ ok: true, data })
+            } catch (err) {
+              reject(new Error('Failed to parse response'))
+            }
+          } else {
+            try {
+              const data = JSON.parse(xhr.responseText)
+              resolve({ ok: false, data })
+            } catch (err) {
+              reject(new Error(xhr.statusText))
+            }
+          }
+        })
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'))
+        })
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload cancelled'))
+        })
+      })
+
+      xhr.open('POST', '/api/finance/upload-statement')
+      xhr.send(formData)
+
+      const result = await uploadPromise
       setUploadProgress(100)
 
-      const data = await res.json()
-
-      if (res.ok) {
-        showToast(`✅ Uploaded ${data.transactionsImported || 0} transactions successfully!`, 'success')
+      if (result.ok) {
+        showToast(`✅ Uploaded ${result.data.transactionsImported || 0} transactions successfully!`, 'success')
         
         // Clear upload state and hide progress
         setTimeout(() => {
@@ -408,7 +437,7 @@ export default function FinanceClient({
       } else {
         setUploadProgress(null)
         setLoading(false)
-        showToast(`Error: ${data.error}`, 'error')
+        showToast(`Error: ${result.data.error}`, 'error')
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)

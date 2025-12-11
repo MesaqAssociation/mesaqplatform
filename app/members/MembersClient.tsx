@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useI18n } from '@/components/I18nProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { getInitials } from '@/lib/utils'
 
 type Member = {
   id: string
@@ -122,8 +123,9 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
         </div>
       )}
 
-    <div className="overflow-auto">
-      <table className="min-w-[800px] w-full text-sm">
+    {/* Desktop: Table view */}
+    <div className="hidden lg:block overflow-auto">
+      <table className="w-full text-sm">
         <thead>
           <tr className="text-left">
             <th className="py-3 px-2">{t("name")}</th>
@@ -148,8 +150,8 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               <td className="py-3 px-2">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={m.image || '/placeholder-user.jpg'} alt={m.name || 'User'} />
-                    <AvatarFallback>{m.name?.[0] || 'U'}</AvatarFallback>
+                    <AvatarImage src={m.image || undefined} alt={m.name || 'User'} />
+                    <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
                   </Avatar>
                   <span className="font-medium">{m.name || '-'}</span>
                 </div>
@@ -179,6 +181,55 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
           ))}
         </tbody>
       </table>
+      </div>
+
+      {/* Mobile: Card view */}
+      <div className="lg:hidden space-y-3">
+        {sortedMembers.map(m => (
+          <div
+            key={m.id}
+            onClick={() => isAdmin && router.push(`/members/${m.id}`)}
+            className={`border rounded-lg p-4 ${isAdmin ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={m.image || undefined} alt={m.name || 'User'} />
+                <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{m.name || '-'}</p>
+                {isAdmin && <p className="text-sm text-muted-foreground truncate">{m.phone}</p>}
+              </div>
+              {isAdmin && getPaymentStatusBadge(m)}
+            </div>
+            {isAdmin && (
+              <div className="space-y-2 text-sm">
+                {m.email && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="truncate ml-2">{m.email}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Household:</span>
+                  <span>{m.household_members || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Role:</span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    m.role === 'Manager' 
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                      : m.role === 'Public Officer' || m.role === 'Finance Officer' || m.role === 'Logistics Officer'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  }`}>
+                    {getRoleTranslation(m.role)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

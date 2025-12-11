@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
     )
     const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
 
+    // Update the transaction category to "Membership Payment"
+    await pool.query(`
+      UPDATE transactions 
+      SET category = 'Membership Payment' 
+      WHERE id = $1
+    `, [transactionId])
+
     // Insert membership payment
     await pool.query(`
       INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)

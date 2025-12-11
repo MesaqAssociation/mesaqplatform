@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/components/I18nProvider'
+import { getInitials } from '@/lib/utils'
 
 export function NavUser({
   user,
@@ -52,7 +53,7 @@ export function NavUser({
         <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-sidebar-accent">
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="rounded-lg">{user.name[0]?.toUpperCase() || 'U'}</AvatarFallback>
+            <AvatarFallback className="rounded-lg">{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start flex-1 ml-2 text-left">
             <span className="text-sm font-medium">{user.name}</span>

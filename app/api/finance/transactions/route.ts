@@ -232,8 +232,8 @@ export async function POST(req: NextRequest) {
       [balanceAfter, accountId]
     )
 
-    // Create membership payment record if matched to member
-    if (matchedMemberId) {
+    // Create membership payment record if matched to member AND category is Membership Payment
+    if (matchedMemberId && category === 'Membership Payment') {
       const txnDate = new Date(transactionDate + 'T00:00:00')
       const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
       const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
@@ -336,12 +336,47 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
       }
 
+      const transaction = updatedTransaction[0]
+
+      // Handle membership payment record based on new category
+      if (category === 'Membership Payment' && transaction.matched_member_id) {
+        // Category changed to Membership Payment - ensure payment record exists
+        const txnDate = new Date(transaction.transaction_date + 'T00:00:00')
+        const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
+        const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
+
+        try {
+          // Delete any existing record first
+          await pool.query(
+            'DELETE FROM membership_payments WHERE transaction_id = $1',
+            [transactionId]
+          )
+          
+          // Create new payment record
+          await pool.query(`
+            INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
+            VALUES ($1, $2, $3, $4, $5, 'paid')
+          `, [transaction.matched_member_id, paymentMonthStr, Math.abs(transaction.amount), transactionId, transaction.transaction_date])
+          
+          console.log(`✅ Created membership payment for category change: ${transaction.matched_member_id} - $${Math.abs(transaction.amount)}`)
+        } catch (paymentErr: any) {
+          console.error('Failed to create membership payment on category change:', paymentErr.message)
+        }
+      } else if (category !== 'Membership Payment') {
+        // Category changed away from Membership Payment - remove payment record
+        await pool.query(
+          'DELETE FROM membership_payments WHERE transaction_id = $1',
+          [transactionId]
+        )
+        console.log(`🗑️ Deleted membership payment for category change to: ${category}`)
+      }
+
       // Get member name if matched
       let matchedMemberName = null
-      if (updatedTransaction[0].matched_member_id) {
+      if (transaction.matched_member_id) {
         const { rows: memberRows } = await pool.query(
           'SELECT name FROM users WHERE id = $1',
-          [updatedTransaction[0].matched_member_id]
+          [transaction.matched_member_id]
         )
         matchedMemberName = memberRows[0]?.name || null
       }
@@ -383,17 +418,17 @@ export async function PATCH(req: NextRequest) {
     const transaction = updatedTransaction[0]
 
     // Handle membership payment record
-    if (memberId) {
-      // Member matched - create/update membership payment
+    // Delete existing payment record for this transaction (in case of re-matching or category change)
+    await pool.query(
+      'DELETE FROM membership_payments WHERE transaction_id = $1',
+      [transactionId]
+    )
+
+    if (memberId && transaction.category === 'Membership Payment') {
+      // Member matched AND category is Membership Payment - create payment record
       const txnDate = new Date(transaction.transaction_date + 'T00:00:00')
       const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
       const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
-
-      // Delete existing payment record for this transaction (in case of re-matching)
-      await pool.query(
-        'DELETE FROM membership_payments WHERE transaction_id = $1',
-        [transactionId]
-      )
 
       // Create new payment record
       try {
@@ -408,12 +443,7 @@ export async function PATCH(req: NextRequest) {
         // Don't fail the transaction match if payment record fails
       }
     } else {
-      // Member unmatched - delete membership payment record
-      await pool.query(
-        'DELETE FROM membership_payments WHERE transaction_id = $1',
-        [transactionId]
-      )
-      console.log(`🗑️ Deleted membership payment for transaction: ${transactionId}`)
+      console.log(`🗑️ Deleted membership payment for transaction: ${transactionId}${memberId ? ' (not a Membership Payment)' : ' (unmatched)'}`)
     }
 
     // Get member name if matched
