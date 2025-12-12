@@ -144,7 +144,7 @@ export function Sidebar({ user }: SidebarProps) {
         <NavUser user={{ 
           name: user?.name || "User", 
           email: user?.email || null, 
-          avatar: user?.image || "/placeholder-user.jpg" 
+          avatar: user?.image || "" 
         }} />
       </div>
     </aside>

@@ -86,6 +86,7 @@ export default function MemberDetailClient({
   const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
+  const [monthsBreakdown, setMonthsBreakdown] = useState<Array<{month: string, monthName: string, expected: number, paid: number, status: string}}>([])
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState({
     name: member.name || '',
@@ -95,6 +96,8 @@ export default function MemberDetailClient({
     banking_name: member.banking_name || '',
     household_members: member.household_members || 1,
   })
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     const loadBalance = async () => {
@@ -105,6 +108,7 @@ export default function MemberDetailClient({
           // Use membershipBalance.currentBalance and ignore special/donation
           const current = Number(data?.membershipBalance?.currentBalance ?? 0)
           setBalance(current)
+          setMonthsBreakdown(data?.membershipBalance?.monthsBreakdown || [])
         }
       } catch (err) {
         console.error('Failed to load balance', err)
@@ -281,6 +285,42 @@ export default function MemberDetailClient({
     }
   }
 
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.trim().length < 6) {
+      showToast('Password must be at least 6 characters', 'error')
+      return
+    }
+
+    if (!confirm('Are you sure you want to change this member\'s password?')) {
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch(`/api/members/${member.id}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: newPassword
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast('Password changed successfully!', 'success')
+        setNewPassword('')
+      } else {
+        showToast(data.error || 'Failed to change password', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to change password', err)
+      showToast('Failed to change password', 'error')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
 
   const handleSaveInfo = async () => {
@@ -377,6 +417,36 @@ export default function MemberDetailClient({
             </div>
           </CardContent>
         </Card>
+
+        {/* Payment History */}
+        {isAdmin && monthsBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {monthsBreakdown.slice().reverse().map((month) => (
+                  <div key={month.month} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{month.monthName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Expected: ${month.expected.toFixed(2)} | Paid: ${month.paid.toFixed(2)}
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      month.status === 'paid' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {month.status === 'paid' ? 'PAID' : 'UNPAID'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -534,6 +604,37 @@ export default function MemberDetailClient({
               )}
             </CardContent>
           </Card>
+
+          {/* Change Password - Admins only */}
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Change Password</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password (min 6 characters)"
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleChangePassword} 
+                    disabled={changingPassword || !newPassword.trim()}
+                    className="w-full"
+                  >
+                    {changingPassword ? 'Changing...' : 'Change Password'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Member Transactions */}
           <Card>

@@ -79,6 +79,8 @@ export default function FinanceClient({
   const [showReasonDialog, setShowReasonDialog] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(true)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
@@ -368,7 +370,7 @@ export default function FinanceClient({
     const file = e.target.files?.[0]
     if (!file) return
 
-    setLoading(true)
+    setUploading(true)
     setUploadProgress(0)
     
     try {
@@ -429,23 +431,23 @@ export default function FinanceClient({
         // Clear upload state and hide progress
         setTimeout(() => {
           setUploadProgress(null)
-          setLoading(false)
+          setUploading(false)
         }, 500)
 
         // Load transactions immediately
         loadTransactions()
       } else {
         setUploadProgress(null)
-        setLoading(false)
+        setUploading(false)
         showToast(`Error: ${result.data.error}`, 'error')
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)
       setUploadProgress(null)
-      setLoading(false)
+      setUploading(false)
       showToast('Failed to upload statement. Please try again.', 'error')
     } finally {
-      setLoading(false)
+      setUploading(false)
       e.target.value = ''
     }
   }
@@ -1025,10 +1027,10 @@ export default function FinanceClient({
             Add Bank Account
           </Button>
           <label htmlFor="statement-upload">
-            <Button asChild disabled={loading}>
+            <Button asChild disabled={uploading}>
               <span>
                 <IconUpload className="mr-2 size-4" />
-                {loading ? 'Uploading...' : 'Upload Bank Statement'}
+                {uploading ? 'Uploading...' : 'Upload Bank Statement'}
               </span>
             </Button>
           </label>
@@ -1045,8 +1047,11 @@ export default function FinanceClient({
       {/* Transactions Table */}
       <Card>
         <CardContent className="pt-6">
-          <h2 className="text-xl font-semibold mb-4">Transactions</h2>
-          <div className="overflow-x-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Transactions</h2>
+            <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
+          </div>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">

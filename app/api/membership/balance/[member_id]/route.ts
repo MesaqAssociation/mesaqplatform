@@ -121,13 +121,28 @@ export async function GET(
 
     const totalSpecialPayments = specialTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
 
+    // Build month-by-month breakdown
+    const monthsBreakdown = months.map(m => {
+      const paidAmount = paymentMap.get(m.month) || 0
+      const expected = monthlyFee
+      const isPaid = paidAmount >= expected
+      return {
+        month: m.month,
+        monthName: m.monthName,
+        expected,
+        paid: paidAmount,
+        status: isPaid ? 'paid' : 'unpaid'
+      }
+    })
+
     return NextResponse.json({
       membershipBalance: {
       currentBalance: runningBalance,
       expectedPayments,
       totalPaid,
       monthlyFee,
-      status
+      status,
+      monthsBreakdown
       },
       specialPaymentBalance: {
         totalSpecialPayments,

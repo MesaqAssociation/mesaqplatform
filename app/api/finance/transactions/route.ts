@@ -143,7 +143,8 @@ export async function POST(req: NextRequest) {
       description, 
       amount, 
       transactionType,
-      matchedMemberId 
+      matchedMemberId,
+      category 
     } = body
 
     // Validation
@@ -173,14 +174,8 @@ export async function POST(req: NextRequest) {
       ? currentBalance + transactionAmount 
       : currentBalance - transactionAmount
 
-    // Get monthly fee to determine category
-    const { rows: feeRows } = await pool.query(
-      "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
-    )
-    const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
-    
-    // Determine category based on amount
-    const category = Math.abs(transactionAmount) === monthlyFee ? 'Membership Payment' : 'Special Payment'
+    // Use category from request, or default to Special Payment if not provided
+    const transactionCategory = category || 'Special Payment'
 
     // Insert transaction
     const { rows: newTransaction } = await pool.query(`
@@ -219,7 +214,7 @@ export async function POST(req: NextRequest) {
       description || '',
       transactionAmount,
       transactionType,
-      category,
+      transactionCategory,
       balanceAfter,
       auth.userId,
       'manual',
@@ -233,7 +228,7 @@ export async function POST(req: NextRequest) {
     )
 
     // Create membership payment record if matched to member AND category is Membership Payment
-    if (matchedMemberId && category === 'Membership Payment') {
+    if (matchedMemberId && transactionCategory === 'Membership Payment') {
       const txnDate = new Date(transactionDate + 'T00:00:00')
       const paymentMonth = new Date(txnDate.getFullYear(), txnDate.getMonth(), 1)
       const paymentMonthStr = paymentMonth.toISOString().split('T')[0]
