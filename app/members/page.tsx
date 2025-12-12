@@ -60,9 +60,12 @@ export default async function MembersPage() {
       ) as monthly_fee
     ) fee
     LEFT JOIN (
-      SELECT user_id, SUM(amount) as total_paid
-      FROM membership_payments
-      GROUP BY user_id
+      SELECT mp.user_id, SUM(mp.amount) as total_paid
+      FROM membership_payments mp
+      LEFT JOIN transactions t ON t.id = mp.transaction_id
+      WHERE mp.transaction_id IS NULL 
+        OR t.category = 'Membership Payment'
+      GROUP BY mp.user_id
     ) mp ON mp.user_id = u.id
     CROSS JOIN LATERAL (
       SELECT COUNT(*)::int AS expected_months

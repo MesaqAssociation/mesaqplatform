@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/whatsapp'
 
 export const runtime = 'nodejs'
 
@@ -104,8 +105,8 @@ export async function POST(req: NextRequest) {
     // Update last organizing group in settings
     if (organizing_group) {
       await pool.query(`
-        INSERT INTO system_settings (key, value, description)
-        VALUES ('last_organizing_group', $1, 'The group that organized the last event')
+        INSERT INTO system_settings (key, value)
+        VALUES ('last_organizing_group', $1)
         ON CONFLICT (key) DO UPDATE
         SET value = EXCLUDED.value
       `, [organizing_group])
@@ -118,25 +119,18 @@ export async function POST(req: NextRequest) {
           WHERE group_name = $1 AND phone IS NOT NULL
         `, [organizing_group])
 
-        if (groupMembers.length > 0 && process.env.WASENDER_API_TOKEN) {
+        if (groupMembers.length > 0) {
           const eventDate = new Date(event_date)
           const formattedDate = eventDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
           const formattedTime = start_time ? formatTime(start_time) : ''
           
           const message = `🎉 *Event Organization Assignment*\n\nYour group (*${organizing_group}*) has been assigned to organize the upcoming event!\n\n📅 *Event:* ${title}\n📆 *Date:* ${formattedDate}\n🕐 *Time:* ${formattedTime}\n📍 *Location:* ${address || 'TBD'}\n\n${description ? `📝 *Details:*\n${description}\n\n` : ''}Please coordinate with your group members to prepare for this event. Thank you for your service to the community! 🙏`
 
-          // Send to each member in the group
+          // Send to each member in the group using the WhatsApp helper (respects test mode)
           for (const member of groupMembers) {
-            await fetch('https://api.wasender.io/messages', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${process.env.WASENDER_API_TOKEN}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                phone: member.phone,
-                message: message,
-              }),
+            await sendWhatsAppMessage({
+              to: formatPhoneNumber(member.phone),
+              body: message
             })
           }
           

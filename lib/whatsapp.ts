@@ -20,7 +20,7 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<boo
     // If test number is configured, send ALL messages there instead
     if (testNumber) {
       console.log(`🧪 TEST MODE: Redirecting message for ${to} to test number`)
-      const testBody = `[TEST - Would send to: ${to}]\n\n${body}`
+      const testBody = `TEST - Would send to: ${to}\n\n${body}`
       return await sendActualMessage(testNumber, testBody)
     }
 

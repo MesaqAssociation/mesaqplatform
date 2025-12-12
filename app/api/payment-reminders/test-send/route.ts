@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     
     const success = await sendWhatsAppMessage({
       to: formatPhoneNumber(testNumber),
-      text: statusMessage
+      body: statusMessage
     })
 
     if (!success) {

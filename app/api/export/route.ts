@@ -111,14 +111,15 @@ export async function GET(req: NextRequest) {
             to_char(event_date, 'YYYY-MM-DD') as event_date,
             start_time,
             end_time,
-            location,
+            address,
             event_type,
+            organizing_group,
             to_char(created_at, 'YYYY-MM-DD') as created_at
           FROM events
           ORDER BY event_date DESC
         `)
         data = events
-        headers = ['id', 'title', 'description', 'event_date', 'start_time', 'end_time', 'location', 'event_type', 'created_at']
+        headers = ['id', 'title', 'description', 'event_date', 'start_time', 'end_time', 'address', 'event_type', 'organizing_group', 'created_at']
         filename = `events_export_${new Date().toISOString().split('T')[0]}`
         break
 
