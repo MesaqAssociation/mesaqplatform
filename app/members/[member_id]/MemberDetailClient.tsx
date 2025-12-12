@@ -62,6 +62,14 @@ type Transaction = {
   source: string | null
 }
 
+type MonthBreakdown = {
+  month: string
+  monthName: string
+  expected: number
+  paid: number
+  status: string
+}
+
 export default function MemberDetailClient({ 
   member, 
   attendedEvents, 
@@ -86,7 +94,7 @@ export default function MemberDetailClient({
   const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
-  const [monthsBreakdown, setMonthsBreakdown] = useState<Array<{month: string, monthName: string, expected: number, paid: number, status: string}}>([])
+  const [monthsBreakdown, setMonthsBreakdown] = useState<MonthBreakdown[]>([])
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState({
     name: member.name || '',

@@ -1052,7 +1052,7 @@ export default function FinanceClient({
             <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-2">Date</th>

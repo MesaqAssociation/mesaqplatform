@@ -8,13 +8,12 @@ import { IconDownload } from '@tabler/icons-react'
 
 export default function ExportData() {
   const [exportType, setExportType] = useState<'members' | 'events' | 'finance'>('members')
-  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv')
   const [exporting, setExporting] = useState(false)
 
   const handleExport = async () => {
     setExporting(true)
     try {
-      const res = await fetch(`/api/export?type=${exportType}&format=${exportFormat}`)
+      const res = await fetch(`/api/export?type=${exportType}&format=csv`)
       
       if (!res.ok) {
         const error = await res.json()
@@ -22,43 +21,16 @@ export default function ExportData() {
         return
       }
 
-      if (exportFormat === 'csv') {
-        // Download CSV directly
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${exportType}_export_${new Date().toISOString().split('T')[0]}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      } else {
-        // For XLSX, we get JSON and convert client-side
-        const jsonData = await res.json()
-        
-        // Use XLSX library if available
-        if (typeof window !== 'undefined' && (window as any).XLSX) {
-          const XLSX = (window as any).XLSX
-          const worksheet = XLSX.utils.json_to_sheet(jsonData.data)
-          const workbook = XLSX.utils.book_new()
-          XLSX.utils.book_append_sheet(workbook, worksheet, exportType)
-          XLSX.writeFile(workbook, jsonData.filename)
-        } else {
-          // Fallback to CSV if XLSX not loaded
-          alert('XLSX library not loaded. Downloading as CSV instead.')
-          const csv = convertToCSV(jsonData.data, jsonData.headers)
-          const blob = new Blob([csv], { type: 'text/csv' })
-          const url = window.URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${exportType}_export_${new Date().toISOString().split('T')[0]}.csv`
-          document.body.appendChild(a)
-          a.click()
-          window.URL.revokeObjectURL(url)
-          document.body.removeChild(a)
-        }
-      }
+      // Download CSV directly
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${exportType}_export_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (error) {
       console.error('Export error:', error)
       alert('Failed to export data')
@@ -103,32 +75,15 @@ export default function ExportData() {
       </div>
 
       <div>
-        <Label htmlFor="export-format">Format</Label>
-        <Select value={exportFormat} onValueChange={(value: any) => setExportFormat(value)}>
-          <SelectTrigger className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="csv">CSV (Comma Separated Values)</SelectItem>
-            <SelectItem value="xlsx">XLSX (Excel Spreadsheet)</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground mt-1">
-          {exportFormat === 'csv' && 'Compatible with Excel, Google Sheets, and most spreadsheet apps'}
-          {exportFormat === 'xlsx' && 'Native Excel format with better formatting support'}
+        <p className="text-sm text-muted-foreground">
+          Data will be exported in CSV format, compatible with Excel, Google Sheets, and most spreadsheet applications.
         </p>
       </div>
 
       <Button onClick={handleExport} disabled={exporting} className="w-full">
         <IconDownload className="mr-2 size-4" />
-        {exporting ? 'Exporting...' : `Export ${exportType.charAt(0).toUpperCase() + exportType.slice(1)}`}
+        {exporting ? 'Exporting...' : `Export ${exportType.charAt(0).toUpperCase() + exportType.slice(1)} as CSV`}
       </Button>
-
-      {exportFormat === 'xlsx' && (
-        <p className="text-xs text-muted-foreground text-center">
-          Note: XLSX export requires the SheetJS library. If unavailable, will fallback to CSV.
-        </p>
-      )}
     </div>
   )
 }
