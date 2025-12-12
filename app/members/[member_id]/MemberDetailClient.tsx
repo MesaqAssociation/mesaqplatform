@@ -35,6 +35,7 @@ type Member = {
   address: string | null
   image: string | null
   role: string
+  group_name: string | null
   banking_name: string | null
   date_joined: string | null
   household_members: number
@@ -101,6 +102,7 @@ export default function MemberDetailClient({
     email: member.email || '',
     phone: member.phone || '',
     address: member.address || '',
+    group_name: member.group_name || '',
     banking_name: member.banking_name || '',
     household_members: member.household_members || 1,
   })
@@ -538,6 +540,22 @@ export default function MemberDetailClient({
                     />
                   ) : (
                     <p className="font-medium">{member.household_members || 1}</p>
+                  )}
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center gap-3">
+                <IconUsers className="size-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Event Organization Group</p>
+                  {editMode ? (
+                    <Input 
+                      value={draft.group_name} 
+                      onChange={(e) => setDraft({ ...draft, group_name: e.target.value })} 
+                      placeholder="e.g., Group A, Group 1"
+                    />
+                  ) : (
+                    <p className="font-medium">{member.group_name || '-'}</p>
                   )}
                 </div>
               </div>

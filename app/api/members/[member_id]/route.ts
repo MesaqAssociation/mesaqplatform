@@ -97,7 +97,7 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { name, email, phone, address, banking_name, household_members } = body
+    const { name, email, phone, address, group_name, banking_name, household_members } = body
 
     const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
 
@@ -108,15 +108,17 @@ export async function PATCH(
         email = $2,
         phone = $3,
         address = $4,
-        banking_name = $5,
-        household_members = $6
-      WHERE id = $7
-      RETURNING id, name, email, phone, address, banking_name, household_members
+        group_name = $5,
+        banking_name = $6,
+        household_members = $7
+      WHERE id = $8
+      RETURNING id, name, email, phone, address, group_name, banking_name, household_members
     `, [
       name?.trim() || null,
       email?.trim() || null,
       phone?.trim() || null,
       address?.trim() || null,
+      group_name?.trim() || null,
       banking_name?.trim() || null,
       hh,
       memberId

@@ -10,6 +10,15 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 })
 
+// Helper function to format time in 12-hour format
+function formatTime(time24: string): string {
+  const [hours, minutes] = time24.split(':')
+  const hour = parseInt(hours)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minutes} ${ampm}`
+}
+
 export async function POST(req: NextRequest) {
   // Verify admin
   const token = cookies().get('auth_token')?.value
@@ -35,7 +44,8 @@ export async function POST(req: NextRequest) {
       end_time, 
       email_attendees, 
       event_type,
-      agenda 
+      agenda,
+      organizing_group 
     } = body
 
     if (!title || !event_date || !start_time || !end_time) {
@@ -56,7 +66,8 @@ export async function POST(req: NextRequest) {
         estimated_cost, 
         email_attendees,
         attendees,
-        agenda
+        agenda,
+        organizing_group
       ) VALUES (
         gen_random_uuid(), 
         $1, 
@@ -69,7 +80,8 @@ export async function POST(req: NextRequest) {
         $8, 
         $9, 
         $10,
-        $11
+        $11,
+        $12
       ) RETURNING id, title, event_type, event_date`,
       [
         title, 
@@ -82,9 +94,59 @@ export async function POST(req: NextRequest) {
         estimated_cost ? parseFloat(estimated_cost) : null, 
         email_attendees || false,
         JSON.stringify(attendees || []),
-        JSON.stringify(agenda || [])
+        JSON.stringify(agenda || []),
+        organizing_group || null
       ]
     )
+
+    const event = result.rows[0]
+    
+    // Update last organizing group in settings
+    if (organizing_group) {
+      await pool.query(`
+        INSERT INTO system_settings (key, value, description)
+        VALUES ('last_organizing_group', $1, 'The group that organized the last event')
+        ON CONFLICT (key) DO UPDATE
+        SET value = EXCLUDED.value
+      `, [organizing_group])
+
+      // Send WhatsApp notifications to group members
+      try {
+        const { rows: groupMembers } = await pool.query(`
+          SELECT id, name, phone 
+          FROM users 
+          WHERE group_name = $1 AND phone IS NOT NULL
+        `, [organizing_group])
+
+        if (groupMembers.length > 0 && process.env.WASENDER_API_TOKEN) {
+          const eventDate = new Date(event_date)
+          const formattedDate = eventDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+          const formattedTime = start_time ? formatTime(start_time) : ''
+          
+          const message = `🎉 *Event Organization Assignment*\n\nYour group (*${organizing_group}*) has been assigned to organize the upcoming event!\n\n📅 *Event:* ${title}\n📆 *Date:* ${formattedDate}\n🕐 *Time:* ${formattedTime}\n📍 *Location:* ${address || 'TBD'}\n\n${description ? `📝 *Details:*\n${description}\n\n` : ''}Please coordinate with your group members to prepare for this event. Thank you for your service to the community! 🙏`
+
+          // Send to each member in the group
+          for (const member of groupMembers) {
+            await fetch('https://api.wasender.io/messages', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.WASENDER_API_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                phone: member.phone,
+                message: message,
+              }),
+            })
+          }
+          
+          console.log(`✅ Sent event organization notifications to ${groupMembers.length} members in ${organizing_group}`)
+        }
+      } catch (whatsappErr) {
+        console.error('Failed to send WhatsApp notifications:', whatsappErr)
+        // Don't fail the event creation if notifications fail
+      }
+    }
     
     return NextResponse.json({ event: result.rows[0] })
   } catch (err: any) {

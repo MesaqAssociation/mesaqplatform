@@ -45,6 +45,7 @@ export default function CreateMemberForm() {
     address: '',
     password: '',
     role: 'Community Member',
+    group_name: '',
     banking_name: '',
     member_id: '',
     date_joined: new Date().toISOString().split('T')[0], // Default to today
@@ -227,6 +228,20 @@ export default function CreateMemberForm() {
             <SelectItem value="Logistics Officer">Logistics Officer</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="group_name">Group (for event organization rotation)</Label>
+        <Input 
+          id="group_name"
+          value={formData.group_name}
+          onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
+          placeholder="e.g., Group A, Group B, Group 1, etc."
+          className="mt-1"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Groups take turns organizing community events
+        </p>
       </div>
 
       <Separator />

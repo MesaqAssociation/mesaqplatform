@@ -45,6 +45,8 @@ export default function CreateEventForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
+  const [availableGroups, setAvailableGroups] = useState<string[]>([])
+  const [lastOrganizingGroup, setLastOrganizingGroup] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -56,12 +58,43 @@ export default function CreateEventForm() {
     start_time: '09:00',
     end_time: '10:00',
     email_attendees: false,
+    organizing_group: '',
   })
 
   // Get days in month
   function getDaysInMonth(year: number, month: number) {
     return new Date(year, month, 0).getDate()
   }
+
+  // Load available groups and last organizing group
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        // Get unique groups from members
+        const res = await fetch('/api/members')
+        if (res.ok) {
+          const data = await res.json()
+          const groups = [...new Set(data.members.map((m: any) => m.group_name).filter(Boolean))] as string[]
+          setAvailableGroups(groups.sort())
+        }
+
+        // Get last organizing group
+        const settingsRes = await fetch('/api/settings/monthly-fee')
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json()
+          // We'll need a new endpoint to get last organizing group
+          const lastGroupRes = await fetch('/api/events/last-organizing-group')
+          if (lastGroupRes.ok) {
+            const lastGroupData = await lastGroupRes.json()
+            setLastOrganizingGroup(lastGroupData.lastGroup)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load groups:', err)
+      }
+    }
+    loadGroups()
+  }, [])
 
   // Setup Google Maps autocomplete
   useEffect(() => {
@@ -208,6 +241,30 @@ export default function CreateEventForm() {
           className="mt-1"
           autoComplete="off"
         />
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="organizing_group">Organizing Group</Label>
+        <Select value={formData.organizing_group} onValueChange={(value) => setFormData({ ...formData, organizing_group: value })}>
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select which group is organizing this event" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableGroups.map(group => (
+              <SelectItem key={group} value={group}>{group}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {lastOrganizingGroup && (
+          <p className="text-xs text-muted-foreground mt-1">
+            💡 Last event was organized by: <strong>{lastOrganizingGroup}</strong>
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground mt-1">
+          Members of this group will receive a WhatsApp notification about organizing this event
+        </p>
       </div>
 
       <Separator />
