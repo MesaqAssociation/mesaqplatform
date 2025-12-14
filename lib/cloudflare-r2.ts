@@ -4,11 +4,11 @@
  * Handles file uploads to Cloudflare R2 (S3-compatible object storage)
  * 
  * Required Environment Variables:
- * - CLOUDFLARE_R2_ACCOUNT_ID: Your Cloudflare account ID
- * - CLOUDFLARE_R2_ACCESS_KEY_ID: R2 access key ID
- * - CLOUDFLARE_R2_SECRET_ACCESS_KEY: R2 secret access key
- * - CLOUDFLARE_R2_BUCKET_NAME: Name of your R2 bucket
- * - CLOUDFLARE_R2_PUBLIC_URL: Public URL for R2 bucket (optional, for custom domain)
+ * - R2_ENDPOINT: Your R2 endpoint URL
+ * - R2_ACCESS_KEY_ID: R2 access key ID  
+ * - R2_SECRET_ACCESS_KEY: R2 secret access key
+ * - R2_BUCKET_NAME: Name of your R2 bucket
+ * - R2_PUBLIC_URL: Public URL for R2 bucket
  */
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
@@ -16,10 +16,10 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 // Check if R2 is configured
 export function isR2Configured(): boolean {
   return !!(
-    process.env.CLOUDFLARE_R2_ACCOUNT_ID &&
-    process.env.CLOUDFLARE_R2_ACCESS_KEY_ID &&
-    process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY &&
-    process.env.CLOUDFLARE_R2_BUCKET_NAME
+    process.env.R2_ENDPOINT &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET_NAME
   )
 }
 
@@ -28,15 +28,13 @@ function getR2Client() {
   if (!isR2Configured()) {
     throw new Error('Cloudflare R2 is not configured. Please set environment variables.')
   }
-
-  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID!
   
   return new S3Client({
     region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint: process.env.R2_ENDPOINT!,
     credentials: {
-      accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
     },
   })
 }
@@ -59,7 +57,7 @@ export async function uploadToR2(
   }
 
   const client = getR2Client()
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME!
+  const bucketName = process.env.R2_BUCKET_NAME!
   
   // Generate a unique key with timestamp to avoid conflicts
   const timestamp = Date.now()
@@ -97,16 +95,13 @@ export async function uploadToR2(
  * Get public URL for an R2 object
  */
 function getPublicUrl(key: string): string {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME!
-  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID!
-  
-  // Use custom domain if configured, otherwise use default R2 URL
-  if (process.env.CLOUDFLARE_R2_PUBLIC_URL) {
-    return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`
+  // Use public URL from env
+  if (process.env.R2_PUBLIC_URL) {
+    return `${process.env.R2_PUBLIC_URL}/${key}`
   }
   
-  // Default R2 public URL format
-  return `https://pub-${accountId}.r2.dev/${key}`
+  // Fallback - this shouldn't happen if R2_PUBLIC_URL is set
+  return key
 }
 
 /**

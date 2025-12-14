@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import MembersClient from './MembersClient'
-import { IconX, IconPlus, IconUsers } from '@tabler/icons-react'
+import { IconX, IconPlus, IconUsers, IconChevronDown, IconEye } from '@tabler/icons-react'
 import { useI18n } from '@/components/I18nProvider'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { showToast as toast } from '@/lib/toast'
 
 type Member = {
@@ -36,6 +37,13 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  
+  // View groups state
+  const [showViewGroupsDialog, setShowViewGroupsDialog] = useState(false)
+  const [groups, setGroups] = useState<Array<{ id: string | null, name: string, member_count: number, members?: Array<{ id: string, name: string }> }>>([])
+  const [loadingGroups, setLoadingGroups] = useState(false)
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null)
+  const [loadingGroupMembers, setLoadingGroupMembers] = useState<string | null>(null)
 
   useEffect(() => {
     const success = searchParams.get('success')
@@ -100,12 +108,80 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
     )
   }
 
+  // Load groups when dialog opens
+  const loadGroups = async () => {
+    setLoadingGroups(true)
+    try {
+      const res = await fetch('/api/groups')
+      if (res.ok) {
+        const data = await res.json()
+        setGroups(data.groups || [])
+      }
+    } catch (err) {
+      console.error('Failed to load groups:', err)
+    } finally {
+      setLoadingGroups(false)
+    }
+  }
+
+  // Load members for a specific group
+  const loadGroupMembers = async (groupName: string, groupId: string | null) => {
+    setLoadingGroupMembers(groupId || groupName)
+    try {
+      // Get members in this group from our initial list or fetch from API
+      const groupMembers = initial.filter(m => {
+        // Check if member's group_name matches (need to get this from members data)
+        return false // Will be populated from API
+      })
+      
+      // Fetch from API for accurate data
+      const res = await fetch(`/api/groups/members?name=${encodeURIComponent(groupName)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setGroups(prev => prev.map(g => 
+          (g.id === groupId || g.name === groupName) 
+            ? { ...g, members: data.members } 
+            : g
+        ))
+      }
+    } catch (err) {
+      console.error('Failed to load group members:', err)
+    } finally {
+      setLoadingGroupMembers(null)
+    }
+  }
+
+  // Handle group accordion toggle
+  const handleGroupToggle = (groupId: string | null, groupName: string) => {
+    const key = groupId || groupName
+    if (openGroupId === key) {
+      setOpenGroupId(null)
+    } else {
+      setOpenGroupId(key)
+      // Load members if not already loaded
+      const group = groups.find(g => (g.id || g.name) === key)
+      if (!group?.members) {
+        loadGroupMembers(groupName, groupId)
+      }
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{t("members")}</h1>
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowViewGroupsDialog(true)
+                loadGroups()
+              }}
+            >
+              <IconEye className="mr-2 size-4" />
+              View Groups
+            </Button>
             <Button variant="outline" onClick={() => setShowGroupDialog(true)}>
               <IconUsers className="mr-2 size-4" />
               Create Group
@@ -199,6 +275,81 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                 {creatingGroup ? 'Creating...' : 'Create Group'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Groups Dialog */}
+      <Dialog open={showViewGroupsDialog} onOpenChange={setShowViewGroupsDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Groups</DialogTitle>
+            <DialogDescription>
+              View all groups and their members. Click on a group to expand and see its members.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2 mt-4">
+            {loadingGroups ? (
+              <div className="space-y-3">
+                <div className="h-12 bg-muted/50 rounded animate-pulse" />
+                <div className="h-12 bg-muted/50 rounded animate-pulse" />
+                <div className="h-12 bg-muted/50 rounded animate-pulse" />
+              </div>
+            ) : groups.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No groups found. Create one to get started.</p>
+            ) : (
+              groups.map((group) => {
+                const key = group.id || group.name
+                const isOpen = openGroupId === key
+                
+                return (
+                  <Collapsible
+                    key={key}
+                    open={isOpen}
+                    onOpenChange={() => handleGroupToggle(group.id, group.name)}
+                  >
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <IconUsers className="size-5 text-muted-foreground" />
+                          <span className="font-medium">{group.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {group.member_count || 0} member{(group.member_count || 0) !== 1 ? 's' : ''}
+                          </span>
+                          <IconChevronDown className={`size-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-8 mt-2 space-y-1 pb-2">
+                        {loadingGroupMembers === key ? (
+                          <div className="space-y-2 p-2">
+                            <div className="h-6 bg-muted/50 rounded animate-pulse w-32" />
+                            <div className="h-6 bg-muted/50 rounded animate-pulse w-40" />
+                            <div className="h-6 bg-muted/50 rounded animate-pulse w-36" />
+                          </div>
+                        ) : group.members && group.members.length > 0 ? (
+                          group.members.map((member) => (
+                            <div 
+                              key={member.id} 
+                              className="px-3 py-2 text-sm rounded hover:bg-muted/50 cursor-pointer"
+                              onClick={() => router.push(`/members/${member.id}`)}
+                            >
+                              {member.name || 'Unknown'}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground px-3 py-2">No members in this group</p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )
+              })
+            )}
           </div>
         </DialogContent>
       </Dialog>

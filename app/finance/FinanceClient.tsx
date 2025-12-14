@@ -737,10 +737,16 @@ export default function FinanceClient({
           t.id === transactionId ? data.transaction : t
         ))
         
+        // Also update selectedTransaction if this is the one being viewed in the dialog
+        if (selectedTransaction && selectedTransaction.id === transactionId) {
+          setSelectedTransaction(data.transaction)
+        }
+        
         // Close popover and clear search
         setOpenPopoverId(null)
         setMemberSearchQuery('')
         setMemberSearchResults([])
+        setDialogMemberSearchQuery('')
       } else {
         const errorMessage = data.details 
           ? `${data.error}: ${data.details}` 
