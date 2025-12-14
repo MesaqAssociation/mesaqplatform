@@ -6,6 +6,7 @@ import { getUserFromToken } from '@/lib/getUserFromToken'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import EventsClient from '../EventsClient'
+import MeetingsClientWrapper from './MeetingsClientWrapper'
 import { Pool } from 'pg'
 
 export default async function MeetingsPage() {
@@ -35,15 +36,17 @@ export default async function MeetingsPage() {
 
   return (
     <MainLayout user={user}>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold">Meetings</h1>
-          <Link href="/events/create?type=meeting">
-            <Button>Create New</Button>
-          </Link>
+      <MeetingsClientWrapper>
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-semibold">Meetings</h1>
+            <Link href="/events/create?type=meeting">
+              <Button>Create New</Button>
+            </Link>
+          </div>
+          <EventsClient initial={rows} />
         </div>
-        <EventsClient initial={rows} />
-      </div>
+      </MeetingsClientWrapper>
     </MainLayout>
   )
 }

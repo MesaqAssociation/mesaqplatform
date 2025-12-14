@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import EventsClient from './EventsClient'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { showToast } from '@/lib/toast'
 
 type Event = {
   id: string
@@ -29,8 +31,19 @@ type Props = {
 export default function EventsClientWrapper({ userRole }: Props) {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams()
 
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes((userRole || '').toLowerCase())
+
+  // Show success toast if redirected with success param
+  useEffect(() => {
+    const success = searchParams.get('success')
+    if (success) {
+      showToast(success, 'success')
+      // Clean up URL
+      window.history.replaceState({}, '', '/events')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     loadEvents()

@@ -9,13 +9,32 @@ export type WhatsAppMessage = {
 }
 
 /**
+ * Validate phone number - returns true if valid format for WhatsApp
+ */
+function isValidPhoneNumber(phone: string): boolean {
+  if (!phone) return false
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '')
+  // Must have at least 9 digits (Australian mobile without country code)
+  // And should not exceed 15 digits (international max)
+  return digits.length >= 9 && digits.length <= 15
+}
+
+/**
  * Send a WhatsApp message
  * In test mode (if WHATSAPP_TEST_NUMBER is set), all messages go to that number
+ * Silently skips invalid phone numbers
  */
 export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<boolean> {
   try {
     const { to, body } = message
     const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
+    // Validate phone number - silently skip if invalid
+    if (!isValidPhoneNumber(to)) {
+      console.log(`⏭️ Skipping invalid phone number: ${to}`)
+      return true // Return true so it doesn't count as a failure
+    }
 
     // If test number is configured, send ALL messages there instead
     if (testNumber) {

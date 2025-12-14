@@ -1279,39 +1279,43 @@ export default function FinanceClient({
                                 onValueChange={setMemberSearchQuery}
                               />
                               <CommandList>
-                                <CommandEmpty>
-                                  {searchingMembers ? 'Searching...' : 'No members found'}
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {memberSearchResults.map((member) => (
-                                    <CommandItem
-                                      key={member.id}
-                                      onSelect={() => {
-                                        handleMatchMember(txn.id, member.id)
-                                        setOpenPopoverId(null)
-                                        setMemberSearchQuery('')
-                                      }}
-                                      className="cursor-pointer"
-                                    >
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{member.name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {member.email} • {member.phone}
-                                        </span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                                {txn.matched_member_id && (
-                                  <CommandGroup>
-                                    <CommandItem
-                                      onSelect={() => handleMatchMember(txn.id, null)}
-                                      className="cursor-pointer text-red-600"
-                                    >
-                                      <IconX className="mr-2 size-4" />
-                                      Remove member match
-                                    </CommandItem>
-                                  </CommandGroup>
+                                {searchingMembers ? (
+                                  <div className="p-2 space-y-2">
+                                    <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                                    <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                                    <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                                  </div>
+                                ) : memberSearchResults.length === 0 && memberSearchQuery ? (
+                                  <CommandEmpty>No members found</CommandEmpty>
+                                ) : (
+                                  <>
+                                    <CommandGroup>
+                                      {memberSearchResults.map((member) => (
+                                        <CommandItem
+                                          key={member.id}
+                                          onSelect={() => {
+                                            handleMatchMember(txn.id, member.id)
+                                            setOpenPopoverId(null)
+                                            setMemberSearchQuery('')
+                                          }}
+                                          className="cursor-pointer"
+                                        >
+                                          <span className="font-medium">{member.name}</span>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                    {txn.matched_member_id && (
+                                      <CommandGroup>
+                                        <CommandItem
+                                          onSelect={() => handleMatchMember(txn.id, null)}
+                                          className="cursor-pointer text-red-600"
+                                        >
+                                          <IconX className="mr-2 size-4" />
+                                          Remove member match
+                                        </CommandItem>
+                                      </CommandGroup>
+                                    )}
+                                  </>
                                 )}
                               </CommandList>
                             </Command>
@@ -1444,40 +1448,44 @@ export default function FinanceClient({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-0" align="start">
-                      <Command>
+                      <Command shouldFilter={false}>
                         <CommandInput 
                           placeholder="Search members..." 
                           value={dialogMemberSearchQuery}
                           onValueChange={setDialogMemberSearchQuery}
                         />
                         <CommandList>
-                          <CommandEmpty>No members found</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              onSelect={() => {
-                                handleMatchMember(selectedTransaction.id, null)
-                                setDialogMemberSearchQuery('')
-                              }}
-                            >
-                              <span className="text-muted-foreground">Remove match</span>
-                            </CommandItem>
-                            {memberSearchResults.map(member => (
+                          {searchingMembers ? (
+                            <div className="p-2 space-y-2">
+                              <div className="h-8 bg-muted/50 rounded animate-pulse" />
+                              <div className="h-8 bg-muted/50 rounded animate-pulse" />
+                              <div className="h-8 bg-muted/50 rounded animate-pulse" />
+                            </div>
+                          ) : memberSearchResults.length === 0 && dialogMemberSearchQuery ? (
+                            <CommandEmpty>No members found</CommandEmpty>
+                          ) : (
+                            <CommandGroup>
                               <CommandItem
-                                key={member.id}
                                 onSelect={() => {
-                                  handleMatchMember(selectedTransaction.id, member.id)
+                                  handleMatchMember(selectedTransaction.id, null)
                                   setDialogMemberSearchQuery('')
                                 }}
                               >
-                                {member.name}
-                                {member.banking_name && (
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    ({member.banking_name})
-                                  </span>
-                                )}
+                                <span className="text-muted-foreground">Remove match</span>
                               </CommandItem>
-                            ))}
-                          </CommandGroup>
+                              {memberSearchResults.map(member => (
+                                <CommandItem
+                                  key={member.id}
+                                  onSelect={() => {
+                                    handleMatchMember(selectedTransaction.id, member.id)
+                                    setDialogMemberSearchQuery('')
+                                  }}
+                                >
+                                  {member.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -1895,30 +1903,32 @@ export default function FinanceClient({
                       onValueChange={setAddTxnMemberQuery}
                     />
                     <CommandList>
-                      <CommandEmpty>
-                        {addTxnSearching ? 'Searching...' : 'No members found'}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {addTxnMemberResults.map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            onSelect={() => {
-                              setNewTransactionMemberId(member.id)
-                              setNewTransactionMemberName(member.name)
-                              setAddTxnMemberQuery('')
-                              setAddTxnMemberResults([])
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <div className="flex flex-col">
+                      {addTxnSearching ? (
+                        <div className="p-2 space-y-2">
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                        </div>
+                      ) : addTxnMemberResults.length === 0 && addTxnMemberQuery ? (
+                        <CommandEmpty>No members found</CommandEmpty>
+                      ) : (
+                        <CommandGroup>
+                          {addTxnMemberResults.map((member) => (
+                            <CommandItem
+                              key={member.id}
+                              onSelect={() => {
+                                setNewTransactionMemberId(member.id)
+                                setNewTransactionMemberName(member.name)
+                                setAddTxnMemberQuery('')
+                                setAddTxnMemberResults([])
+                              }}
+                              className="cursor-pointer"
+                            >
                               <span className="font-medium">{member.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {member.email} • {member.phone}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
                       {newTransactionMemberId && (
                         <CommandGroup>
                           <CommandItem
@@ -2002,30 +2012,32 @@ export default function FinanceClient({
                       onValueChange={setAdvanceMemberQuery}
                     />
                     <CommandList>
-                      <CommandEmpty>
-                        {advanceSearching ? 'Searching...' : 'No members found'}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {advanceMemberResults.map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            onSelect={() => {
-                              setAdvanceMemberId(member.id)
-                              setAdvanceMemberName(member.name)
-                              setAdvanceMemberQuery('')
-                              setAdvanceMemberResults([])
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <div className="flex flex-col">
+                      {advanceSearching ? (
+                        <div className="p-2 space-y-2">
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                          <div className="h-10 bg-muted/50 rounded animate-pulse" />
+                        </div>
+                      ) : advanceMemberResults.length === 0 && advanceMemberQuery ? (
+                        <CommandEmpty>No members found</CommandEmpty>
+                      ) : (
+                        <CommandGroup>
+                          {advanceMemberResults.map((member) => (
+                            <CommandItem
+                              key={member.id}
+                              onSelect={() => {
+                                setAdvanceMemberId(member.id)
+                                setAdvanceMemberName(member.name)
+                                setAdvanceMemberQuery('')
+                                setAdvanceMemberResults([])
+                              }}
+                              className="cursor-pointer"
+                            >
                               <span className="font-medium">{member.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {member.email} • {member.phone}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>

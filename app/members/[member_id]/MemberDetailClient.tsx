@@ -350,8 +350,11 @@ export default function MemberDetailClient({
 
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
 
+  const [savingInfo, setSavingInfo] = useState(false)
+
   const handleSaveInfo = async () => {
-    if (!isAdmin) return
+    if (!isAdmin || savingInfo) return
+    setSavingInfo(true)
     try {
       const res = await fetch(`/api/members/${member.id}`, {
         method: 'PATCH',
@@ -363,12 +366,14 @@ export default function MemberDetailClient({
         showToast(data.error || 'Failed to update member', 'error')
         return
       }
-      showToast('Member updated', 'success')
+      showToast('Member info updated successfully!', 'success')
       setEditMode(false)
       router.refresh()
     } catch (err) {
       console.error('Update member failed', err)
       showToast('Failed to update member', 'error')
+    } finally {
+      setSavingInfo(false)
     }
   }
 
@@ -462,7 +467,9 @@ export default function MemberDetailClient({
                         <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1 }) }}>
                           Cancel
                         </Button>
-                        <Button size="sm" onClick={handleSaveInfo}>Save</Button>
+                        <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
+                          {savingInfo ? 'Saving...' : 'Save'}
+                        </Button>
                       </>
                     )}
                   </div>
