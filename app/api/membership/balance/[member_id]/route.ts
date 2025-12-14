@@ -48,8 +48,8 @@ export async function GET(
 
     const member = memberRows[0]
     
-    // Use date_joined or created_at as the start
-    const startDate = member.date_joined ? new Date(member.date_joined) : (member.created_at ? new Date(member.created_at) : new Date())
+    // ONLY use date_joined (mandatory field) - ignore created_at
+    const startDate = member.date_joined ? new Date(member.date_joined) : new Date('2025-05-01')
     const currentDate = new Date()
     
     // Generate list of months from start to current month

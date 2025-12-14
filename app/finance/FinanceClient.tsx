@@ -39,6 +39,7 @@ type Transaction = {
   matched_member_name?: string | null
   statement_id?: string | null
   statement_file_name?: string | null
+  statement_file_url?: string | null
   statement_date_from?: string | null
   statement_date_to?: string | null
 }
@@ -167,6 +168,13 @@ export default function FinanceClient({
   const [searchType, setSearchType] = useState<'description' | 'amount' | 'name'>('description')
   const [searchResults, setSearchResults] = useState<Transaction[]>([])
   const [searching, setSearching] = useState(false)
+  
+  // Dialog edit states
+  const [dialogCategory, setDialogCategory] = useState<string>('')
+  const [dialogMemberId, setDialogMemberId] = useState<string | null>(null)
+  const [dialogMemberSearchQuery, setDialogMemberSearchQuery] = useState('')
+  const [dialogMemberResults, setDialogMemberResults] = useState<Member[]>([])
+  const [savingDialog, setSavingDialog] = useState(false)
   
   // Update balance when account changes
   useEffect(() => {
@@ -1019,6 +1027,79 @@ export default function FinanceClient({
         </Button>
       </div>
 
+      {/* Search Bar - Under Month Selector */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select value={searchType} onValueChange={(v: any) => setSearchType(v)}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="description">Description</SelectItem>
+              <SelectItem value="name">Transaction Name</SelectItem>
+              <SelectItem value="amount">Amount</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative flex-1">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search all transactions by ${searchType}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+            {searching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              </div>
+            )}
+          </div>
+          {searchQuery && (
+            <Button variant="ghost" size="icon" onClick={() => {
+              setSearchQuery('')
+              setSearchResults([])
+            }}>
+              <IconX className="size-4" />
+            </Button>
+          )}
+        </div>
+        
+        {/* Search Results */}
+        {searchQuery && searchResults.length > 0 && (
+          <Card>
+            <CardContent className="p-0">
+              <div className="max-h-64 overflow-y-auto divide-y">
+                {searchResults.map((txn) => (
+                  <button
+                    key={txn.id}
+                    className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setSelectedTransaction(txn)
+                      setShowTransactionDialog(true)
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{txn.transaction_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(txn.transaction_date).toLocaleDateString('en-AU')}</p>
+                      </div>
+                      <span className={`ml-3 font-medium ${txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                        {txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {searchQuery && searchResults.length === 0 && !searching && (
+          <p className="text-sm text-muted-foreground text-center py-2">No transactions found</p>
+        )}
+      </div>
+
       {/* Upload Bank Statement */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
@@ -1087,87 +1168,9 @@ export default function FinanceClient({
       {/* Transactions Table */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 mb-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Transactions</h2>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSearchBar(!showSearchBar)}
-                >
-                  <IconSearch className="size-4" />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Search Bar */}
-            {showSearchBar && (
-              <div className="flex flex-col sm:flex-row gap-2 p-3 bg-muted/50 rounded-lg">
-                <Select value={searchType} onValueChange={(v: any) => setSearchType(v)}>
-                  <SelectTrigger className="w-full sm:w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="description">Description</SelectItem>
-                    <SelectItem value="name">Transaction Name</SelectItem>
-                    <SelectItem value="amount">Amount</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="relative flex-1">
-                  <Input
-                    placeholder={`Search by ${searchType}...`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-8"
-                  />
-                  {searching && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    </div>
-                  )}
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setShowSearchBar(false)
-                  setSearchQuery('')
-                  setSearchResults([])
-                }}>
-                  <IconX className="size-4" />
-                </Button>
-              </div>
-            )}
-            
-            {/* Search Results */}
-            {showSearchBar && searchQuery && searchResults.length > 0 && (
-              <div className="border rounded-lg max-h-64 overflow-y-auto">
-                {searchResults.map((txn) => (
-                  <button
-                    key={txn.id}
-                    className="w-full text-left px-4 py-3 hover:bg-muted/50 border-b last:border-b-0 transition-colors"
-                    onClick={() => {
-                      setSelectedTransaction(txn)
-                      setShowTransactionDialog(true)
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{txn.transaction_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(txn.transaction_date).toLocaleDateString('en-AU')}</p>
-                      </div>
-                      <span className={`ml-3 font-medium ${txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                        {txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {showSearchBar && searchQuery && searchResults.length === 0 && !searching && (
-              <p className="text-sm text-muted-foreground text-center py-4">No transactions found</p>
-            )}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Transactions</h2>
+            <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm min-w-[800px]">
@@ -1404,13 +1407,73 @@ export default function FinanceClient({
 
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  selectedTransaction.category === 'Misc' 
-                    ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' 
-                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                }`}>
-                  {selectedTransaction.category}
-                </span>
+                <Select 
+                  value={dialogCategory || selectedTransaction.category} 
+                  onValueChange={(v) => setDialogCategory(v)}
+                >
+                  <SelectTrigger className="w-48 mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                    <SelectItem value="Special Payment">Special Payment</SelectItem>
+                    <SelectItem value="Donation">Donation</SelectItem>
+                    <SelectItem value="Expense">Expense</SelectItem>
+                    <SelectItem value="Misc">Misc</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground text-xs">Matched Member</Label>
+                <div className="mt-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        {selectedTransaction.matched_member_name || 'No member matched'}
+                        <IconChevronDown className="size-4 ml-2" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Search members..." 
+                          value={dialogMemberSearchQuery}
+                          onValueChange={setDialogMemberSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No members found</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                handleMatchMember(selectedTransaction.id, null)
+                                setDialogMemberSearchQuery('')
+                              }}
+                            >
+                              <span className="text-muted-foreground">Remove match</span>
+                            </CommandItem>
+                            {memberSearchResults.map(member => (
+                              <CommandItem
+                                key={member.id}
+                                onSelect={() => {
+                                  handleMatchMember(selectedTransaction.id, member.id)
+                                  setDialogMemberSearchQuery('')
+                                }}
+                              >
+                                {member.name}
+                                {member.banking_name && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    ({member.banking_name})
+                                  </span>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1487,13 +1550,34 @@ export default function FinanceClient({
                   <div className="flex items-center gap-2 mt-1">
                     <IconFileText className="size-4 text-blue-500" />
                     <div className="flex-1">
-                      <p className="font-medium text-sm">{selectedTransaction.statement_file_name}</p>
+                      {selectedTransaction.statement_file_url ? (
+                        <a 
+                          href={selectedTransaction.statement_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-sm text-blue-600 hover:text-blue-800 underline hover:no-underline"
+                        >
+                          {selectedTransaction.statement_file_name}
+                        </a>
+                      ) : (
+                        <p className="font-medium text-sm">{selectedTransaction.statement_file_name}</p>
+                      )}
                       {selectedTransaction.statement_date_from && selectedTransaction.statement_date_to && (
                         <p className="text-xs text-muted-foreground">
                           {formatDate(selectedTransaction.statement_date_from)} - {formatDate(selectedTransaction.statement_date_to)}
                         </p>
                       )}
                     </div>
+                    {selectedTransaction.statement_file_url && (
+                      <a 
+                        href={selectedTransaction.statement_file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <IconDownload className="size-4" />
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
@@ -1505,14 +1589,50 @@ export default function FinanceClient({
                   disabled={loading}
                 >
                   <IconTrash className="mr-2 size-4" />
-                  Delete Transaction
+                  Delete
                 </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowTransactionDialog(false)}
-                >
-                  Close
-                </Button>
+                <div className="flex gap-2">
+                  {dialogCategory && dialogCategory !== selectedTransaction.category && (
+                    <Button 
+                      onClick={async () => {
+                        setSavingDialog(true)
+                        try {
+                          const res = await fetch('/api/finance/transactions', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              transactionId: selectedTransaction.id,
+                              category: dialogCategory
+                            })
+                          })
+                          if (res.ok) {
+                            showToast('Category updated!', 'success')
+                            loadTransactions()
+                            setShowTransactionDialog(false)
+                          } else {
+                            showToast('Failed to update category', 'error')
+                          }
+                        } catch (err) {
+                          showToast('Failed to update category', 'error')
+                        } finally {
+                          setSavingDialog(false)
+                        }
+                      }}
+                      disabled={savingDialog}
+                    >
+                      {savingDialog ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setShowTransactionDialog(false)
+                      setDialogCategory('')
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
           )}

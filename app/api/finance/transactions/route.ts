@@ -99,10 +99,11 @@ export async function GET(req: NextRequest) {
         u.name as creator_name,
         m.name as matched_member_name,
         bs.file_name as statement_file_name,
+        bs.file_url as statement_file_url,
         to_char(bs.statement_date_from, 'YYYY-MM-DD') as statement_date_from,
         to_char(bs.statement_date_to, 'YYYY-MM-DD') as statement_date_to
-      FROM transactions t 
-      LEFT JOIN users u ON t.created_by = u.id 
+      FROM transactions t
+      LEFT JOIN users u ON t.created_by = u.id
       LEFT JOIN users m ON t.matched_member_id = m.id
       LEFT JOIN bank_statements bs ON t.statement_id = bs.id
       WHERE t.account_id = $1 

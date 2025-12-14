@@ -73,7 +73,8 @@ export async function GET(req: NextRequest) {
         t.matched_member_id,
         u.name as matched_member_name,
         t.statement_id,
-        bs.file_name as statement_file_name
+        bs.file_name as statement_file_name,
+        bs.file_url as statement_file_url
       FROM transactions t
       LEFT JOIN users u ON u.id = t.matched_member_id
       LEFT JOIN bank_statements bs ON bs.id = t.statement_id

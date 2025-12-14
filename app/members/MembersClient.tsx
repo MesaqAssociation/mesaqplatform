@@ -18,6 +18,7 @@ type Member = {
   address: string | null
   image: string | null
   role: string | null
+  group_name: string | null
   household_members: number | null
   balance?: number | null
   current_balance?: number | null
@@ -131,7 +132,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             <th className="py-3 px-2">{t("name")}</th>
               {isAdmin && (
                 <>
-            <th className="py-3 px-2">{t("email")}</th>
+            <th className="py-3 px-2">Group</th>
             <th className="py-3 px-2">{t("phone")}</th>
             <th className="py-3 px-2">{t("householdMembers")}</th>
             <th className="py-3 px-2">{t("role")}</th>
@@ -158,7 +159,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               </td>
               {isAdmin && (
                 <>
-              <td className="py-3 px-2 text-muted-foreground">{m.email || '-'}</td>
+              <td className="py-3 px-2 text-muted-foreground">{m.group_name || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
               <td className="py-3 px-2">

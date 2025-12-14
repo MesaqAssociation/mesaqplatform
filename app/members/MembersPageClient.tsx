@@ -33,9 +33,9 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   // Group creation state
   const [showGroupDialog, setShowGroupDialog] = useState(false)
   const [groupName, setGroupName] = useState('')
-  const [groupDescription, setGroupDescription] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [creatingGroup, setCreatingGroup] = useState(false)
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
 
   useEffect(() => {
     const success = searchParams.get('success')
@@ -68,7 +68,6 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: groupName.trim(),
-          description: groupDescription.trim() || null,
           memberIds: selectedMembers.length > 0 ? selectedMembers : undefined
         })
       })
@@ -79,8 +78,8 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
         toast('Group created successfully!', 'success')
         setShowGroupDialog(false)
         setGroupName('')
-        setGroupDescription('')
         setSelectedMembers([])
+        setMemberSearchQuery('')
         router.refresh()
       } else {
         toast(data.error || 'Failed to create group', 'error')
@@ -145,33 +144,50 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
             </div>
             
             <div>
-              <Label htmlFor="group-description">Description (optional)</Label>
+              <Label>Add Members (optional)</Label>
               <Input
-                id="group-description"
-                value={groupDescription}
-                onChange={(e) => setGroupDescription(e.target.value)}
-                placeholder="Optional description"
+                placeholder="Search members..."
+                value={memberSearchQuery}
+                onChange={(e) => setMemberSearchQuery(e.target.value)}
                 className="mt-1"
               />
-            </div>
-            
-            <div>
-              <Label>Add Members (optional)</Label>
-              <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
-                {initial.map((member) => (
-                  <label key={member.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
-                    <Checkbox
-                      checked={selectedMembers.includes(member.id)}
-                      onCheckedChange={() => toggleMember(member.id)}
-                    />
-                    <span className="text-sm">{member.name || 'Unknown'}</span>
-                  </label>
-                ))}
+              <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                {initial
+                  .filter(m => 
+                    !memberSearchQuery || 
+                    m.name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                    m.phone?.toLowerCase().includes(memberSearchQuery.toLowerCase())
+                  )
+                  .map((member) => (
+                    <label key={member.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                      <Checkbox
+                        checked={selectedMembers.includes(member.id)}
+                        onCheckedChange={() => toggleMember(member.id)}
+                      />
+                      <span className="text-sm">{member.name || 'Unknown'}</span>
+                    </label>
+                  ))}
               </div>
               {selectedMembers.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {selectedMembers.length} member(s) selected
-                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {selectedMembers.map(id => {
+                    const member = initial.find(m => m.id === id)
+                    return (
+                      <span 
+                        key={id} 
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
+                      >
+                        {member?.name || 'Unknown'}
+                        <button 
+                          onClick={() => toggleMember(id)} 
+                          className="hover:text-destructive"
+                        >
+                          <IconX className="size-3" />
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
               )}
             </div>
             

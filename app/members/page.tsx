@@ -43,6 +43,7 @@ export default async function MembersPage() {
       u.address, 
       u.image, 
       u.role, 
+      u.group_name,
       u.household_members,
       -- Compute balance based on membership payments vs expected months
       COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
@@ -70,7 +71,7 @@ export default async function MembersPage() {
     CROSS JOIN LATERAL (
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(
-        date_trunc('month', COALESCE(u.date_joined, u.created_at, CURRENT_DATE)),
+        date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
         date_trunc('month', CURRENT_DATE),
         interval '1 month'
       ) gs

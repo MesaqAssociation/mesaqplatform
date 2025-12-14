@@ -445,36 +445,6 @@ export default function MemberDetailClient({
           </CardContent>
         </Card>
 
-        {/* Expected Payments */}
-        {isAdmin && monthsBreakdown.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Expected Payments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {monthsBreakdown.slice().reverse().map((month) => (
-                  <div key={month.month} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{month.monthName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Expected: ${month.expected.toFixed(2)} | Paid: ${month.paid.toFixed(2)}
-                      </p>
-                    </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      month.status === 'paid' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                    }`}>
-                      {month.status === 'paid' ? 'PAID' : 'UNPAID'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Contact Information */}
@@ -765,6 +735,36 @@ export default function MemberDetailClient({
               )}
             </CardContent>
           </Card>
+
+          {/* Expected Payments - Next to Transactions for easy viewing */}
+          {isAdmin && monthsBreakdown.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Expected Payments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {monthsBreakdown.slice().reverse().map((month) => (
+                    <div key={month.month} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">{month.monthName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Expected: ${month.expected.toFixed(2)} | Paid: ${month.paid.toFixed(2)}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        month.status === 'paid' 
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
+                        {month.status === 'paid' ? 'PAID' : 'UNPAID'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Events Attended */}
           <Card>
