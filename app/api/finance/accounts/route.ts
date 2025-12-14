@@ -134,17 +134,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
 
-    // Check if there are transactions for this account
-    const { rows: txnCheck } = await pool.query(
-      'SELECT COUNT(*) as count FROM transactions WHERE account_id = $1',
-      [accountId]
-    )
+    // First delete all related membership_payments that reference transactions from this account
+    await pool.query(`
+      DELETE FROM membership_payments 
+      WHERE transaction_id IN (SELECT id FROM transactions WHERE account_id = $1)
+    `, [accountId])
 
-    if (parseInt(txnCheck[0].count) > 0) {
-      return NextResponse.json({ 
-        error: 'Cannot delete account with existing transactions. Delete transactions first.' 
-      }, { status: 400 })
-    }
+    // Delete all bank statements for this account
+    await pool.query('DELETE FROM bank_statements WHERE account_id = $1', [accountId])
+
+    // Delete all transactions for this account
+    await pool.query('DELETE FROM transactions WHERE account_id = $1', [accountId])
 
     // Delete account
     await pool.query('DELETE FROM financial_accounts WHERE id = $1', [accountId])

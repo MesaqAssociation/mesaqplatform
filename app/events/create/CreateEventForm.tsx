@@ -70,24 +70,19 @@ export default function CreateEventForm() {
   useEffect(() => {
     const loadGroups = async () => {
       try {
-        // Get unique groups from members
-        const res = await fetch('/api/members')
+        // Get groups from API
+        const res = await fetch('/api/groups')
         if (res.ok) {
           const data = await res.json()
-          const groups = [...new Set(data.members.map((m: any) => m.group_name).filter(Boolean))] as string[]
-          setAvailableGroups(groups.sort())
+          const groupNames = (data.groups || []).map((g: any) => g.name)
+          setAvailableGroups(groupNames.sort())
         }
 
         // Get last organizing group
-        const settingsRes = await fetch('/api/settings/monthly-fee')
-        if (settingsRes.ok) {
-          const settingsData = await settingsRes.json()
-          // We'll need a new endpoint to get last organizing group
-          const lastGroupRes = await fetch('/api/events/last-organizing-group')
-          if (lastGroupRes.ok) {
-            const lastGroupData = await lastGroupRes.json()
-            setLastOrganizingGroup(lastGroupData.lastGroup)
-          }
+        const lastGroupRes = await fetch('/api/events/last-organizing-group')
+        if (lastGroupRes.ok) {
+          const lastGroupData = await lastGroupRes.json()
+          setLastOrganizingGroup(lastGroupData.lastGroup)
         }
       } catch (err) {
         console.error('Failed to load groups:', err)

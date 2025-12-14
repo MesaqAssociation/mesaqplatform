@@ -108,6 +108,23 @@ export default function MemberDetailClient({
   })
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
+  const [groups, setGroups] = useState<Array<{id: string | null, name: string}>>([])
+
+  // Load groups
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const res = await fetch('/api/groups')
+        if (res.ok) {
+          const data = await res.json()
+          setGroups(data.groups || [])
+        }
+      } catch (err) {
+        console.error('Failed to load groups:', err)
+      }
+    }
+    loadGroups()
+  }, [])
 
   useEffect(() => {
     const loadBalance = async () => {
@@ -428,11 +445,11 @@ export default function MemberDetailClient({
           </CardContent>
         </Card>
 
-        {/* Payment History */}
+        {/* Expected Payments */}
         {isAdmin && monthsBreakdown.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Payment History</CardTitle>
+              <CardTitle>Expected Payments</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="max-h-64 overflow-y-auto space-y-2">
@@ -546,14 +563,20 @@ export default function MemberDetailClient({
               <Separator />
               <div className="flex items-center gap-3">
                 <IconUsers className="size-5 text-muted-foreground" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Event Organization Group</p>
                   {editMode ? (
-                    <Input 
-                      value={draft.group_name} 
-                      onChange={(e) => setDraft({ ...draft, group_name: e.target.value })} 
-                      placeholder="e.g., Group A, Group 1"
-                    />
+                    <Select value={draft.group_name} onValueChange={(value) => setDraft({ ...draft, group_name: value })}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select a group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No Group</SelectItem>
+                        {groups.map(group => (
+                          <SelectItem key={group.id || group.name} value={group.name}>{group.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <p className="font-medium">{member.group_name || '-'}</p>
                   )}

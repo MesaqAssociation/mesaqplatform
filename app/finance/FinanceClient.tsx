@@ -161,6 +161,13 @@ export default function FinanceClient({
   // Test send messages
   const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
+  // Transaction Search
+  const [showSearchBar, setShowSearchBar] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchType, setSearchType] = useState<'description' | 'amount' | 'name'>('description')
+  const [searchResults, setSearchResults] = useState<Transaction[]>([])
+  const [searching, setSearching] = useState(false)
+  
   // Update balance when account changes
   useEffect(() => {
     setBalance(currentAccount.current_balance)
@@ -302,6 +309,36 @@ export default function FinanceClient({
     setIsEditing(true)
     setEditValue(balance.toString())
   }
+
+  // Search transactions
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/finance/transactions/search?accountId=${selectedAccountId}&type=${searchType}&query=${encodeURIComponent(searchQuery)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(data.transactions || [])
+      }
+    } catch (err) {
+      console.error('Search failed:', err)
+    } finally {
+      setSearching(false)
+    }
+  }
+  
+  // Debounced search
+  useEffect(() => {
+    if (!showSearchBar) return
+    const timer = setTimeout(() => {
+      handleSearch()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchType, selectedAccountId, showSearchBar])
 
   const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -885,15 +922,26 @@ export default function FinanceClient({
             </button>
           ))}
         </div>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => setShowDeleteAccountDialog(true)}
-          disabled={accounts.length <= 1}
-        >
-          <IconTrash className="mr-2 size-4" />
-          Delete Account
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddAccountDialog(true)}
+            disabled={loading}
+          >
+            <IconPlus className="mr-2 size-4" />
+            Add Account
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteAccountDialog(true)}
+            disabled={accounts.length <= 1}
+          >
+            <IconTrash className="mr-2 size-4" />
+            Delete Account
+          </Button>
+        </div>
       </div>
 
       {/* Bank Balance */}
@@ -1018,14 +1066,6 @@ export default function FinanceClient({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="outline"
-            onClick={() => setShowAddAccountDialog(true)}
-            disabled={loading}
-          >
-            <IconPlus className="mr-2 size-4" />
-            Add Bank Account
-          </Button>
           <label htmlFor="statement-upload">
             <Button asChild disabled={uploading}>
               <span>
@@ -1047,9 +1087,87 @@ export default function FinanceClient({
       {/* Transactions Table */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Transactions</h2>
-            <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
+          <div className="flex flex-col gap-4 mb-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Transactions</h2>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSearchBar(!showSearchBar)}
+                >
+                  <IconSearch className="size-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Search Bar */}
+            {showSearchBar && (
+              <div className="flex flex-col sm:flex-row gap-2 p-3 bg-muted/50 rounded-lg">
+                <Select value={searchType} onValueChange={(v: any) => setSearchType(v)}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="description">Description</SelectItem>
+                    <SelectItem value="name">Transaction Name</SelectItem>
+                    <SelectItem value="amount">Amount</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Input
+                    placeholder={`Search by ${searchType}...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pr-8"
+                  />
+                  {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    </div>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setShowSearchBar(false)
+                  setSearchQuery('')
+                  setSearchResults([])
+                }}>
+                  <IconX className="size-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Search Results */}
+            {showSearchBar && searchQuery && searchResults.length > 0 && (
+              <div className="border rounded-lg max-h-64 overflow-y-auto">
+                {searchResults.map((txn) => (
+                  <button
+                    key={txn.id}
+                    className="w-full text-left px-4 py-3 hover:bg-muted/50 border-b last:border-b-0 transition-colors"
+                    onClick={() => {
+                      setSelectedTransaction(txn)
+                      setShowTransactionDialog(true)
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{txn.transaction_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(txn.transaction_date).toLocaleDateString('en-AU')}</p>
+                      </div>
+                      <span className={`ml-3 font-medium ${txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                        {txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {showSearchBar && searchQuery && searchResults.length === 0 && !searching && (
+              <p className="text-sm text-muted-foreground text-center py-4">No transactions found</p>
+            )}
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm min-w-[800px]">

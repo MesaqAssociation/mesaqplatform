@@ -11,7 +11,6 @@ ADD COLUMN IF NOT EXISTS organizing_group VARCHAR(50);
 -- Update system_settings to track last organizing group
 INSERT INTO system_settings (key, value)
 VALUES ('last_organizing_group', '')
-ON CONFLICT (key) DO NOTHING;
 
 -- Optional: Set some example groups for existing users (you can customize these)
 -- UPDATE users SET group_name = 'Group A' WHERE member_id BETWEEN '1' AND '10';

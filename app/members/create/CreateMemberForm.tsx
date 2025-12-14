@@ -27,6 +27,12 @@ function useGoogleMaps() {
   return loaded
 }
 
+type Group = {
+  id: string | null
+  name: string
+  legacy?: boolean
+}
+
 export default function CreateMemberForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -37,6 +43,23 @@ export default function CreateMemberForm() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const addressInputRef = useRef<HTMLInputElement>(null)
   const mapsLoaded = useGoogleMaps()
+  const [groups, setGroups] = useState<Group[]>([])
+
+  // Load groups on mount
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const res = await fetch('/api/groups')
+        if (res.ok) {
+          const data = await res.json()
+          setGroups(data.groups || [])
+        }
+      } catch (err) {
+        console.error('Failed to load groups:', err)
+      }
+    }
+    loadGroups()
+  }, [])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -232,13 +255,17 @@ export default function CreateMemberForm() {
 
       <div>
         <Label htmlFor="group_name">Group (for event organization rotation)</Label>
-        <Input 
-          id="group_name"
-          value={formData.group_name}
-          onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-          placeholder="e.g., Group A, Group B, Group 1, etc."
-          className="mt-1"
-        />
+        <Select value={formData.group_name} onValueChange={(value) => setFormData({ ...formData, group_name: value })}>
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select a group" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">No Group</SelectItem>
+            {groups.map(group => (
+              <SelectItem key={group.id || group.name} value={group.name}>{group.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-xs text-muted-foreground mt-1">
           Groups take turns organizing community events
         </p>
