@@ -536,12 +536,15 @@ export default function MemberDetailClient({
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Event Organization Group</p>
                   {editMode ? (
-                    <Select value={draft.group_name} onValueChange={(value) => setDraft({ ...draft, group_name: value })}>
+                    <Select 
+                      value={draft.group_name || "no-group"} 
+                      onValueChange={(value) => setDraft({ ...draft, group_name: value === "no-group" ? "" : value })}
+                    >
                       <SelectTrigger className="mt-1">
                         <SelectValue placeholder="Select a group" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No Group</SelectItem>
+                        <SelectItem value="no-group">No Group</SelectItem>
                         {groups.map(group => (
                           <SelectItem key={group.id || group.name} value={group.name}>{group.name}</SelectItem>
                         ))}

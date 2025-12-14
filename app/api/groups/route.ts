@@ -139,9 +139,11 @@ export async function POST(req: NextRequest) {
       console.log('member_groups table not found, using legacy mode')
       
       if (memberIds && memberIds.length > 0) {
+        // Cast memberIds properly for text comparison with uuid column
+        const placeholders = memberIds.map((_: string, i: number) => `$${i + 2}`).join(',')
         await pool.query(
-          `UPDATE users SET group_name = $1 WHERE id = ANY($2::uuid[])`,
-          [name.trim(), memberIds]
+          `UPDATE users SET group_name = $1 WHERE id::text IN (${placeholders})`,
+          [name.trim(), ...memberIds]
         )
       }
 

@@ -339,14 +339,13 @@ export default function FinanceClient({
     }
   }
   
-  // Debounced search
+  // Debounced search - always active now that search bar is always visible
   useEffect(() => {
-    if (!showSearchBar) return
     const timer = setTimeout(() => {
       handleSearch()
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, searchType, selectedAccountId, showSearchBar])
+  }, [searchQuery, searchType, selectedAccountId])
 
   const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -565,6 +564,19 @@ export default function FinanceClient({
 
     return () => clearTimeout(timer)
   }, [memberSearchQuery])
+
+  // Handle member search for transaction detail dialog
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (dialogMemberSearchQuery) {
+        searchMembers(dialogMemberSearchQuery)
+      } else {
+        setMemberSearchResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [dialogMemberSearchQuery])
   
   // Handle member search for add transaction dialog
   useEffect(() => {
@@ -1382,7 +1394,7 @@ export default function FinanceClient({
 
       {/* Transaction Detail Dialog */}
       <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
           </DialogHeader>
@@ -1417,9 +1429,6 @@ export default function FinanceClient({
                   <SelectContent>
                     <SelectItem value="Membership Payment">Membership Payment</SelectItem>
                     <SelectItem value="Special Payment">Special Payment</SelectItem>
-                    <SelectItem value="Donation">Donation</SelectItem>
-                    <SelectItem value="Expense">Expense</SelectItem>
-                    <SelectItem value="Misc">Misc</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

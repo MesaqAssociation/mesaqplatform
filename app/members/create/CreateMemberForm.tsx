@@ -255,12 +255,15 @@ export default function CreateMemberForm() {
 
       <div>
         <Label htmlFor="group_name">Group (for event organization rotation)</Label>
-        <Select value={formData.group_name} onValueChange={(value) => setFormData({ ...formData, group_name: value })}>
+        <Select 
+          value={formData.group_name || "no-group"} 
+          onValueChange={(value) => setFormData({ ...formData, group_name: value === "no-group" ? "" : value })}
+        >
           <SelectTrigger className="mt-1">
             <SelectValue placeholder="Select a group" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">No Group</SelectItem>
+            <SelectItem value="no-group">No Group</SelectItem>
             {groups.map(group => (
               <SelectItem key={group.id || group.name} value={group.name}>{group.name}</SelectItem>
             ))}
