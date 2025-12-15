@@ -23,19 +23,7 @@ export default function RootLayout({
     : "en"
 
   return (
-    <html lang={initialLocale} dir={initialLocale === "fa" || initialLocale === "ar" ? "rtl" : "ltr"}>
-      <head>
-        <style>{`
-        html {
-          font-family: ${GeistSans.style.fontFamily};
-          --font-sans: ${GeistSans.variable};
-          --font-mono: ${GeistMono.variable};
-        }
-        input, textarea, select {
-          -webkit-autofill: none !important;
-        }
-                `}</style>
-      </head>
+    <html lang={initialLocale} dir={initialLocale === "fa" || initialLocale === "ar" ? "rtl" : "ltr"} className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body autoComplete="off">
         <I18nProvider initialLocale={initialLocale}>
           {children}
