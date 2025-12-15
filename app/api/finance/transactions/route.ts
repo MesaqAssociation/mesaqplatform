@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { corsHeaders } from '@/lib/cors'
 
 export const runtime = 'nodejs'
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders })
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,8 +16,11 @@ const pool = new Pool({
 })
 
 // Helper function to verify auth
-async function verifyAuth(): Promise<{ userId: string } | null> {
-  const token = cookies().get('auth_token')?.value
+async function verifyAuth(req: NextRequest): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get('Authorization')
+  const cookieToken = cookies().get('auth_token')?.value
+  const token = authHeader?.replace('Bearer ', '') || cookieToken
+  
   if (!token || !process.env.AUTH_SECRET) {
     return null
   }
@@ -27,9 +35,9 @@ async function verifyAuth(): Promise<{ userId: string } | null> {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await verifyAuth()
+  const auth = await verifyAuth(req)
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -71,11 +79,33 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({ 
         transactions
-      })
+      }, { headers: corsHeaders })
     }
 
-    if (!accountId || !year || !month) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
+    // If no specific filters, return recent transactions from all accounts
+    if (!accountId) {
+      const { rows: transactions } = await pool.query(`
+        SELECT 
+          t.id,
+          t.account_id,
+          to_char(t.transaction_date, 'YYYY-MM-DD') as transaction_date,
+          t.transaction_name,
+          t.description,
+          t.category,
+          t.amount,
+          t.transaction_type
+        FROM transactions t 
+        ORDER BY t.transaction_date DESC, t.created_at DESC
+        LIMIT 100
+      `)
+
+      return NextResponse.json({ 
+        transactions
+      }, { headers: corsHeaders })
+    }
+
+    if (!year || !month) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400, headers: corsHeaders })
     }
 
     // Get transactions for specific month
@@ -121,10 +151,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ 
       transactions,
       balance: accountRows[0]?.current_balance || 0
-    })
+    }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Get transactions error:', err)
-    return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500, headers: corsHeaders })
   }
 }
 
