@@ -147,6 +147,38 @@ export async function POST(req: NextRequest) {
     const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
     const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
     
+    // Check for duplicate statement - same file name and overlapping date range
+    const { rows: existingStatements } = await pool.query(`
+      SELECT id, file_name, statement_date_from, statement_date_to 
+      FROM bank_statements 
+      WHERE account_id = $1 
+        AND (
+          file_name = $2 
+          OR (
+            statement_date_from IS NOT NULL 
+            AND statement_date_to IS NOT NULL 
+            AND $3::date IS NOT NULL 
+            AND $4::date IS NOT NULL
+            AND (
+              (statement_date_from <= $4::date AND statement_date_to >= $3::date)
+            )
+          )
+        )
+    `, [finalAccountId, file.name, minDate, maxDate])
+    
+    if (existingStatements.length > 0) {
+      const existingFile = existingStatements[0]
+      if (existingFile.file_name === file.name) {
+        return NextResponse.json({ 
+          error: `Duplicate statement: A file named "${file.name}" has already been uploaded to this account.`
+        }, { status: 400 })
+      } else {
+        return NextResponse.json({ 
+          error: `Duplicate date range: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists. This statement covers ${minDate} to ${maxDate}.`
+        }, { status: 400 })
+      }
+    }
+    
     const { rows: statementRows } = await pool.query(`
       INSERT INTO bank_statements 
         (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, uploaded_by, file_url)

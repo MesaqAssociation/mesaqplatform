@@ -29,7 +29,22 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, email, phone, address, household_members } = body
+    const { name, email, phone, address, household_members, image } = body
+    
+    // If only updating image
+    if (image !== undefined && !name && !phone) {
+      const { rows } = await pool.query(`
+        UPDATE users SET image = $1 WHERE id = $2
+        RETURNING id, name, email, phone, address, household_members, image
+      `, [image, userId])
+      
+      if (rows.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+      
+      return NextResponse.json({ success: true, user: rows[0] })
+    }
+    
     const household = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
 
     // Validation
@@ -51,7 +66,7 @@ export async function PATCH(req: NextRequest) {
         address = $4,
         household_members = $5
       WHERE id = $6
-      RETURNING id, name, email, phone, address, household_members
+      RETURNING id, name, email, phone, address, household_members, image
     `, [
       name.trim(),
       email?.trim() || null,

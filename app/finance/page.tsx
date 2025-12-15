@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { MainLayout } from '@/components/Sidebar'
 import { Pool } from 'pg'
 import FinanceClient from './FinanceClient'
+import LandscapeCheck from './LandscapeCheck'
 import { getUserFromToken } from '@/lib/getUserFromToken'
 
 // Force dynamic rendering to avoid hydration issues
@@ -60,12 +61,14 @@ export default async function FinancePage() {
 
   return (
     <MainLayout user={user}>
-      <div className="p-6">
-        <FinanceClient 
-          account={firstAccount} 
-          allAccounts={accounts}
-        />
-      </div>
+      <LandscapeCheck>
+        <div className="p-6">
+          <FinanceClient 
+            account={firstAccount} 
+            allAccounts={accounts}
+          />
+        </div>
+      </LandscapeCheck>
     </MainLayout>
   )
 }

@@ -51,7 +51,7 @@ export default async function SettingsPage() {
     // Get full user data
     const { rows: userRows } = await pool.query(`
       SELECT 
-        id, member_id, name, email, phone, address, 
+        id, member_id, name, email, phone, address, image,
         household_members, date_joined, created_at, role
       FROM users 
       WHERE id = $1

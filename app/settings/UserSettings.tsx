@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { IconCheck, IconX } from '@tabler/icons-react'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { IconCheck, IconX, IconCamera, IconEye, IconEyeOff } from '@tabler/icons-react'
+import { getInitials } from '@/lib/utils'
 
 type User = {
   id: string
@@ -13,6 +15,7 @@ type User = {
   email: string | null
   phone: string | null
   address: string | null
+  image?: string | null
   household_members: number | null
   joined_date: string | null
   created_at: string | null
@@ -28,6 +31,18 @@ export default function UserSettings({ user }: Props) {
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Profile picture state
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [profileImage, setProfileImage] = useState(user.image || '')
+  
+  // Password change state
+  const [showPasswordSection, setShowPasswordSection] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   const [formData, setFormData] = useState({
     name: user.name || '',
@@ -36,6 +51,89 @@ export default function UserSettings({ user }: Props) {
     address: user.address || '',
     household_members: user.household_members?.toString() || '1',
   })
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setToastMessage(message)
+    setToastType(type)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        throw new Error('Upload failed')
+      }
+
+      const { url } = await uploadRes.json()
+      
+      // Update profile with new image URL
+      const updateRes = await fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: url }),
+      })
+
+      if (updateRes.ok) {
+        setProfileImage(url)
+        showNotification('Profile picture updated!', 'success')
+        // Reload to update sidebar
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        throw new Error('Failed to update profile')
+      }
+    } catch (error) {
+      showNotification('Failed to upload image', 'error')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (newPassword.length < 8) {
+      showNotification('Password must be at least 8 characters', 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      showNotification('Passwords do not match', 'error')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword }),
+      })
+
+      if (res.ok) {
+        showNotification('Password changed successfully!', 'success')
+        setNewPassword('')
+        setConfirmPassword('')
+        setShowPasswordSection(false)
+      } else {
+        const data = await res.json()
+        showNotification(data.error || 'Failed to change password', 'error')
+      }
+    } catch (error) {
+      showNotification('An error occurred', 'error')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -47,23 +145,15 @@ export default function UserSettings({ user }: Props) {
       })
 
       if (res.ok) {
-        setToastType('success')
-        setToastMessage('Profile updated successfully!')
+        showNotification('Profile updated successfully!', 'success')
         setEditing(false)
-        // Reload page to reflect changes
         setTimeout(() => window.location.reload(), 1500)
       } else {
         const data = await res.json()
-        setToastType('error')
-        setToastMessage(data.error || 'Failed to update profile')
+        showNotification(data.error || 'Failed to update profile', 'error')
       }
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), 3000)
     } catch (error) {
-      setToastType('error')
-      setToastMessage('An error occurred')
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), 3000)
+      showNotification('An error occurred', 'error')
     } finally {
       setSaving(false)
     }
@@ -93,7 +183,6 @@ export default function UserSettings({ user }: Props) {
     }
   }
 
-  // Check if user data is loaded
   if (!user || !user.id) {
     return (
       <div className="border rounded-lg p-6">
@@ -104,6 +193,47 @@ export default function UserSettings({ user }: Props) {
 
   return (
     <>
+      {/* Profile Picture Section */}
+      <div className="border rounded-lg p-6">
+        <h2 className="text-lg font-medium mb-4">Profile Picture</h2>
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={profileImage || undefined} alt={user.name || 'User'} />
+              <AvatarFallback className="text-2xl">{getInitials(user.name || 'U')}</AvatarFallback>
+            </Avatar>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <IconCamera className="size-4" />
+            </button>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">
+              Upload a new profile picture
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+            >
+              {uploadingImage ? 'Uploading...' : 'Choose Image'}
+            </Button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+        </div>
+      </div>
+
+      {/* Profile Information Section */}
       <div className="border rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium">Your Profile</h2>
@@ -115,7 +245,6 @@ export default function UserSettings({ user }: Props) {
         </div>
 
         <div className="space-y-4">
-          {/* Editable Fields */}
           <div>
             <label className="text-sm font-medium text-muted-foreground">Name *</label>
             {editing ? (
@@ -192,7 +321,6 @@ export default function UserSettings({ user }: Props) {
             )}
           </div>
 
-          {/* Read-only Fields */}
           <div className="pt-4 border-t">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Account Information (Read-only)</h3>
             
@@ -214,7 +342,6 @@ export default function UserSettings({ user }: Props) {
             </div>
           </div>
 
-          {/* Action Buttons */}
           {editing && (
             <div className="flex gap-2 pt-4">
               <Button onClick={handleSave} disabled={saving}>
@@ -228,6 +355,76 @@ export default function UserSettings({ user }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Change Password Section */}
+      <div className="border rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium">Change Password</h2>
+          {!showPasswordSection && (
+            <Button onClick={() => setShowPasswordSection(true)} variant="outline" size="sm">
+              Change Password
+            </Button>
+          )}
+        </div>
+
+        {showPasswordSection ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">New Password *</label>
+              <div className="relative mt-1">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Confirm Password *</label>
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm your new password"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button 
+                onClick={handlePasswordChange} 
+                disabled={changingPassword || !newPassword || !confirmPassword}
+              >
+                {changingPassword ? 'Changing...' : 'Update Password'}
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowPasswordSection(false)
+                  setNewPassword('')
+                  setConfirmPassword('')
+                }} 
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Click the button above to change your password.
+          </p>
+        )}
       </div>
 
       {/* Toast Notification */}
@@ -249,4 +446,3 @@ export default function UserSettings({ user }: Props) {
     </>
   )
 }
-

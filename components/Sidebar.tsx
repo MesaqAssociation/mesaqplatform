@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconCirclePlusFilled, IconChevronRight, IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX } from '@tabler/icons-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
-import { NavUser } from '@/components/nav-user'
+import { IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX, IconLogout } from '@tabler/icons-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useI18n } from '@/components/I18nProvider'
-import GlobalSearch from '@/components/GlobalSearch'
+import { getInitials } from '@/lib/utils'
 
 type SidebarProps = {
   user?: {
@@ -21,7 +19,6 @@ type SidebarProps = {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
-  const [open, setOpen] = useState<Record<string, boolean>>({})
   const { t } = useI18n()
   
   // Mobile sidebar state - closed by default on mobile
@@ -49,20 +46,12 @@ export function Sidebar({ user }: SidebarProps) {
   const userRole = (user?.role || '').toLowerCase()
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
 
-  // Define navigation items based on role
+  // Define navigation items based on role - NO meetings, just events as direct link
   const NAV_ITEMS = isAdminOrBoard ? [
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
     { title: t("members"), url: "/members", icon: IconUsers },
     { title: t("finance"), url: "/finance", icon: IconCash },
-    { 
-      title: t("events"), 
-      url: "/events", 
-      icon: IconCalendarEvent,
-      children: [
-        { title: t("meetings"), url: '/meetings' },
-        { title: t("events"), url: '/events' },
-      ]
-    },
+    { title: t("events"), url: "/events", icon: IconCalendarEvent },
     { title: "Documents", url: "/documents", icon: IconFileText },
     { title: "Messaging", url: "/messaging", icon: IconSend },
   ] : [
@@ -70,19 +59,20 @@ export function Sidebar({ user }: SidebarProps) {
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
     { title: t("members"), url: "/members", icon: IconUsers },
     { title: "Payments", url: "/payments", icon: IconCash },
-    { 
-      title: t("events"), 
-      url: "/events", 
-      icon: IconCalendarEvent,
-      children: [
-        { title: t("meetings"), url: '/meetings' },
-        { title: t("events"), url: '/events' },
-      ]
-    },
+    { title: t("events"), url: "/events", icon: IconCalendarEvent },
     { title: "Documents", url: "/documents", icon: IconFileText },
   ]
 
-  // Collapsed sidebar (mobile closed state)
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      window.location.href = '/'
+    } catch (err) {
+      console.error('Logout failed:', err)
+    }
+  }
+
+  // Sidebar width and text visibility
   const sidebarWidth = isMobile && !isMobileOpen ? 'w-16' : 'w-64'
   const showText = !isMobile || isMobileOpen
 
@@ -98,7 +88,7 @@ export function Sidebar({ user }: SidebarProps) {
       
       <aside className={`fixed left-0 top-0 z-40 h-screen ${sidebarWidth} bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300`}>
         {/* Header with Logo and Mobile Toggle */}
-        <div className="p-4 flex items-center justify-between">
+        <div className="p-4 flex items-center justify-between flex-shrink-0">
           <Link href="/dashboard" className="flex items-center">
             <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" className="object-contain" />
           </Link>
@@ -112,104 +102,85 @@ export function Sidebar({ user }: SidebarProps) {
           )}
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - takes remaining space */}
         <nav className="flex-1 px-2 md:px-4 py-2 overflow-y-auto">
           <ul className="space-y-1">
             {NAV_ITEMS.map((item) => {
-              const hasChildren = !!item.children?.length
-              const childActive = !!item.children?.some((c) => {
-                // Check exact match or if pathname starts with the child URL
-                if (pathname === c.url || pathname.startsWith(c.url + '/')) return true
-                // Special case: highlight Meetings for /meetings/create
-                if (c.url === '/meetings' && pathname.startsWith('/meetings')) return true
-                // Special case: highlight Events for /events/create
-                if (c.url === '/events' && pathname.startsWith('/events') && !pathname.startsWith('/meetings')) return true
-                return false
-              })
-              const itemActive = pathname === item.url || (pathname.startsWith(item.url + '/') && !hasChildren)
-              const isOpen = open[item.title] ?? (hasChildren && childActive)
+              const itemActive = pathname === item.url || pathname.startsWith(item.url + '/')
 
               return (
                 <li key={item.title}>
-                  {hasChildren ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          if (!showText) {
-                            // On mobile collapsed, navigate to first child
-                            window.location.href = item.children![0].url
-                          } else {
-                            setOpen({ ...open, [item.title]: !isOpen })
-                          }
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors ${!showText ? 'justify-center' : ''}`}
-                        title={!showText ? item.title : undefined}
-                      >
-                        {item.icon && <item.icon className="size-5" />}
-                        {showText && (
-                          <>
-                            <span className="flex-1 text-left">{item.title}</span>
-                            <IconChevronRight className={`size-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                          </>
-                        )}
-                      </button>
-                      {showText && isOpen && (
-                        <ul className="mt-1 ml-6 space-y-1">
-                          {item.children!.map((child) => (
-                            <li key={child.url}>
-                              <Link
-                                href={child.url}
-                                className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                                  pathname === child.url
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                                }`}
-                                prefetch={true}
-                              >
-                                {child.title}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
-                  ) : (
-                    <Link
-                      href={item.url}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${!showText ? 'justify-center' : ''} ${
-                        itemActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                      }`}
-                      prefetch={true}
-                      title={!showText ? item.title : undefined}
-                    >
-                      {item.icon && <item.icon className="size-5" />}
-                      {showText && <span>{item.title}</span>}
-                    </Link>
-                  )}
+                  <Link
+                    href={item.url}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${!showText ? 'justify-center' : ''} ${
+                      itemActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    }`}
+                    prefetch={true}
+                    title={!showText ? item.title : undefined}
+                  >
+                    {item.icon && <item.icon className="size-5 flex-shrink-0" />}
+                    {showText && <span>{item.title}</span>}
+                  </Link>
                 </li>
               )
             })}
           </ul>
         </nav>
 
-        {/* User - always visible with proper spacing */}
-        <div className={`p-2 md:p-4 border-t border-sidebar-border ${!showText ? 'flex justify-center' : ''}`}>
+        {/* User Section - Fixed at bottom */}
+        <div className={`border-t border-sidebar-border flex-shrink-0 ${showText ? 'p-3' : 'p-2'}`}>
           {showText ? (
-            <NavUser user={{ 
-              name: user?.name || "User", 
-              email: user?.email || null, 
-              avatar: user?.image || "" 
-            }} />
+            <div className="space-y-2">
+              {/* Settings button */}
+              <Link
+                href="/settings"
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full ${
+                  pathname === '/settings'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                }`}
+              >
+                <IconSettings className="size-5" />
+                <span>{t("settings")}</span>
+              </Link>
+              
+              {/* Logout button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full text-sidebar-foreground hover:bg-sidebar-accent"
+              >
+                <IconLogout className="size-5" />
+                <span>{t("logout")}</span>
+              </button>
+              
+              {/* User info */}
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-sidebar-border mt-2 pt-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.image || undefined} alt={user?.name || 'User'} />
+                  <AvatarFallback>{getInitials(user?.name || 'U')}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium truncate flex-1">{user?.name || 'User'}</span>
+              </div>
+            </div>
           ) : (
-            <Link
-              href="/settings"
-              className="p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-              title="Settings"
-            >
-              <IconSettings className="size-5" />
-            </Link>
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/settings"
+                className="p-2 rounded-md hover:bg-sidebar-accent transition-colors"
+                title={t("settings")}
+              >
+                <IconSettings className="size-5" />
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-md hover:bg-sidebar-accent transition-colors"
+                title={t("logout")}
+              >
+                <IconLogout className="size-5" />
+              </button>
+            </div>
           )}
         </div>
       </aside>
@@ -222,7 +193,7 @@ export function MainLayout({ children, user }: { children: React.ReactNode; user
     <div className="flex min-h-screen">
       <Sidebar user={user} />
       {/* Main content with responsive margin */}
-      <main className="flex-1 ml-16 md:ml-64 bg-background pt-0 transition-all duration-300">
+      <main className="flex-1 ml-16 md:ml-64 bg-background transition-all duration-300">
         {children}
       </main>
     </div>
