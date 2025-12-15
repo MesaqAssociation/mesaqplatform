@@ -41,7 +41,7 @@ export default async function MemberDetailPage({
   try {
     // Fetch member details by ID (UUID)
     const { rows } = await pool.query(
-      'SELECT * FROM users WHERE id = $1',
+      'SELECT *, COALESCE(is_group_leader, false) as is_group_leader FROM users WHERE id = $1',
       [memberId]
     )
 

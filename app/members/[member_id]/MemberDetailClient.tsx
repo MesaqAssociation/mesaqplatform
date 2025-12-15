@@ -36,6 +36,7 @@ type Member = {
   image: string | null
   role: string
   group_name: string | null
+  is_group_leader: boolean | null
   banking_name: string | null
   date_joined: string | null
   household_members: number
@@ -109,6 +110,7 @@ export default function MemberDetailClient({
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [groups, setGroups] = useState<Array<{id: string | null, name: string}>>([])
+  const [settingLeader, setSettingLeader] = useState(false)
 
   // Load groups
   useEffect(() => {
@@ -558,10 +560,44 @@ export default function MemberDetailClient({
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="font-medium">{member.group_name || '-'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{member.group_name || '-'}</p>
+                      {member.is_group_leader && member.group_name && (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Leader</span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
+              {isAdmin && member.group_name && !editMode && (
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant={member.is_group_leader ? "outline" : "default"}
+                    onClick={async () => {
+                      if (member.is_group_leader) return
+                      setSettingLeader(true)
+                      try {
+                        const res = await fetch(`/api/members/${member.id}/set-leader`, { method: 'POST' })
+                        if (res.ok) {
+                          showToast('Group leader updated!', 'success')
+                          router.refresh()
+                        } else {
+                          const data = await res.json()
+                          showToast(data.error || 'Failed to set leader', 'error')
+                        }
+                      } catch (err) {
+                        showToast('Failed to set leader', 'error')
+                      } finally {
+                        setSettingLeader(false)
+                      }
+                    }}
+                    disabled={settingLeader || member.is_group_leader}
+                  >
+                    {settingLeader ? 'Setting...' : member.is_group_leader ? 'Current Leader' : 'Make Group Leader'}
+                  </Button>
+                </div>
+              )}
               <Separator />
               <div className="flex items-center gap-3">
                 <IconCalendar className="size-5 text-muted-foreground" />

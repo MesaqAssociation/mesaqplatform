@@ -116,8 +116,8 @@ export async function GET(req: NextRequest) {
             members.map(async (member: any) => {
                 const balance = await getMemberBalance(member.id)
                 return {
-                    member_id: member.id,
-                    member_name: member.name,
+                    'member-id': member.id,
+                    'member-name': member.name,
                     balance: `$${balance.toFixed(2)}`
                 }
             })
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
         // Set the template data
         const templateData = {
             date: getMelbourneDate(),
-            members: memberData
+            'member-table-loop': memberData
         }
 
         console.log(`🔧 Rendering template with data:`, JSON.stringify(templateData, null, 2))
@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
                 })
             }
 
-            throw new Error(`Template rendering failed: ${renderError.message}. Please ensure the template has the correct placeholders: {{date}} and {{#members}}{{member_id}}{{member_name}}{{balance}}{{/members}}`)
+            throw new Error(`Template rendering failed: ${renderError.message}. Please ensure the template has the correct placeholders: {{date}} and {{#member-table-loop}}{{member-id}}{{member-name}}{{balance}}{{/member-table-loop}}`)
         }
 
         console.log(`✅ Template rendered successfully`)
