@@ -153,7 +153,21 @@ export async function GET(req: NextRequest) {
             doc.render(templateData)
         } catch (renderError: any) {
             console.error('❌ Template rendering error:', renderError)
+            console.error('Error name:', renderError.name)
             console.error('Error properties:', renderError.properties)
+
+            // Log all individual errors if it's a multi-error
+            if (renderError.properties?.errors) {
+                console.error('Individual errors:')
+                renderError.properties.errors.forEach((err: any, index: number) => {
+                    console.error(`  Error ${index + 1}:`, {
+                        message: err.message,
+                        name: err.name,
+                        properties: err.properties
+                    })
+                })
+            }
+
             throw new Error(`Template rendering failed: ${renderError.message}. Please ensure the template has the correct placeholders: {{date}} and {{#member-table-loop}}{{member-id}}{{member-name}}{{balance}}{{/member-table-loop}}`)
         }
 
