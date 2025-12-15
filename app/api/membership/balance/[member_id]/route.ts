@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { corsHeaders } from '@/lib/cors'
 
 export const runtime = 'nodejs'
 
@@ -10,19 +11,26 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 })
 
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders })
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ member_id: string }> | { member_id: string } }
 ) {
-  const token = cookies().get('auth_token')?.value
+  const authHeader = req.headers.get('Authorization')
+  const cookieToken = cookies().get('auth_token')?.value
+  const token = authHeader?.replace('Bearer ', '') || cookieToken
+  
   if (!token || !process.env.AUTH_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
   
   try {
     jwt.verify(token, process.env.AUTH_SECRET)
   } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -43,7 +51,7 @@ export async function GET(
     )
 
     if (memberRows.length === 0) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Member not found' }, { status: 404, headers: corsHeaders })
     }
 
     const member = memberRows[0]
@@ -148,10 +156,10 @@ export async function GET(
         totalSpecialPayments,
         transactions: specialTxns
       }
-    })
+    }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Get balance error:', err)
-    return NextResponse.json({ error: 'Server error', details: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Server error', details: err.message }, { status: 500, headers: corsHeaders })
   }
 }
 
