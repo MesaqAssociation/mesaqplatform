@@ -8,6 +8,12 @@
  *   npx tsx scripts/setup-telegram-bot.ts
  */
 
+import { config } from 'dotenv'
+import { resolve } from 'path'
+
+// Load environment variables from .env.local
+config({ path: resolve(process.cwd(), '.env.local') })
+
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const WEBHOOK_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mesaq-association.vercel.app'
 
@@ -33,7 +39,7 @@ async function setupWebhook() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: webhookEndpoint,
-          allowed_updates: ['message'],
+          allowed_updates: ['message', 'callback_query'],
           drop_pending_updates: true,
         }),
       }

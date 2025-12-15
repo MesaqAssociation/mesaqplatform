@@ -48,6 +48,26 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 6. Copy the API key and add it to Vercel environment variables
 7. **Important:** Redeploy your app after adding the env var for it to take effect
 
+### Telegram Bot (Bank Statement Upload & Create Features)
+```
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+```
+
+**Setup Instructions:**
+1. Open Telegram and search for [@BotFather](https://t.me/BotFather)
+2. Send `/newbot` command to create a new bot
+3. Choose a name (e.g., "Mesaq Bank Statement Bot")
+4. Choose a username (e.g., "mesaq_bank_bot")
+5. BotFather will give you a token like: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
+6. Copy the token and add it to your environment variables
+7. After deploying, run: `npx tsx scripts/setup-telegram-bot.ts` to configure webhook
+
+**Features:**
+- 📄 Upload bank statements via PDF
+- 📅 Create events with interactive buttons
+- 👤 Add members through conversational flow
+- See `TELEGRAM_BOT_SETUP.md` for detailed setup guide
+
 ### Membership Settings
 ```
 MONTHLY_FEE=50.00

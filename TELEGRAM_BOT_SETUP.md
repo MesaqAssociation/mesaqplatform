@@ -1,10 +1,12 @@
 # 🤖 Telegram Bot Setup Guide
 
-Automatically upload bank statements by sending PDFs to your Telegram bot!
+Automatically upload bank statements by sending PDFs to your Telegram bot, plus create events and members interactively!
 
 ## 📋 Features
 
 - **Automatic PDF Processing**: Send a PDF → Bot extracts transactions → Adds to finance system
+- **Interactive Event Creation**: Create events with guided buttons and inputs (see `/create`)
+- **Interactive Member Creation**: Add members through conversational flow (see `/create`)
 - **Real-time Feedback**: Get instant confirmation with transaction summary
 - **Payment Detection**: Automatically detects membership payments
 - **Error Reporting**: Shows which transactions failed and why
@@ -53,8 +55,10 @@ This will:
 1. Open Telegram
 2. Search for your bot username (e.g., `@mesaq_bank_bot`)
 3. Send `/start` to begin
-4. Send a PDF bank statement
-5. Bot will process it and send you a summary!
+4. Use the bot:
+   - Send a PDF bank statement to upload transactions
+   - Use `/create` to create events or add members interactively
+   - Bot will guide you through each process!
 
 ---
 
@@ -63,7 +67,11 @@ This will:
 | Command | Description |
 |---------|-------------|
 | `/start` | Show welcome message and instructions |
+| `/create` | Create events or members with interactive buttons |
+| `/cancel` | Cancel current creation process |
 | Send PDF | Automatically process bank statement |
+
+**📖 For detailed information about the `/create` command, see [TELEGRAM_CREATE_FEATURE.md](./TELEGRAM_CREATE_FEATURE.md)**
 
 ---
 

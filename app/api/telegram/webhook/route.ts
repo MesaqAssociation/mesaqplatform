@@ -4,6 +4,7 @@ import { parseBankStatementPDF } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
+import bcrypt from 'bcryptjs'
 
 export const runtime = 'nodejs'
 
@@ -14,12 +15,73 @@ const pool = new Pool({
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
+// In-memory state management for multi-step creation flows
+// In production, consider using Redis or database
+type CreationState = {
+  type: 'event' | 'member'
+  step: string
+  data: Record<string, any>
+  timestamp: number
+}
+
+const userStates = new Map<number, CreationState>()
+
 export async function POST(req: NextRequest) {
   try {
     const update = await req.json()
     console.log('Telegram webhook received:', JSON.stringify(update, null, 2))
 
-    // Only handle PDF documents
+    // Handle callback queries (button clicks)
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query)
+      return NextResponse.json({ ok: true })
+    }
+
+    // Handle text commands
+    if (update.message?.text) {
+      const message = update.message
+      const chatId = message.chat.id
+      const text = message.text.trim()
+
+      // Handle /start command
+      if (text === '/start') {
+        await sendTelegramMessage(chatId, '👋 Welcome! You can:\n\n📄 Send a PDF bank statement to upload it\n➕ Use /create to create events or members')
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle /create command
+      if (text === '/create') {
+        await showCreateOptions(chatId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle /cancel command
+      if (text === '/cancel') {
+        userStates.delete(chatId)
+        await sendTelegramMessage(chatId, '❌ Operation cancelled.')
+        return NextResponse.json({ ok: true })
+      }
+
+      // Check if user is in a creation flow
+      const state = userStates.get(chatId)
+      if (state) {
+        await handleCreationInput(chatId, text, state)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle unrecognized commands or messages
+      if (text.startsWith('/')) {
+        // Unknown command
+        await sendTelegramMessage(chatId, '❓ Unknown command. Available commands:\n\n/start - Show welcome message\n/create - Create event or member\n/cancel - Cancel current operation')
+        return NextResponse.json({ ok: true })
+      } else {
+        // Regular message when not in a flow
+        await sendTelegramMessage(chatId, '👋 Hi! Use /create to create events or members, or send a PDF bank statement to upload it.\n\nType /start for more info.')
+        return NextResponse.json({ ok: true })
+      }
+    }
+
+    // Handle PDF documents
     if (update.message?.document) {
       const message = update.message
       const document = message.document
@@ -331,7 +393,7 @@ async function downloadFile(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer)
 }
 
-async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
+async function sendTelegramMessage(chatId: number, text: string, options?: any): Promise<void> {
   try {
     const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -342,6 +404,7 @@ async function sendTelegramMessage(chatId: number, text: string): Promise<void> 
           chat_id: chatId,
           text: text,
           parse_mode: 'HTML',
+          ...options,
         }),
       }
     )
@@ -352,6 +415,448 @@ async function sendTelegramMessage(chatId: number, text: string): Promise<void> 
     }
   } catch (err) {
     console.error('Error sending Telegram message:', err)
+  }
+}
+
+async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: callbackQueryId,
+          text: text,
+        }),
+      }
+    )
+  } catch (err) {
+    console.error('Error answering callback query:', err)
+  }
+}
+
+// Show initial create options
+async function showCreateOptions(chatId: number): Promise<void> {
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '📅 Create Event', callback_data: 'create_event' },
+        { text: '👤 Create Member', callback_data: 'create_member' },
+      ],
+    ],
+  }
+
+  await sendTelegramMessage(chatId, '➕ What would you like to create?', {
+    reply_markup: keyboard,
+  })
+}
+
+// Handle callback queries (button clicks)
+async function handleCallbackQuery(callbackQuery: any): Promise<void> {
+  const chatId = callbackQuery.message.chat.id
+  const data = callbackQuery.data
+  const callbackQueryId = callbackQuery.id
+
+  await answerCallbackQuery(callbackQueryId)
+
+  // Initial creation type selection
+  if (data === 'create_event') {
+    userStates.set(chatId, {
+      type: 'event',
+      step: 'title',
+      data: {},
+      timestamp: Date.now(),
+    })
+    await sendTelegramMessage(chatId, '📅 <b>Creating Event</b>\n\nPlease enter the event title:\n\n<i>Type /cancel to abort</i>')
+  } else if (data === 'create_member') {
+    userStates.set(chatId, {
+      type: 'member',
+      step: 'name',
+      data: {},
+      timestamp: Date.now(),
+    })
+    await sendTelegramMessage(chatId, '👤 <b>Creating Member</b>\n\nPlease enter the member\'s full name:\n\n<i>Type /cancel to abort</i>')
+  }
+  // Event type selection
+  else if (data.startsWith('event_type_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      const eventType = data.replace('event_type_', '')
+      state.data.event_type = eventType
+      state.step = 'date'
+      await sendTelegramMessage(chatId, '📆 Enter the event date (YYYY-MM-DD):\n\nExample: 2024-12-25')
+    }
+  }
+  // Member role selection
+  else if (data.startsWith('role_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'member') {
+      const role = data.replace('role_', '').replace(/_/g, ' ')
+      state.data.role = role
+      state.step = 'group'
+      await showGroupSelection(chatId)
+    }
+  }
+  // Member group selection
+  else if (data.startsWith('group_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'member') {
+      const group = data.replace('group_', '')
+      state.data.group_name = group === 'none' ? null : group
+      state.step = 'household'
+      await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number, e.g., 1, 2, 3)')
+    }
+  }
+  // Event organizing group selection
+  else if (data.startsWith('org_group_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      const group = data.replace('org_group_', '')
+      state.data.organizing_group = group === 'none' ? null : group
+      await createEvent(chatId, state.data)
+      userStates.delete(chatId)
+    }
+  }
+  // Confirm creation
+  else if (data === 'confirm_yes') {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      await showOrgGroupSelection(chatId)
+    }
+  } else if (data === 'confirm_no') {
+    userStates.delete(chatId)
+    await sendTelegramMessage(chatId, '❌ Creation cancelled.')
+  }
+}
+
+// Handle text input during creation flow
+async function handleCreationInput(chatId: number, text: string, state: CreationState): Promise<void> {
+  if (state.type === 'event') {
+    await handleEventInput(chatId, text, state)
+  } else if (state.type === 'member') {
+    await handleMemberInput(chatId, text, state)
+  }
+}
+
+// Handle event creation input
+async function handleEventInput(chatId: number, text: string, state: CreationState): Promise<void> {
+  switch (state.step) {
+    case 'title':
+      state.data.title = text
+      state.step = 'description'
+      await sendTelegramMessage(chatId, '📝 Enter event description (or type "skip" to skip):')
+      break
+
+    case 'description':
+      state.data.description = text.toLowerCase() === 'skip' ? null : text
+      state.step = 'address'
+      await sendTelegramMessage(chatId, '📍 Enter event address (or type "skip" to skip):')
+      break
+
+    case 'address':
+      state.data.address = text.toLowerCase() === 'skip' ? null : text
+      state.step = 'type'
+      await showEventTypeSelection(chatId)
+      break
+
+    case 'date':
+      // Validate date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-12-25):')
+        return
+      }
+      state.data.event_date = text
+      state.step = 'start_time'
+      await sendTelegramMessage(chatId, '🕐 Enter start time (HH:MM in 24-hour format):\n\nExample: 14:30')
+      break
+
+    case 'start_time':
+      // Validate time format
+      if (!/^\d{2}:\d{2}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 14:30):')
+        return
+      }
+      state.data.start_time = text
+      state.step = 'end_time'
+      await sendTelegramMessage(chatId, '🕐 Enter end time (HH:MM in 24-hour format):\n\nExample: 16:30')
+      break
+
+    case 'end_time':
+      // Validate time format
+      if (!/^\d{2}:\d{2}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 16:30):')
+        return
+      }
+      state.data.end_time = text
+      state.step = 'cost'
+      await sendTelegramMessage(chatId, '💰 Enter estimated cost in dollars (or type "0" for free):')
+      break
+
+    case 'cost':
+      const cost = parseFloat(text)
+      if (isNaN(cost) || cost < 0) {
+        await sendTelegramMessage(chatId, '❌ Invalid amount. Please enter a number (e.g., 100 or 0):')
+        return
+      }
+      state.data.estimated_cost = cost
+      state.step = 'confirm'
+      await showEventConfirmation(chatId, state.data)
+      break
+  }
+}
+
+// Handle member creation input
+async function handleMemberInput(chatId: number, text: string, state: CreationState): Promise<void> {
+  switch (state.step) {
+    case 'name':
+      state.data.name = text
+      state.step = 'phone'
+      await sendTelegramMessage(chatId, '📱 Enter phone number (e.g., 0412345678):')
+      break
+
+    case 'phone':
+      // Basic phone validation
+      const cleanPhone = text.replace(/\s+/g, '')
+      if (!/^\d{10}$/.test(cleanPhone) && !/^04\d{8}$/.test(cleanPhone)) {
+        await sendTelegramMessage(chatId, '❌ Invalid phone number. Please enter a 10-digit Australian mobile (e.g., 0412345678):')
+        return
+      }
+      state.data.phone = cleanPhone
+      state.step = 'email'
+      await sendTelegramMessage(chatId, '📧 Enter email address (or type "skip" to skip):')
+      break
+
+    case 'email':
+      if (text.toLowerCase() !== 'skip') {
+        // Basic email validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+          await sendTelegramMessage(chatId, '❌ Invalid email format. Please enter a valid email or type "skip":')
+          return
+        }
+        state.data.email = text
+      }
+      state.step = 'address'
+      await sendTelegramMessage(chatId, '🏠 Enter home address (or type "skip" to skip):')
+      break
+
+    case 'address':
+      state.data.address = text.toLowerCase() === 'skip' ? null : text
+      state.step = 'password'
+      await sendTelegramMessage(chatId, '🔒 Enter a password (minimum 8 characters):')
+      break
+
+    case 'password':
+      if (text.length < 8) {
+        await sendTelegramMessage(chatId, '❌ Password must be at least 8 characters. Please try again:')
+        return
+      }
+      state.data.password = text
+      state.step = 'role'
+      await showRoleSelection(chatId)
+      break
+
+    case 'household':
+      const household = parseInt(text)
+      if (isNaN(household) || household < 1) {
+        await sendTelegramMessage(chatId, '❌ Please enter a valid number (1 or more):')
+        return
+      }
+      state.data.household_members = household
+      await createMember(chatId, state.data)
+      userStates.delete(chatId)
+      break
+  }
+}
+
+// Show event type selection
+async function showEventTypeSelection(chatId: number): Promise<void> {
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🎉 Event', callback_data: 'event_type_Event' }],
+      [{ text: '📚 Meeting', callback_data: 'event_type_Meeting' }],
+      [{ text: '🎊 Celebration', callback_data: 'event_type_Celebration' }],
+      [{ text: '📖 Educational', callback_data: 'event_type_Educational' }],
+      [{ text: '🙏 Religious', callback_data: 'event_type_Religious' }],
+    ],
+  }
+  await sendTelegramMessage(chatId, '🎯 Select event type:', { reply_markup: keyboard })
+}
+
+// Show role selection
+async function showRoleSelection(chatId: number): Promise<void> {
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '👤 Community Member', callback_data: 'role_Community_Member' }],
+      [{ text: '👔 Manager', callback_data: 'role_Manager' }],
+      [{ text: '📋 Public Officer', callback_data: 'role_Public_Officer' }],
+      [{ text: '💰 Finance Officer', callback_data: 'role_Finance_Officer' }],
+      [{ text: '📦 Logistics Officer', callback_data: 'role_Logistics_Officer' }],
+    ],
+  }
+  await sendTelegramMessage(chatId, '👔 Select member role:', { reply_markup: keyboard })
+}
+
+// Show group selection
+async function showGroupSelection(chatId: number): Promise<void> {
+  try {
+    const { rows: groups } = await pool.query(`
+      SELECT id, name FROM member_groups ORDER BY name ASC
+    `)
+    
+    const buttons = groups.map((g: any) => [{
+      text: g.name,
+      callback_data: `group_${g.name}`,
+    }])
+    buttons.push([{ text: '❌ No Group', callback_data: 'group_none' }])
+
+    const keyboard = { inline_keyboard: buttons }
+    await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
+  } catch (err) {
+    console.error('Error loading groups:', err)
+    await sendTelegramMessage(chatId, '❌ Error loading groups. Continuing without group selection.')
+    const state = userStates.get(chatId)
+    if (state) {
+      state.data.group_name = null
+      state.step = 'household'
+      await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number)')
+    }
+  }
+}
+
+// Show organizing group selection
+async function showOrgGroupSelection(chatId: number): Promise<void> {
+  try {
+    const { rows: groups } = await pool.query(`
+      SELECT id, name FROM member_groups ORDER BY name ASC
+    `)
+    
+    const buttons = groups.map((g: any) => [{
+      text: g.name,
+      callback_data: `org_group_${g.name}`,
+    }])
+    buttons.push([{ text: '❌ No Group', callback_data: 'org_group_none' }])
+
+    const keyboard = { inline_keyboard: buttons }
+    await sendTelegramMessage(chatId, '👥 Select organizing group (optional):', { reply_markup: keyboard })
+  } catch (err) {
+    console.error('Error loading groups:', err)
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      state.data.organizing_group = null
+      await createEvent(chatId, state.data)
+      userStates.delete(chatId)
+    }
+  }
+}
+
+// Show event confirmation
+async function showEventConfirmation(chatId: number, data: any): Promise<void> {
+  const summary = `
+📅 <b>Event Summary</b>
+
+<b>Title:</b> ${data.title}
+<b>Type:</b> ${data.event_type || 'Event'}
+<b>Date:</b> ${data.event_date}
+<b>Time:</b> ${data.start_time} - ${data.end_time}
+${data.address ? `<b>Location:</b> ${data.address}` : ''}
+${data.description ? `<b>Description:</b> ${data.description}` : ''}
+<b>Estimated Cost:</b> $${data.estimated_cost || 0}
+
+Ready to create this event?
+  `.trim()
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '✅ Create Event', callback_data: 'confirm_yes' },
+        { text: '❌ Cancel', callback_data: 'confirm_no' },
+      ],
+    ],
+  }
+
+  await sendTelegramMessage(chatId, summary, { reply_markup: keyboard })
+}
+
+// Create event in database
+async function createEvent(chatId: number, data: any): Promise<void> {
+  try {
+    await sendTelegramMessage(chatId, '⏳ Creating event...')
+
+    const result = await pool.query(
+      `INSERT INTO events (
+        id, title, description, address, event_type, event_date, 
+        start_time, end_time, estimated_cost, organizing_group
+      ) VALUES (
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
+      ) RETURNING id, title, event_date`,
+      [
+        data.title,
+        data.description || null,
+        data.address || null,
+        data.event_type || 'Event',
+        data.event_date,
+        data.start_time,
+        data.end_time,
+        data.estimated_cost || 0,
+        data.organizing_group || null,
+      ]
+    )
+
+    const event = result.rows[0]
+    await sendTelegramMessage(
+      chatId,
+      `✅ <b>Event Created Successfully!</b>\n\n<b>Title:</b> ${event.title}\n<b>Date:</b> ${event.event_date}\n<b>ID:</b> ${event.id}`
+    )
+  } catch (err: any) {
+    console.error('Error creating event:', err)
+    await sendTelegramMessage(chatId, `❌ Failed to create event: ${err.message}`)
+  }
+}
+
+// Create member in database
+async function createMember(chatId: number, data: any): Promise<void> {
+  try {
+    await sendTelegramMessage(chatId, '⏳ Creating member...')
+
+    const hashed = await bcrypt.hash(data.password, 10)
+    const result = await pool.query(
+      `INSERT INTO users (
+        id, name, email, phone, password_hash, address, role, 
+        group_name, date_joined, household_members
+      ) VALUES (
+        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), $8
+      ) RETURNING id, name, phone, role`,
+      [
+        data.name,
+        data.email || null,
+        data.phone,
+        hashed,
+        data.address || null,
+        data.role || 'Community Member',
+        data.group_name || null,
+        data.household_members || 1,
+      ]
+    )
+
+    const member = result.rows[0]
+    await sendTelegramMessage(
+      chatId,
+      `✅ <b>Member Created Successfully!</b>\n\n<b>Name:</b> ${member.name}\n<b>Phone:</b> ${member.phone}\n<b>Role:</b> ${member.role}\n<b>ID:</b> ${member.id}`
+    )
+  } catch (err: any) {
+    console.error('Error creating member:', err)
+    let errorMsg = 'Failed to create member'
+    
+    if (err.code === '23505') {
+      if (err.constraint?.includes('phone')) {
+        errorMsg = 'This phone number is already registered'
+      } else if (err.constraint?.includes('email')) {
+        errorMsg = 'This email is already registered'
+      }
+    }
+    
+    await sendTelegramMessage(chatId, `❌ ${errorMsg}`)
   }
 }
 
