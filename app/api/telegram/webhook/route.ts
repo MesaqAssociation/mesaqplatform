@@ -478,14 +478,20 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
     })
     await sendTelegramMessage(chatId, '👤 <b>Creating Member</b>\n\nPlease enter the member\'s full name:\n\n<i>Type /cancel to abort</i>')
   }
-  // Event type selection
-  else if (data.startsWith('event_type_')) {
+  // Organizing group selection for event
+  else if (data.startsWith('org_group_') && !data.includes('confirm')) {
     const state = userStates.get(chatId)
-    if (state?.type === 'event') {
-      const eventType = data.replace('event_type_', '')
-      state.data.event_type = eventType
+    if (state?.type === 'event' && state.step === 'organizing_group') {
+      const group = data.replace('org_group_', '')
+      state.data.organizing_group = group === 'none' ? null : group
       state.step = 'date'
       await sendTelegramMessage(chatId, '📆 Enter the event date (DD-MM-YYYY):\n\nExample: 25-12-2024')
+    } else if (state?.type === 'event' && state.step === 'confirm') {
+      // Final group selection after confirmation
+      const group = data.replace('org_group_', '')
+      state.data.organizing_group = group === 'none' ? null : group
+      await createEvent(chatId, state.data)
+      userStates.delete(chatId)
     }
   }
   // Member role selection
@@ -508,21 +514,13 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number, e.g., 1, 2, 3)')
     }
   }
-  // Event organizing group selection
-  else if (data.startsWith('org_group_')) {
-    const state = userStates.get(chatId)
-    if (state?.type === 'event') {
-      const group = data.replace('org_group_', '')
-      state.data.organizing_group = group === 'none' ? null : group
-      await createEvent(chatId, state.data)
-      userStates.delete(chatId)
-    }
-  }
   // Confirm creation
   else if (data === 'confirm_yes') {
     const state = userStates.get(chatId)
     if (state?.type === 'event') {
-      await showOrgGroupSelection(chatId)
+      // Event already has organizing group, just create it
+      await createEvent(chatId, state.data)
+      userStates.delete(chatId)
     }
   } else if (data === 'confirm_no') {
     userStates.delete(chatId)
@@ -556,8 +554,8 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
 
     case 'address':
       state.data.address = text.toLowerCase() === 'skip' ? null : text
-      state.step = 'type'
-      await showEventTypeSelection(chatId)
+      state.step = 'organizing_group'
+      await showOrgGroupSelection(chatId)
       break
 
     case 'date':
@@ -592,7 +590,7 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
       }
       state.data.end_time = text
       state.step = 'cost'
-      await sendTelegramMessage(chatId, '💰 How much will this event cost per person? (Enter amount in dollars, or type "0" for free):')
+      await sendTelegramMessage(chatId, '💰 What is the total cost for this event? (Enter amount in dollars, or type "0" for free):')
       break
 
     case 'cost':
@@ -797,12 +795,12 @@ async function showEventConfirmation(chatId: number, data: any): Promise<void> {
 📅 <b>Event Summary</b>
 
 <b>Title:</b> ${data.title}
-<b>Type:</b> ${data.event_type || 'Event'}
 <b>Date:</b> ${displayDate}
 <b>Time:</b> ${data.start_time} - ${data.end_time}
 ${data.address ? `<b>Location:</b> ${data.address}` : ''}
 ${data.description ? `<b>Description:</b> ${data.description}` : ''}
-<b>Cost per person:</b> $${data.estimated_cost || 0}
+${data.organizing_group ? `<b>Organizing Group:</b> ${data.organizing_group}` : ''}
+<b>Total Cost:</b> $${data.estimated_cost || 0}
 
 Ready to create this event?
   `.trim()
@@ -832,16 +830,15 @@ async function createEvent(chatId: number, data: any): Promise<void> {
 
     const result = await pool.query(
       `INSERT INTO events (
-        id, title, description, address, event_type, event_date, 
+        id, title, description, address, event_date, 
         start_time, end_time, estimated_cost, organizing_group, attendees
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
       ) RETURNING id, title, event_date`,
       [
         data.title,
         data.description || null,
         data.address || null,
-        data.event_type || 'Event',
         data.event_date,
         data.start_time,
         data.end_time,
