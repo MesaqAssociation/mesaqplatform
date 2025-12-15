@@ -109,6 +109,8 @@ export async function GET(req: NextRequest) {
       ORDER BY name ASC
     `)
 
+        console.log(`📊 Found ${members.length} members for report`)
+
         // Calculate balance for each member
         const memberData = await Promise.all(
             members.map(async (member: any) => {
@@ -121,30 +123,49 @@ export async function GET(req: NextRequest) {
             })
         )
 
+        console.log(`💰 Calculated balances for ${memberData.length} members`)
+
         // Load the template
         const templatePath = join(process.cwd(), 'public', 'report-template.docx')
+        console.log(`📄 Loading template from: ${templatePath}`)
+
         const content = readFileSync(templatePath, 'binary')
+        console.log(`✅ Template loaded, size: ${content.length} bytes`)
 
         // Create a new PizZip instance with the template
         const zip = new PizZip(content)
 
-        // Create docxtemplater instance
+        // Create docxtemplater instance with error handling
         const doc = new Docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
         })
 
         // Set the template data
-        doc.render({
+        const templateData = {
             date: getMelbourneDate(),
             'member-table-loop': memberData
-        })
+        }
+
+        console.log(`🔧 Rendering template with data:`, JSON.stringify(templateData, null, 2))
+
+        try {
+            doc.render(templateData)
+        } catch (renderError: any) {
+            console.error('❌ Template rendering error:', renderError)
+            console.error('Error properties:', renderError.properties)
+            throw new Error(`Template rendering failed: ${renderError.message}. Please ensure the template has the correct placeholders: {{date}} and {{#member-table-loop}}{{member-id}}{{member-name}}{{balance}}{{/member-table-loop}}`)
+        }
+
+        console.log(`✅ Template rendered successfully`)
 
         // Generate the document
         const buffer = doc.getZip().generate({
             type: 'nodebuffer',
             compression: 'DEFLATE',
         }) as Buffer
+
+        console.log(`📦 Generated document, size: ${buffer.length} bytes`)
 
         // Return the file as a download
         return new NextResponse(new Uint8Array(buffer), {
@@ -154,10 +175,12 @@ export async function GET(req: NextRequest) {
             },
         })
     } catch (err: any) {
-        console.error('Report generation error:', err)
+        console.error('❌ Report generation error:', err)
+        console.error('Error stack:', err.stack)
         return NextResponse.json({
             error: 'Failed to generate report',
-            details: err.message
+            details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         }, { status: 500 })
     }
 }
