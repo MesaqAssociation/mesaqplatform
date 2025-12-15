@@ -43,6 +43,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Delete all bank statements for this account (so they can be re-uploaded)
+    await pool.query(
+      'DELETE FROM bank_statements WHERE account_id = $1',
+      [accountId]
+    )
+
     // Delete all transactions for this account
     const { rowCount } = await pool.query(
       'DELETE FROM transactions WHERE account_id = $1 OR account_id IS NULL',
