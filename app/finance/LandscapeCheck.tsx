@@ -5,13 +5,11 @@ import { IconRotate } from '@tabler/icons-react'
 
 export default function LandscapeCheck({ children }: { children: React.ReactNode }) {
   const [isPortrait, setIsPortrait] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const checkOrientation = () => {
       const mobile = window.innerWidth < 768
       const portrait = window.innerHeight > window.innerWidth
-      setIsMobile(mobile)
       setIsPortrait(mobile && portrait)
     }
 
@@ -27,7 +25,7 @@ export default function LandscapeCheck({ children }: { children: React.ReactNode
 
   if (isPortrait) {
     return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="flex flex-col items-center justify-center p-6 text-center min-h-[80vh]">
         <IconRotate className="size-16 text-muted-foreground mb-6 animate-pulse" />
         <h2 className="text-xl font-semibold mb-2">Please Rotate Your Device</h2>
         <p className="text-muted-foreground max-w-sm">

@@ -85,6 +85,46 @@ export async function POST(req: NextRequest) {
         const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
         const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
         
+        // Check for duplicate statement - same file name or overlapping date range
+        const { rows: existingStatements } = await pool.query(`
+          SELECT id, file_name, statement_date_from, statement_date_to 
+          FROM bank_statements 
+          WHERE account_id = $1 
+            AND (
+              file_name = $2 
+              OR (
+                statement_date_from IS NOT NULL 
+                AND statement_date_to IS NOT NULL 
+                AND $3::date IS NOT NULL 
+                AND $4::date IS NOT NULL
+                AND (statement_date_from <= $4::date AND statement_date_to >= $3::date)
+              )
+            )
+        `, [accountId, document.file_name, minDate, maxDate])
+        
+        if (existingStatements.length > 0) {
+          const existingFile = existingStatements[0]
+          let errorMsg = ''
+          if (existingFile.file_name === document.file_name) {
+            errorMsg = `⚠️ Duplicate: A file named "${document.file_name}" has already been uploaded.`
+          } else {
+            errorMsg = `⚠️ Duplicate: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists.`
+          }
+          console.log(`[Telegram] ${errorMsg}`)
+          
+          // Send message back to user
+          await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: errorMsg
+            })
+          })
+          
+          return NextResponse.json({ ok: true })
+        }
+        
         const { rows: statementRows } = await pool.query(`
           INSERT INTO bank_statements 
             (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, file_url)

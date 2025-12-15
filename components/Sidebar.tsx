@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX, IconLogout } from '@tabler/icons-react'
+import { IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX, IconLogout, IconBell } from '@tabler/icons-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/components/I18nProvider'
 import { getInitials } from '@/lib/utils'
 
@@ -46,9 +47,10 @@ export function Sidebar({ user }: SidebarProps) {
   const userRole = (user?.role || '').toLowerCase()
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
 
-  // Define navigation items based on role - NO meetings, just events as direct link
+  // Define navigation items based on role - with Calendar before Members
   const NAV_ITEMS = isAdminOrBoard ? [
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
+    { title: "Calendar", url: "/calendar", icon: IconBell },
     { title: t("members"), url: "/members", icon: IconUsers },
     { title: t("finance"), url: "/finance", icon: IconCash },
     { title: t("events"), url: "/events", icon: IconCalendarEvent },
@@ -57,6 +59,7 @@ export function Sidebar({ user }: SidebarProps) {
   ] : [
     // Regular members only see limited items
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
+    { title: "Calendar", url: "/calendar", icon: IconBell },
     { title: t("members"), url: "/members", icon: IconUsers },
     { title: "Payments", url: "/payments", icon: IconCash },
     { title: t("events"), url: "/events", icon: IconCalendarEvent },
@@ -132,6 +135,7 @@ export function Sidebar({ user }: SidebarProps) {
         {/* User Section - Fixed at bottom */}
         <div className={`border-t border-sidebar-border flex-shrink-0 ${showText ? 'p-3' : 'p-2'}`}>
           {showText ? (
+            // Expanded view (desktop or mobile expanded) - buttons open to the right
             <div className="space-y-2">
               {/* Settings button */}
               <Link
@@ -165,22 +169,33 @@ export function Sidebar({ user }: SidebarProps) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Link
-                href="/settings"
-                className="p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-                title={t("settings")}
-              >
-                <IconSettings className="size-5" />
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-                title={t("logout")}
-              >
-                <IconLogout className="size-5" />
-              </button>
-            </div>
+            // Collapsed view (mobile only) - dropdown opens UPWARD
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full flex justify-center p-2 rounded-md hover:bg-sidebar-accent transition-colors">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.image || undefined} alt={user?.name || 'User'} />
+                    <AvatarFallback>{getInitials(user?.name || 'U')}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-48 mb-2">
+                <div className="px-2 py-1.5 text-sm font-medium truncate">
+                  {user?.name || 'User'}
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="cursor-pointer">
+                    <IconSettings className="mr-2 size-4" />
+                    {t("settings")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                  <IconLogout className="mr-2 size-4" />
+                  {t("logout")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </aside>

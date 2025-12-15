@@ -168,28 +168,33 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold">{t("members")}</h1>
         {isAdmin && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-row gap-2 overflow-x-auto">
             <Button 
               variant="outline" 
+              size="sm"
+              className="whitespace-nowrap"
               onClick={() => {
                 setShowViewGroupsDialog(true)
                 loadGroups()
               }}
             >
-              <IconEye className="mr-2 size-4" />
-              View Groups
+              <IconEye className="mr-1 size-4" />
+              <span className="hidden sm:inline">View Groups</span>
+              <span className="sm:hidden">Groups</span>
             </Button>
-            <Button variant="outline" onClick={() => setShowGroupDialog(true)}>
-              <IconUsers className="mr-2 size-4" />
-              Create Group
+            <Button variant="outline" size="sm" className="whitespace-nowrap" onClick={() => setShowGroupDialog(true)}>
+              <IconUsers className="mr-1 size-4" />
+              <span className="hidden sm:inline">Create Group</span>
+              <span className="sm:hidden">New Group</span>
             </Button>
             <Link href="/members/create">
-              <Button>
-                <IconPlus className="mr-2 size-4" />
-                {t("createNew")}
+              <Button size="sm" className="whitespace-nowrap">
+                <IconPlus className="mr-1 size-4" />
+                <span className="hidden sm:inline">{t("createNew")}</span>
+                <span className="sm:hidden">New</span>
               </Button>
             </Link>
           </div>
