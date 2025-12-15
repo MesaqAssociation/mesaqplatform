@@ -6,14 +6,15 @@ import FineSettings from './FineSettings'
 import UserSettings from './UserSettings'
 import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
+import BoardMemberReport from './BoardMemberReport'
 
-export default function SettingsClient({ 
-  user, 
+export default function SettingsClient({
+  user,
   fullUserData,
   currentFee,
   finesEnabled,
   fineAmount
-}: { 
+}: {
   user: any
   fullUserData: any
   currentFee: string
@@ -26,7 +27,7 @@ export default function SettingsClient({
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-6">Settings</h1>
-      
+
       <Tabs defaultValue="personal" className="max-w-4xl">
         <TabsList>
           <TabsTrigger value="personal">Personal Settings</TabsTrigger>
@@ -60,7 +61,7 @@ export default function SettingsClient({
               <p className="text-sm text-muted-foreground mb-4">
                 Configure automatic fines for late payments
               </p>
-              <FineSettings 
+              <FineSettings
                 initialEnabled={finesEnabled}
                 initialAmount={fineAmount}
               />
@@ -81,6 +82,8 @@ export default function SettingsClient({
               </p>
               <ExportData />
             </div>
+
+            <BoardMemberReport />
           </TabsContent>
         )}
       </Tabs>

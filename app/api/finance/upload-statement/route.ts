@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!token || !process.env.AUTH_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  
+
   let userId: string
   try {
     const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
 
     // Only process PDF files
     if (file.type !== 'application/pdf') {
-      return NextResponse.json({ 
-        error: 'Only PDF files are supported at this time' 
+      return NextResponse.json({
+        error: 'Only PDF files are supported at this time'
       }, { status: 400 })
     }
 
@@ -52,8 +52,8 @@ export async function POST(req: NextRequest) {
     const parsed = await parseBankStatementPDF(buffer)
 
     if (parsed.transactions.length === 0) {
-      return NextResponse.json({ 
-        error: 'No transactions found in the statement. Please ensure the PDF is a valid bank statement.' 
+      return NextResponse.json({
+        error: 'No transactions found in the statement. Please ensure the PDF is a valid bank statement.'
       }, { status: 400 })
     }
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       const maxDate = dates.reduce((a, b) => a > b ? a : b)
       const firstTransactionName = parsed.transactions[0]?.name || ''
       const lastTransactionName = parsed.transactions[parsed.transactions.length - 1]?.name || ''
-      
+
       // Check if we already have transactions from this exact date range with matching details
       const { rows: existingStatements } = await pool.query(`
         SELECT COUNT(*) as count
@@ -75,9 +75,9 @@ export async function POST(req: NextRequest) {
           AND source = 'bank_statement'
         HAVING COUNT(*) >= $4
       `, [accountId || parsed.accountNumber, minDate, maxDate, Math.floor(parsed.transactions.length * 0.8)])
-      
+
       if (existingStatements.length > 0 && existingStatements[0].count >= Math.floor(parsed.transactions.length * 0.8)) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: `This statement appears to have already been uploaded. Found ${existingStatements[0].count} existing transactions between ${minDate} and ${maxDate}. If you believe this is an error, please contact support.`,
           duplicate: true,
           dateRange: { min: minDate, max: maxDate },
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     // Determine which account to use
     let finalAccountId = accountId
     let isDonationAccount = false
-    
+
     // If PDF has account number, try to match it to an existing account
     if (parsed.accountNumber) {
       console.log(`📋 PDF contains account number: ${parsed.accountNumber}`)
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         'SELECT id, is_donation_account FROM financial_accounts WHERE account_number = $1',
         [parsed.accountNumber]
       )
-      
+
       if (matchedAccounts.length > 0) {
         finalAccountId = matchedAccounts[0].id
         isDonationAccount = matchedAccounts[0].is_donation_account || false
@@ -146,39 +146,26 @@ export async function POST(req: NextRequest) {
     const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
     const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
     const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
-    
-    // Check for duplicate statement - same file name and overlapping date range
+
+    // Check for duplicate statement - overlapping date range only
     const { rows: existingStatements } = await pool.query(`
-      SELECT id, file_name, statement_date_from, statement_date_to 
+      SELECT id, statement_date_from, statement_date_to 
       FROM bank_statements 
       WHERE account_id = $1 
-        AND (
-          file_name = $2 
-          OR (
-            statement_date_from IS NOT NULL 
-            AND statement_date_to IS NOT NULL 
-            AND $3::date IS NOT NULL 
-            AND $4::date IS NOT NULL
-            AND (
-              (statement_date_from <= $4::date AND statement_date_to >= $3::date)
-            )
-          )
-        )
-    `, [finalAccountId, file.name, minDate, maxDate])
-    
+        AND statement_date_from IS NOT NULL 
+        AND statement_date_to IS NOT NULL 
+        AND $2::date IS NOT NULL 
+        AND $3::date IS NOT NULL
+        AND (statement_date_from <= $3::date AND statement_date_to >= $2::date)
+    `, [finalAccountId, minDate, maxDate])
+
     if (existingStatements.length > 0) {
       const existingFile = existingStatements[0]
-      if (existingFile.file_name === file.name) {
-        return NextResponse.json({ 
-          error: `Duplicate statement: A file named "${file.name}" has already been uploaded to this account.`
-        }, { status: 400 })
-      } else {
-        return NextResponse.json({ 
-          error: `Duplicate date range: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists. This statement covers ${minDate} to ${maxDate}.`
-        }, { status: 400 })
-      }
+      return NextResponse.json({
+        error: `Duplicate date range: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists. This statement covers ${minDate} to ${maxDate}.`
+      }, { status: 400 })
     }
-    
+
     const { rows: statementRows } = await pool.query(`
       INSERT INTO bank_statements 
         (account_id, file_name, file_size, file_type, statement_date_from, statement_date_to, transaction_count, uploaded_by, file_url)
@@ -195,44 +182,44 @@ export async function POST(req: NextRequest) {
       userId,
       fileUrl
     ])
-    
+
     const statementId = statementRows[0]?.id
     console.log(`📄 Created bank statement record: ${statementId}${fileUrl ? ` with R2 URL` : ''}`)
 
     // Match transactions to members for categorization (CREDIT ONLY) - SKIP FOR DONATION ACCOUNTS
     let memberMatches: Array<{ memberId: string; memberName: string } | null> = []
-    
+
     if (isDonationAccount) {
       console.log(`\n⚠️ Donation account detected - skipping member matching`)
       memberMatches = new Array(parsed.transactions.length).fill(null)
     } else {
-    console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
+      console.log(`\n=== Matching ${parsed.transactions.length} transactions to members ===`)
       memberMatches = await batchMatchTransactions(
-      pool,
-      parsed.transactions.map(txn => ({
-        name: txn.name,
+        pool,
+        parsed.transactions.map(txn => ({
+          name: txn.name,
           description: txn.description,
           type: txn.type // Pass type to filter out debits
-      }))
-    )
-    
-    console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
+        }))
+      )
+
+      console.log(`✅ Matched ${memberMatches.filter(m => m !== null).length} transactions to members`)
     }
-    
+
     // Insert transactions
     const insertedCount = []
     const failedTransactions: any[] = []
     const skippedTransactions: any[] = []
-    
+
     console.log(`\n=== Inserting ${parsed.transactions.length} transactions ===`)
-    
+
     for (let idx = 0; idx < parsed.transactions.length; idx++) {
       const txn = parsed.transactions[idx]
       const match = memberMatches[idx]
       // Determine amount and type
       let amount = 0
       let txnType = 'debit'
-      
+
       if (txn.credit && txn.credit > 0) {
         amount = txn.credit
         txnType = 'credit'
@@ -254,8 +241,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (amount === 0) {
-        skippedTransactions.push({ 
-          date: txn.date, 
+        skippedTransactions.push({
+          date: txn.date,
           name: txn.name?.substring(0, 50) || 'No name',
           description: txn.description?.substring(0, 50) || '',
           reason: 'No transaction amount found'
@@ -277,7 +264,7 @@ export async function POST(req: NextRequest) {
         const year = parseInt(dateParts[0])
         const month = parseInt(dateParts[1])
         const day = parseInt(dateParts[2])
-        
+
         const testDate = new Date(year, month - 1, day)
         if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
           const error = `Invalid date values: ${txn.date}`
@@ -291,7 +278,7 @@ export async function POST(req: NextRequest) {
           "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
-        
+
         // Get all payment keywords with their payment types
         let keywords: Array<{ keyword: string, paymentType: string }> = []
         try {
@@ -300,33 +287,33 @@ export async function POST(req: NextRequest) {
         } catch (kwErr) {
           console.log('⚠️ Keywords table not found, skipping keyword check')
         }
-        
+
         // SMART CLASSIFICATION LOGIC
         let category = isDonationAccount ? 'Donation' : 'Special Payment' // Default
-        
+
         // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY - regardless of member match)
         // ONLY check description for keywords (case-insensitive)
         let keywordMatch: { keyword: string, paymentType: string } | null = null
         if (!isDonationAccount && txn.description) {
           const descLower = txn.description.toLowerCase()
-          
+
           // Find keyword in description only
           keywordMatch = keywords.find(kw => descLower.includes(kw.keyword)) || null
-          
+
           if (keywordMatch) {
             category = keywordMatch.paymentType
             console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in description → ${keywordMatch.paymentType} (overrides all other logic)`)
           }
         }
-        
+
         // 2. If no keyword match, check if matched to a member and do amount-based logic
         if (!keywordMatch && !isDonationAccount && match && match.memberId) {
           console.log(`✓ Matched to member: ${match.memberName}`)
-          
+
           // Check if amount is a multiple of monthly fee (40, 80, 120, etc)
           const paymentAmount = Math.abs(amount)
           const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
-          
+
           if (isMultiple) {
             // Calculate member's balance deficit
             try {
@@ -352,12 +339,12 @@ export async function POST(req: NextRequest) {
                 FROM months_owed mo
                 LEFT JOIN months_paid mp ON true
               `, [match.memberId])
-              
+
               const monthsBehind = balanceRows[0]?.months_behind || 0
               const amountOwed = monthsBehind * monthlyFee
-              
+
               console.log(`Member balance: ${monthsBehind} months behind, owes $${amountOwed}, paying $${paymentAmount}`)
-              
+
               // If payment matches their deficit (or covers it), it's membership
               if (monthsBehind > 0 && paymentAmount <= amountOwed + monthlyFee) {
                 category = 'Membership Payment'
@@ -384,7 +371,7 @@ export async function POST(req: NextRequest) {
           // No keyword match and no member match
           console.log(`✗ No keyword or member match → Special Payment`)
         }
-        
+
         const { rows: inserted } = await pool.query(
           `INSERT INTO transactions 
            (account_id, transaction_date, transaction_name, description, amount, transaction_type, balance_after, created_by, source, reference, category, statement_id, matched_member_id) 
@@ -408,7 +395,7 @@ export async function POST(req: NextRequest) {
         )
         if (inserted.length > 0) {
           insertedCount.push(inserted[0])
-          
+
           // Auto-detect membership payment if categorized to a member (skip donation accounts)
           if (!isDonationAccount && category !== 'Misc' && txnType === 'credit') {
             await autoDetectMembershipPayment(
@@ -426,19 +413,19 @@ export async function POST(req: NextRequest) {
         failedTransactions.push({ date: txn.date, name: txn.name, description: txn.description, error })
       }
     }
-    
+
     // Log summary
     console.log(`\n=== Upload Summary ===`)
     console.log(`Total found: ${parsed.transactions.length}`)
     console.log(`Successfully inserted: ${insertedCount.length}`)
     console.log(`Skipped (no amount): ${skippedTransactions.length}`)
     console.log(`Failed: ${failedTransactions.length}`)
-    
+
     if (skippedTransactions.length > 0) {
       console.log(`\nSkipped transactions:`)
       skippedTransactions.forEach(s => console.log(`  - Date: ${s.date}, Name: ${s.name}, Reason: ${s.reason}`))
     }
-    
+
     if (failedTransactions.length > 0) {
       console.log(`\nFailed transactions:`)
       failedTransactions.forEach(f => console.log(`  - Date: ${f.date}, Name: ${f.name}, Error: ${f.error}`))
@@ -481,7 +468,7 @@ export async function POST(req: NextRequest) {
         "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
       )
       const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
-      
+
       const { rows: members } = await pool.query(`
         SELECT id, banking_name, name, date_joined
         FROM users
@@ -518,7 +505,7 @@ export async function POST(req: NextRequest) {
             VALUES ($1, $2, $3, $4, $5, 'paid')
             ON CONFLICT (user_id, payment_month) DO NOTHING
           `, [member.id, paymentMonthStr, monthlyFee, txn.id, txn.transaction_date])
-          
+
           paymentsDetected++
         }
       }
@@ -529,7 +516,7 @@ export async function POST(req: NextRequest) {
       // Don't fail the upload if payment detection fails
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       transactionsImported: insertedCount.length,
       totalFound: parsed.transactions.length,
@@ -542,8 +529,8 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: any) {
     console.error('Upload statement error:', err)
-    return NextResponse.json({ 
-      error: err.message || 'Failed to parse bank statement. Please ensure it\'s a valid PDF format.' 
+    return NextResponse.json({
+      error: err.message || 'Failed to parse bank statement. Please ensure it\'s a valid PDF format.'
     }, { status: 500 })
   }
 }
