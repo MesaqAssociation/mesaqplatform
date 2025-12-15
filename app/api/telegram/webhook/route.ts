@@ -485,7 +485,7 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       const eventType = data.replace('event_type_', '')
       state.data.event_type = eventType
       state.step = 'date'
-      await sendTelegramMessage(chatId, '📆 Enter the event date (YYYY-MM-DD):\n\nExample: 2024-12-25')
+      await sendTelegramMessage(chatId, '📆 Enter the event date (DD-MM-YYYY):\n\nExample: 25-12-2024')
     }
   }
   // Member role selection
@@ -561,12 +561,14 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
       break
 
     case 'date':
-      // Validate date format
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-        await sendTelegramMessage(chatId, '❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-12-25):')
+      // Validate date format DD-MM-YYYY
+      if (!/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid date format. Please use DD-MM-YYYY (e.g., 25-12-2024):')
         return
       }
-      state.data.event_date = text
+      // Convert DD-MM-YYYY to YYYY-MM-DD for database
+      const [day, month, year] = text.split('-')
+      state.data.event_date = `${year}-${month}-${day}`
       state.step = 'start_time'
       await sendTelegramMessage(chatId, '🕐 Enter start time (HH:MM in 24-hour format):\n\nExample: 14:30')
       break
@@ -590,7 +592,7 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
       }
       state.data.end_time = text
       state.step = 'cost'
-      await sendTelegramMessage(chatId, '💰 Enter estimated cost in dollars (or type "0" for free):')
+      await sendTelegramMessage(chatId, '💰 How much will this event cost per person? (Enter amount in dollars, or type "0" for free):')
       break
 
     case 'cost':
@@ -642,6 +644,12 @@ async function handleMemberInput(chatId: number, text: string, state: CreationSt
 
     case 'address':
       state.data.address = text.toLowerCase() === 'skip' ? null : text
+      state.step = 'member_id'
+      await sendTelegramMessage(chatId, '🆔 Enter member ID (or type "skip" to skip):')
+      break
+
+    case 'member_id':
+      state.data.member_id = text.toLowerCase() === 'skip' ? null : text
       state.step = 'password'
       await sendTelegramMessage(chatId, '🔒 Enter a password (minimum 8 characters):')
       break
@@ -700,21 +708,50 @@ async function showRoleSelection(chatId: number): Promise<void> {
 // Show group selection
 async function showGroupSelection(chatId: number): Promise<void> {
   try {
+    // First try member_groups table
     const { rows: groups } = await pool.query(`
       SELECT id, name FROM member_groups ORDER BY name ASC
     `)
     
-    const buttons = groups.map((g: any) => [{
-      text: g.name,
-      callback_data: `group_${g.name}`,
-    }])
-    buttons.push([{ text: '❌ No Group', callback_data: 'group_none' }])
+    if (groups.length > 0) {
+      const buttons = groups.map((g: any) => [{
+        text: g.name,
+        callback_data: `group_${g.name}`,
+      }])
+      buttons.push([{ text: '❌ No Group', callback_data: 'group_none' }])
 
-    const keyboard = { inline_keyboard: buttons }
-    await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
+      const keyboard = { inline_keyboard: buttons }
+      await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
+    } else {
+      // No groups found, try legacy group_name
+      const { rows: legacyGroups } = await pool.query(`
+        SELECT DISTINCT group_name as name 
+        FROM users 
+        WHERE group_name IS NOT NULL AND group_name != ''
+        ORDER BY group_name ASC
+      `)
+      
+      if (legacyGroups.length > 0) {
+        const buttons = legacyGroups.map((g: any) => [{
+          text: g.name,
+          callback_data: `group_${g.name}`,
+        }])
+        buttons.push([{ text: '❌ No Group', callback_data: 'group_none' }])
+
+        const keyboard = { inline_keyboard: buttons }
+        await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
+      } else {
+        // No groups at all, skip to household
+        const state = userStates.get(chatId)
+        if (state) {
+          state.data.group_name = null
+          state.step = 'household'
+          await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number)')
+        }
+      }
+    }
   } catch (err) {
     console.error('Error loading groups:', err)
-    await sendTelegramMessage(chatId, '❌ Error loading groups. Continuing without group selection.')
     const state = userStates.get(chatId)
     if (state) {
       state.data.group_name = null
@@ -752,16 +789,20 @@ async function showOrgGroupSelection(chatId: number): Promise<void> {
 
 // Show event confirmation
 async function showEventConfirmation(chatId: number, data: any): Promise<void> {
+  // Convert date back to DD-MM-YYYY for display
+  const [year, month, day] = data.event_date.split('-')
+  const displayDate = `${day}-${month}-${year}`
+  
   const summary = `
 📅 <b>Event Summary</b>
 
 <b>Title:</b> ${data.title}
 <b>Type:</b> ${data.event_type || 'Event'}
-<b>Date:</b> ${data.event_date}
+<b>Date:</b> ${displayDate}
 <b>Time:</b> ${data.start_time} - ${data.end_time}
 ${data.address ? `<b>Location:</b> ${data.address}` : ''}
 ${data.description ? `<b>Description:</b> ${data.description}` : ''}
-<b>Estimated Cost:</b> $${data.estimated_cost || 0}
+<b>Cost per person:</b> $${data.estimated_cost || 0}
 
 Ready to create this event?
   `.trim()
@@ -783,12 +824,18 @@ async function createEvent(chatId: number, data: any): Promise<void> {
   try {
     await sendTelegramMessage(chatId, '⏳ Creating event...')
 
+    // Get all members as attendees
+    const { rows: allMembers } = await pool.query(`
+      SELECT id FROM users ORDER BY name ASC
+    `)
+    const attendees = allMembers.map((m: any) => m.id)
+
     const result = await pool.query(
       `INSERT INTO events (
         id, title, description, address, event_type, event_date, 
-        start_time, end_time, estimated_cost, organizing_group
+        start_time, end_time, estimated_cost, organizing_group, attendees
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
       ) RETURNING id, title, event_date`,
       [
         data.title,
@@ -800,13 +847,14 @@ async function createEvent(chatId: number, data: any): Promise<void> {
         data.end_time,
         data.estimated_cost || 0,
         data.organizing_group || null,
+        JSON.stringify(attendees),
       ]
     )
 
     const event = result.rows[0]
     await sendTelegramMessage(
       chatId,
-      `✅ <b>Event Created Successfully!</b>\n\n<b>Title:</b> ${event.title}\n<b>Date:</b> ${event.event_date}\n<b>ID:</b> ${event.id}`
+      `✅ Event created successfully! 🎉`
     )
   } catch (err: any) {
     console.error('Error creating event:', err)
@@ -823,9 +871,9 @@ async function createMember(chatId: number, data: any): Promise<void> {
     const result = await pool.query(
       `INSERT INTO users (
         id, name, email, phone, password_hash, address, role, 
-        group_name, date_joined, household_members
+        group_name, date_joined, household_members, member_id
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), $8
+        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9
       ) RETURNING id, name, phone, role`,
       [
         data.name,
@@ -836,13 +884,14 @@ async function createMember(chatId: number, data: any): Promise<void> {
         data.role || 'Community Member',
         data.group_name || null,
         data.household_members || 1,
+        data.member_id || null,
       ]
     )
 
     const member = result.rows[0]
     await sendTelegramMessage(
       chatId,
-      `✅ <b>Member Created Successfully!</b>\n\n<b>Name:</b> ${member.name}\n<b>Phone:</b> ${member.phone}\n<b>Role:</b> ${member.role}\n<b>ID:</b> ${member.id}`
+      `✅ Member created successfully! 🎉`
     )
   } catch (err: any) {
     console.error('Error creating member:', err)
