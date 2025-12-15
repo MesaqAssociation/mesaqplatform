@@ -134,69 +134,39 @@ export function Sidebar({ user }: SidebarProps) {
 
         {/* User Section - Fixed at bottom */}
         <div className={`border-t border-sidebar-border flex-shrink-0 ${showText ? 'p-3' : 'p-2'}`}>
-          {showText ? (
-            // Expanded view (desktop or mobile expanded) - buttons open to the right
-            <div className="space-y-2">
-              {/* Settings button */}
-              <Link
-                href="/settings"
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full ${
-                  pathname === '/settings'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                }`}
-              >
-                <IconSettings className="size-5" />
-                <span>{t("settings")}</span>
-              </Link>
-              
-              {/* Logout button */}
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full text-sidebar-foreground hover:bg-sidebar-accent"
-              >
-                <IconLogout className="size-5" />
-                <span>{t("logout")}</span>
-              </button>
-              
-              {/* User info */}
-              <div className="flex items-center gap-2 px-3 py-2 border-t border-sidebar-border mt-2 pt-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={`w-full flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors ${!showText ? 'justify-center' : ''}`}>
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.image || undefined} alt={user?.name || 'User'} />
                   <AvatarFallback>{getInitials(user?.name || 'U')}</AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-medium truncate flex-1">{user?.name || 'User'}</span>
+                {showText && (
+                  <span className="text-sm font-medium truncate flex-1 text-left">{user?.name || 'User'}</span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              side={isMobile ? "top" : "right"} 
+              align={isMobile ? "start" : "end"} 
+              className="w-48"
+            >
+              <div className="px-2 py-1.5 text-sm font-medium truncate">
+                {user?.name || 'User'}
               </div>
-            </div>
-          ) : (
-            // Collapsed view (mobile only) - dropdown opens UPWARD
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="w-full flex justify-center p-2 rounded-md hover:bg-sidebar-accent transition-colors">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.image || undefined} alt={user?.name || 'User'} />
-                    <AvatarFallback>{getInitials(user?.name || 'U')}</AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-48 mb-2">
-                <div className="px-2 py-1.5 text-sm font-medium truncate">
-                  {user?.name || 'User'}
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="cursor-pointer">
-                    <IconSettings className="mr-2 size-4" />
-                    {t("settings")}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                  <IconLogout className="mr-2 size-4" />
-                  {t("logout")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="cursor-pointer">
+                  <IconSettings className="mr-2 size-4" />
+                  {t("settings")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                <IconLogout className="mr-2 size-4" />
+                {t("logout")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
     </>

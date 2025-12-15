@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { IconPlus, IconBell, IconTrash, IconSend, IconCheck, IconX, IconClock } from '@tabler/icons-react'
+import { IconPlus, IconBell, IconTrash, IconSend, IconCheck, IconX, IconClock, IconCalendarEvent, IconMapPin } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Notification = {
@@ -24,8 +25,20 @@ type Notification = {
   created_by_name: string | null
 }
 
+type Event = {
+  id: string
+  title: string
+  description: string | null
+  event_date: string
+  event_time: string | null
+  address: string | null
+  organizing_group: string | null
+}
+
 export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -36,18 +49,31 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    loadNotifications()
+    loadData()
   }, [])
 
-  const loadNotifications = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch('/api/notifications')
-      if (res.ok) {
-        const data = await res.json()
+      // Load notifications and events in parallel
+      const [notifRes, eventsRes] = await Promise.all([
+        fetch('/api/notifications'),
+        fetch('/api/events')
+      ])
+      
+      if (notifRes.ok) {
+        const data = await notifRes.json()
         setNotifications(data.notifications || [])
       }
+      
+      if (eventsRes.ok) {
+        const data = await eventsRes.json()
+        // Only show future events
+        const today = new Date().toISOString().split('T')[0]
+        const futureEvents = (data.events || []).filter((e: Event) => e.event_date >= today)
+        setEvents(futureEvents)
+      }
     } catch (err) {
-      console.error('Failed to load notifications:', err)
+      console.error('Failed to load data:', err)
     } finally {
       setLoading(false)
     }
@@ -85,7 +111,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         setTitle('')
         setMessage('')
         setSelectedDate(undefined)
-        loadNotifications()
+        loadData()
       } else {
         const data = await res.json()
         showToast(data.error || 'Failed to create notification', 'error')
@@ -102,7 +128,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch(`/api/notifications?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
         showToast('Notification cancelled', 'success')
-        loadNotifications()
+        loadData()
       } else {
         showToast('Failed to cancel notification', 'error')
       }
@@ -111,10 +137,12 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  // Get dates that have notifications for highlighting
+  // Get dates that have notifications or events for highlighting
   const notificationDates = notifications
     .filter(n => n.status === 'pending')
     .map(n => new Date(n.scheduled_date))
+  
+  const eventDates = events.map(e => new Date(e.event_date))
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-AU', {
@@ -123,6 +151,19 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       month: 'short',
       year: 'numeric'
     })
+  }
+
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return ''
+    try {
+      const [hours, minutes] = timeStr.split(':')
+      const hour = parseInt(hours)
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const hour12 = hour % 12 || 12
+      return `${hour12}:${minutes} ${ampm}`
+    } catch {
+      return timeStr
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -140,12 +181,17 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // Sort upcoming items by date
+  const upcomingEvents = [...events].sort((a, b) => 
+    new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+  ).slice(0, 5)
+
   return (
     <div className="p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Calendar & Notifications</h1>
-          <p className="text-muted-foreground text-sm mt-1">Schedule messages to be sent to all members</p>
+          <p className="text-muted-foreground text-sm mt-1">Schedule messages and view upcoming events</p>
         </div>
         {isAdmin && (
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -173,95 +219,179 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 }
               }}
               modifiers={{
-                hasNotification: notificationDates
+                hasNotification: notificationDates,
+                hasEvent: eventDates
               }}
               modifiersStyles={{
                 hasNotification: {
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                  backgroundColor: 'hsl(var(--primary) / 0.15)',
                   fontWeight: 'bold'
+                },
+                hasEvent: {
+                  border: '2px solid hsl(var(--primary))',
+                  borderRadius: '50%'
                 }
               }}
               className="rounded-md border w-full"
             />
+            <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-primary/15"></div>
+                <span>Notification</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full border-2 border-primary"></div>
+                <span>Event</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Notifications List */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <IconBell className="size-5" />
-              Scheduled Notifications
-            </CardTitle>
-            <CardDescription>View and manage upcoming messages to members</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <IconBell className="size-12 mx-auto mb-3 opacity-20" />
-                <p>No notifications scheduled yet</p>
-                {isAdmin && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-4"
-                    onClick={() => setShowCreateDialog(true)}
-                  >
-                    Create your first notification
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                {notifications.map((notification) => (
-                  <div 
-                    key={notification.id} 
-                    className={`p-4 border rounded-lg ${notification.status === 'cancelled' ? 'opacity-50' : ''}`}
-                  >
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium truncate">{notification.title}</h3>
-                          {getStatusBadge(notification.status)}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>📅 {formatDate(notification.scheduled_date)}</span>
-                          {notification.sent_at && (
-                            <span>✉️ Sent to {notification.recipients_count} members</span>
+        {/* Main Content Area */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Upcoming Events */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <IconCalendarEvent className="size-5" />
+                Upcoming Events
+              </CardTitle>
+              <CardDescription>Events scheduled for the future</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : upcomingEvents.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <IconCalendarEvent className="size-10 mx-auto mb-2 opacity-20" />
+                  <p>No upcoming events</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingEvents.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/events/${event.id}`)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{event.title}</h3>
+                          {event.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{event.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span>📅 {formatDate(event.event_date)}</span>
+                            {event.event_time && <span>🕐 {formatTime(event.event_time)}</span>}
+                            {event.organizing_group && (
+                              <Badge variant="outline" className="text-xs">{event.organizing_group}</Badge>
+                            )}
+                          </div>
+                          {event.address && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                              <IconMapPin className="size-3" />
+                              <span className="truncate">{event.address}</span>
+                            </div>
                           )}
                         </div>
                       </div>
-                      {notification.status === 'pending' && isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCancel(notification.id)}
-                          title="Cancel notification"
-                        >
-                          <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                  {events.length > 5 && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full" 
+                      onClick={() => router.push('/events')}
+                    >
+                      View all {events.length} events
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scheduled Notifications */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <IconBell className="size-5" />
+                Scheduled Notifications
+              </CardTitle>
+              <CardDescription>Messages scheduled to be sent to all members</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <IconBell className="size-10 mx-auto mb-2 opacity-20" />
+                  <p>No notifications scheduled</p>
+                  {isAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-3"
+                      onClick={() => setShowCreateDialog(true)}
+                    >
+                      Create your first notification
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {notifications.map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={`p-4 border rounded-lg ${notification.status === 'cancelled' ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-medium truncate">{notification.title}</h3>
+                            {getStatusBadge(notification.status)}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span>📅 {formatDate(notification.scheduled_date)}</span>
+                            {notification.sent_at && (
+                              <span>✉️ Sent to {notification.recipients_count} members</span>
+                            )}
+                          </div>
+                        </div>
+                        {notification.status === 'pending' && isAdmin && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleCancel(notification.id)}
+                            title="Cancel notification"
+                          >
+                            <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Create Notification Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Schedule Notification</DialogTitle>
             <DialogDescription>

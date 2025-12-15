@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS scheduled_notifications (
   message TEXT NOT NULL,
   scheduled_date DATE NOT NULL,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'cancelled')),
-  created_by UUID REFERENCES users(id),
+  created_by TEXT,  -- Matches users.id which is TEXT type
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   sent_at TIMESTAMP WITH TIME ZONE,
   recipients_count INTEGER DEFAULT 0,

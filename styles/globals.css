@@ -86,7 +86,19 @@
   * {
     @apply border-border;
   }
+  html {
+    /* Fix Safari mobile viewport issues */
+    height: -webkit-fill-available;
+  }
   body {
     @apply bg-background text-foreground;
+    /* Use dvh for dynamic viewport height on mobile Safari */
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    /* Safe area insets for notched devices */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
