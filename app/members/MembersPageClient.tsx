@@ -191,13 +191,13 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
               <span className="hidden sm:inline">Create Group</span>
               <span className="sm:hidden">New Group</span>
             </Button>
-            <Link href="/members/create">
+        <Link href="/members/create">
               <Button size="sm" className="whitespace-nowrap">
                 <IconPlus className="mr-1 size-4" />
                 <span className="hidden sm:inline">{t("createNew")}</span>
                 <span className="sm:hidden">New</span>
               </Button>
-            </Link>
+        </Link>
           </div>
         )}
       </div>

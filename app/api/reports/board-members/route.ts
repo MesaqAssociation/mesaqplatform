@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import PizZip from 'pizzip'
-import Docxtemplater from 'docxtemplater'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 export const runtime = 'nodejs'
 
@@ -116,85 +112,65 @@ export async function GET(req: NextRequest) {
             members.map(async (member: any) => {
                 const balance = await getMemberBalance(member.id)
                 return {
-                    'member-id': member.id,
-                    'member-name': member.name,
-                    balance: `$${balance.toFixed(2)}`
+                    id: member.id,
+                    name: member.name,
+                    email: member.email || '',
+                    phone: member.phone || '',
+                    dateJoined: member.date_joined ? new Date(member.date_joined).toLocaleDateString('en-AU') : '',
+                    balance: balance.toFixed(2)
                 }
             })
         )
 
         console.log(`💰 Calculated balances for ${memberData.length} members`)
 
-        // Load the template
-        const templatePath = join(process.cwd(), 'public', 'report-template.docx')
-        console.log(`📄 Loading template from: ${templatePath}`)
-
-        let content: string
-        try {
-            content = readFileSync(templatePath, 'binary')
-            console.log(`✅ Template loaded, size: ${content.length} bytes`)
-        } catch (err: any) {
-            console.error('❌ Failed to load template:', err.message)
-            return NextResponse.json({
-                error: 'Report template not found',
-                details: 'Please ensure report-template.docx exists in the public folder'
-            }, { status: 500 })
-        }
-
-        // Create a new PizZip instance with the template
-        const zip = new PizZip(content)
-
-        // Create docxtemplater instance with error handling
-        const doc = new Docxtemplater(zip, {
-            paragraphLoop: true,
-            linebreaks: true,
+        // Generate CSV content
+        const csvRows = []
+        
+        // Header row
+        csvRows.push(['Board Member Report'])
+        csvRows.push([`Generated: ${getMelbourneDate()}`])
+        csvRows.push([]) // Empty row
+        
+        // Column headers
+        csvRows.push(['Member ID', 'Name', 'Email', 'Phone', 'Date Joined', 'Balance'])
+        
+        // Data rows
+        memberData.forEach(member => {
+            csvRows.push([
+                member.id,
+                member.name,
+                member.email,
+                member.phone,
+                member.dateJoined,
+                `$${member.balance}`
+            ])
         })
+        
+        // Add summary row
+        csvRows.push([]) // Empty row
+        const totalBalance = memberData.reduce((sum, m) => sum + parseFloat(m.balance), 0)
+        csvRows.push(['', '', '', '', 'Total Balance:', `$${totalBalance.toFixed(2)}`])
+        
+        // Convert to CSV string
+        const csvContent = csvRows.map(row => 
+            row.map(cell => {
+                // Escape quotes and wrap in quotes if contains comma or quote
+                const cellStr = String(cell)
+                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                    return `"${cellStr.replace(/"/g, '""')}"`
+                }
+                return cellStr
+            }).join(',')
+        ).join('\n')
+        
+        console.log(`✅ Generated CSV with ${memberData.length} members`)
 
-        // Set the template data
-        const templateData = {
-            date: getMelbourneDate(),
-            'member-table-loop': memberData
-        }
-
-        console.log(`🔧 Rendering template with data:`, JSON.stringify(templateData, null, 2))
-
-        try {
-            doc.render(templateData)
-        } catch (renderError: any) {
-            console.error('❌ Template rendering error:', renderError)
-            console.error('Error name:', renderError.name)
-            console.error('Error properties:', renderError.properties)
-
-            // Log all individual errors if it's a multi-error
-            if (renderError.properties?.errors) {
-                console.error('Individual errors:')
-                renderError.properties.errors.forEach((err: any, index: number) => {
-                    console.error(`  Error ${index + 1}:`, {
-                        message: err.message,
-                        name: err.name,
-                        properties: err.properties
-                    })
-                })
-            }
-
-            throw new Error(`Template rendering failed: ${renderError.message}. Please ensure the template has the correct placeholders: {{date}} and {{#member-table-loop}}{{member-id}}{{member-name}}{{balance}}{{/member-table-loop}}`)
-        }
-
-        console.log(`✅ Template rendered successfully`)
-
-        // Generate the document
-        const buffer = doc.getZip().generate({
-            type: 'nodebuffer',
-            compression: 'DEFLATE',
-        }) as Buffer
-
-        console.log(`📦 Generated document, size: ${buffer.length} bytes`)
-
-        // Return the file as a download
-        return new NextResponse(new Uint8Array(buffer), {
+        // Return the CSV file as a download
+        return new NextResponse(csvContent, {
             headers: {
-                'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'Content-Disposition': `attachment; filename="Board-Member-Report-${getMelbourneDate().replace(/\//g, '-')}.docx"`,
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': `attachment; filename="Board-Member-Report-${getMelbourneDate().replace(/\//g, '-')}.csv"`,
             },
         })
     } catch (err: any) {

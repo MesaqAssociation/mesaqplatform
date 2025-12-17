@@ -92,9 +92,9 @@ export function Sidebar({ user }: SidebarProps) {
       <aside className={`fixed left-0 top-0 z-40 h-screen ${sidebarWidth} bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300`}>
         {/* Header with Logo and Mobile Toggle */}
         <div className="p-4 flex items-center justify-between flex-shrink-0">
-          <Link href="/dashboard" className="flex items-center">
-            <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" className="object-contain" />
-          </Link>
+        <Link href="/dashboard" className="flex items-center">
+          <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" className="object-contain" />
+        </Link>
           {isMobile && (
             <button
               onClick={() => setIsMobileOpen(!isMobileOpen)}
@@ -103,16 +103,16 @@ export function Sidebar({ user }: SidebarProps) {
               {isMobileOpen ? <IconX className="size-5" /> : <IconMenu2 className="size-5" />}
             </button>
           )}
-        </div>
+      </div>
 
         {/* Navigation - takes remaining space */}
         <nav className="flex-1 px-2 md:px-4 py-2 overflow-y-auto">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
+        <ul className="space-y-1">
+          {NAV_ITEMS.map((item) => {
               const itemActive = pathname === item.url || pathname.startsWith(item.url + '/')
 
-              return (
-                <li key={item.title}>
+            return (
+              <li key={item.title}>
                   <Link
                     href={item.url}
                     className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${!showText ? 'justify-center' : ''} ${
@@ -126,11 +126,11 @@ export function Sidebar({ user }: SidebarProps) {
                     {item.icon && <item.icon className="size-5 flex-shrink-0" />}
                     {showText && <span>{item.title}</span>}
                   </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
 
         {/* User Section - Fixed at bottom */}
         <div className={`border-t border-sidebar-border flex-shrink-0 ${showText ? 'p-3' : 'p-2'}`}>
@@ -167,8 +167,8 @@ export function Sidebar({ user }: SidebarProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </aside>
+      </div>
+    </aside>
     </>
   )
 }

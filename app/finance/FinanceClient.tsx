@@ -958,15 +958,15 @@ export default function FinanceClient({
             <IconPlus className="mr-2 size-4" />
             Add Account
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowDeleteAccountDialog(true)}
-            disabled={accounts.length <= 1}
-          >
-            <IconTrash className="mr-2 size-4" />
-            Delete Account
-          </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setShowDeleteAccountDialog(true)}
+          disabled={accounts.length <= 1}
+        >
+          <IconTrash className="mr-2 size-4" />
+          Delete Account
+        </Button>
         </div>
       </div>
 
@@ -1295,31 +1295,31 @@ export default function FinanceClient({
                                   <CommandEmpty>No members found</CommandEmpty>
                                 ) : (
                                   <>
-                                    <CommandGroup>
-                                      {memberSearchResults.map((member) => (
-                                        <CommandItem
-                                          key={member.id}
-                                          onSelect={() => {
-                                            handleMatchMember(txn.id, member.id)
-                                            setOpenPopoverId(null)
-                                            setMemberSearchQuery('')
-                                          }}
-                                          className="cursor-pointer"
-                                        >
-                                          <span className="font-medium">{member.name}</span>
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                    {txn.matched_member_id && (
-                                      <CommandGroup>
-                                        <CommandItem
-                                          onSelect={() => handleMatchMember(txn.id, null)}
-                                          className="cursor-pointer text-red-600"
-                                        >
-                                          <IconX className="mr-2 size-4" />
-                                          Remove member match
-                                        </CommandItem>
-                                      </CommandGroup>
+                                <CommandGroup>
+                                  {memberSearchResults.map((member) => (
+                                    <CommandItem
+                                      key={member.id}
+                                      onSelect={() => {
+                                        handleMatchMember(txn.id, member.id)
+                                        setOpenPopoverId(null)
+                                        setMemberSearchQuery('')
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                        <span className="font-medium">{member.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                                {txn.matched_member_id && (
+                                  <CommandGroup>
+                                    <CommandItem
+                                      onSelect={() => handleMatchMember(txn.id, null)}
+                                      className="cursor-pointer text-red-600"
+                                    >
+                                      <IconX className="mr-2 size-4" />
+                                      Remove member match
+                                    </CommandItem>
+                                  </CommandGroup>
                                     )}
                                   </>
                                 )}
@@ -1583,7 +1583,7 @@ export default function FinanceClient({
                           {selectedTransaction.statement_file_name}
                         </a>
                       ) : (
-                        <p className="font-medium text-sm">{selectedTransaction.statement_file_name}</p>
+                      <p className="font-medium text-sm">{selectedTransaction.statement_file_name}</p>
                       )}
                       {selectedTransaction.statement_date_from && selectedTransaction.statement_date_to && (
                         <p className="text-xs text-muted-foreground">
@@ -1646,15 +1646,15 @@ export default function FinanceClient({
                       {savingDialog ? 'Saving...' : 'Save Changes'}
                     </Button>
                   )}
-                  <Button 
-                    variant="outline"
+                <Button 
+                  variant="outline"
                     onClick={() => {
                       setShowTransactionDialog(false)
                       setDialogCategory('')
                     }}
-                  >
-                    Close
-                  </Button>
+                >
+                  Close
+                </Button>
                 </div>
               </div>
             </div>
@@ -1918,22 +1918,22 @@ export default function FinanceClient({
                       ) : addTxnMemberResults.length === 0 && addTxnMemberQuery ? (
                         <CommandEmpty>No members found</CommandEmpty>
                       ) : (
-                        <CommandGroup>
-                          {addTxnMemberResults.map((member) => (
-                            <CommandItem
-                              key={member.id}
-                              onSelect={() => {
-                                setNewTransactionMemberId(member.id)
-                                setNewTransactionMemberName(member.name)
-                                setAddTxnMemberQuery('')
-                                setAddTxnMemberResults([])
-                              }}
-                              className="cursor-pointer"
-                            >
+                      <CommandGroup>
+                        {addTxnMemberResults.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            onSelect={() => {
+                              setNewTransactionMemberId(member.id)
+                              setNewTransactionMemberName(member.name)
+                              setAddTxnMemberQuery('')
+                              setAddTxnMemberResults([])
+                            }}
+                            className="cursor-pointer"
+                          >
                               <span className="font-medium">{member.name}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                       )}
                       {newTransactionMemberId && (
                         <CommandGroup>
@@ -2027,22 +2027,22 @@ export default function FinanceClient({
                       ) : advanceMemberResults.length === 0 && advanceMemberQuery ? (
                         <CommandEmpty>No members found</CommandEmpty>
                       ) : (
-                        <CommandGroup>
-                          {advanceMemberResults.map((member) => (
-                            <CommandItem
-                              key={member.id}
-                              onSelect={() => {
-                                setAdvanceMemberId(member.id)
-                                setAdvanceMemberName(member.name)
-                                setAdvanceMemberQuery('')
-                                setAdvanceMemberResults([])
-                              }}
-                              className="cursor-pointer"
-                            >
+                      <CommandGroup>
+                        {advanceMemberResults.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            onSelect={() => {
+                              setAdvanceMemberId(member.id)
+                              setAdvanceMemberName(member.name)
+                              setAdvanceMemberQuery('')
+                              setAdvanceMemberResults([])
+                            }}
+                            className="cursor-pointer"
+                          >
                               <span className="font-medium">{member.name}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                       )}
                     </CommandList>
                   </Command>
