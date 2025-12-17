@@ -105,10 +105,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, description, memberIds } = body
+    const { name, description, memberIds, leaderId } = body
 
     if (!name || name.trim() === '') {
       return NextResponse.json({ error: 'Group name is required' }, { status: 400 })
+    }
+
+    if (!leaderId) {
+      return NextResponse.json({ error: 'Group leader is required' }, { status: 400 })
     }
 
     // Try to insert into member_groups table
@@ -125,10 +129,16 @@ export async function POST(req: NextRequest) {
       // If memberIds provided, update those members to be in this group
       if (memberIds && memberIds.length > 0) {
         await pool.query(
-          `UPDATE users SET group_id = $1 WHERE id = ANY($2::uuid[])`,
+          `UPDATE users SET group_id = $1, is_group_leader = false WHERE id = ANY($2::uuid[])`,
           [groupId, memberIds]
         )
       }
+
+      // Set the leader
+      await pool.query(
+        `UPDATE users SET group_id = $1, is_group_leader = true WHERE id = $2`,
+        [groupId, leaderId]
+      )
 
       return NextResponse.json({ 
         success: true,
@@ -142,10 +152,16 @@ export async function POST(req: NextRequest) {
         // Cast memberIds properly for text comparison with uuid column
         const placeholders = memberIds.map((_: string, i: number) => `$${i + 2}`).join(',')
         await pool.query(
-          `UPDATE users SET group_name = $1 WHERE id::text IN (${placeholders})`,
+          `UPDATE users SET group_name = $1, is_group_leader = false WHERE id::text IN (${placeholders})`,
           [name.trim(), ...memberIds]
         )
       }
+
+      // Set the leader
+      await pool.query(
+        `UPDATE users SET group_name = $1, is_group_leader = true WHERE id = $2`,
+        [name.trim(), leaderId]
+      )
 
       return NextResponse.json({ 
         success: true,

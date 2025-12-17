@@ -35,6 +35,7 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   const [showGroupDialog, setShowGroupDialog] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
+  const [selectedLeader, setSelectedLeader] = useState<string>('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   
@@ -225,9 +226,9 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
             </div>
             
             <div>
-              <Label>Add Members (optional)</Label>
+              <Label>Group Leader *</Label>
               <Input
-                placeholder="Search members..."
+                placeholder="Search for leader..."
                 value={memberSearchQuery}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
                 className="mt-1"
@@ -241,6 +242,36 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                   )
                   .map((member) => (
                     <label key={member.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                      <input
+                        type="radio"
+                        name="leader"
+                        checked={selectedLeader === member.id}
+                        onChange={() => {
+                          setSelectedLeader(member.id)
+                          if (!selectedMembers.includes(member.id)) {
+                            setSelectedMembers(prev => [...prev, member.id])
+                          }
+                        }}
+                        className="size-4"
+                      />
+                      <span className="text-sm font-medium">{member.name || 'Unknown'}</span>
+                    </label>
+                  ))}
+              </div>
+              {selectedLeader && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Leader: <span className="font-medium text-foreground">{initial.find(m => m.id === selectedLeader)?.name}</span>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label>Add Additional Members (optional)</Label>
+              <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                {initial
+                  .filter(m => m.id !== selectedLeader)
+                  .map((member) => (
+                    <label key={member.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
                       <Checkbox
                         checked={selectedMembers.includes(member.id)}
                         onCheckedChange={() => toggleMember(member.id)}
@@ -249,9 +280,9 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                     </label>
                   ))}
               </div>
-              {selectedMembers.length > 0 && (
+              {selectedMembers.filter(id => id !== selectedLeader).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {selectedMembers.map(id => {
+                  {selectedMembers.filter(id => id !== selectedLeader).map(id => {
                     const member = initial.find(m => m.id === id)
                     return (
                       <span 
@@ -276,7 +307,7 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
               <Button variant="outline" onClick={() => setShowGroupDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateGroup} disabled={creatingGroup || !groupName.trim()}>
+              <Button onClick={handleCreateGroup} disabled={creatingGroup || !groupName.trim() || !selectedLeader}>
                 {creatingGroup ? 'Creating...' : 'Create Group'}
               </Button>
             </div>
@@ -337,13 +368,18 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                             <div className="h-6 bg-muted/50 rounded animate-pulse w-36" />
                           </div>
                         ) : group.members && group.members.length > 0 ? (
-                          group.members.map((member) => (
+                          group.members.map((member: any) => (
                             <div 
                               key={member.id} 
                               className="px-3 py-2 text-sm rounded hover:bg-muted/50 cursor-pointer"
                               onClick={() => router.push(`/members/${member.id}`)}
                             >
-                              {member.name || 'Unknown'}
+                              <span className={member.is_group_leader ? 'font-bold' : ''}>
+                                {member.name || 'Unknown'}
+                              </span>
+                              {member.is_group_leader && (
+                                <span className="ml-2 text-xs text-primary">(Leader)</span>
+                              )}
                             </div>
                           ))
                         ) : (

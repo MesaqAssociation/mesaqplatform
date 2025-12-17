@@ -37,9 +37,9 @@ export async function GET(req: NextRequest) {
     if (groupId) {
       // Query by group_id (new schema)
       const { rows } = await pool.query(`
-        SELECT id, name FROM users 
+        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_id = $1
-        ORDER BY name ASC
+        ORDER BY is_group_leader DESC, name ASC
       `, [groupId])
       members = rows
     }
@@ -47,9 +47,9 @@ export async function GET(req: NextRequest) {
     // If no results from group_id, try group_name (legacy)
     if (members.length === 0 && groupName) {
       const { rows } = await pool.query(`
-        SELECT id, name FROM users 
+        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_name = $1
-        ORDER BY name ASC
+        ORDER BY is_group_leader DESC, name ASC
       `, [groupName])
       members = rows
     }
