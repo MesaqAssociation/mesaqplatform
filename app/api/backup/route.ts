@@ -150,14 +150,26 @@ export async function POST(req: NextRequest) {
     try {
       await client.query('BEGIN')
 
+      // Helper to safely execute queries that might fail (table doesn't exist)
+      const safeQuery = async (sql: string, params?: any[]) => {
+        try {
+          await client.query('SAVEPOINT safe_query')
+          await client.query(sql, params)
+          await client.query('RELEASE SAVEPOINT safe_query')
+        } catch (err: any) {
+          await client.query('ROLLBACK TO SAVEPOINT safe_query')
+          console.log(`⚠️ Query skipped (table may not exist): ${sql.substring(0, 50)}...`)
+        }
+      }
+
       // Clear existing data in reverse dependency order
       await client.query('DELETE FROM membership_payments')
       await client.query('DELETE FROM transactions')
       await client.query('DELETE FROM bank_statements')
       await client.query('DELETE FROM events')
-      await client.query('DELETE FROM scheduled_notifications').catch(() => {})
-      await client.query('DELETE FROM payment_keywords').catch(() => {})
-      await client.query('DELETE FROM member_groups').catch(() => {})
+      await safeQuery('DELETE FROM scheduled_notifications')
+      await safeQuery('DELETE FROM payment_keywords')
+      await safeQuery('DELETE FROM member_groups')
       
       // Keep financial accounts but clear and restore
       await client.query('DELETE FROM financial_accounts')
@@ -234,29 +246,29 @@ export async function POST(req: NextRequest) {
 
       // 8. Payment keywords (if exists)
       for (const keyword of backup.tables.payment_keywords || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO payment_keywords (id, keyword, payment_type, created_at)
            VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
           [keyword.id, keyword.keyword, keyword.payment_type, keyword.created_at]
-        ).catch(() => {})
+        )
       }
 
       // 9. Member groups (if exists)
       for (const group of backup.tables.member_groups || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO member_groups (id, name, description, created_at)
            VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
           [group.id, group.name, group.description, group.created_at]
-        ).catch(() => {})
+        )
       }
 
       // 10. Scheduled notifications (if exists)
       for (const notification of backup.tables.scheduled_notifications || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO scheduled_notifications (id, title, message, scheduled_date, status, created_by, created_at, sent_at, recipients_count, error_message)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING`,
           [notification.id, notification.title, notification.message, notification.scheduled_date, notification.status, notification.created_by, notification.created_at, notification.sent_at, notification.recipients_count, notification.error_message]
-        ).catch(() => {})
+        )
       }
 
       await client.query('COMMIT')
