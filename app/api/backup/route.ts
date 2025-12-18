@@ -33,19 +33,29 @@ export async function GET(req: NextRequest) {
     const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
     const userId = decoded.sub
 
-    // Check if user is admin
+    // Check if user is admin/board
     const { rows: roleRows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId])
     const role = (roleRows[0]?.role || '').toLowerCase()
     if (!['admin', 'board', 'manager'].includes(role)) {
-      return NextResponse.json({ error: 'Only admins can create backups' }, { status: 403 })
+      return NextResponse.json({ error: 'Only board members can create backups' }, { status: 403 })
     }
 
     console.log('📦 Creating backup...')
 
-    // Fetch all tables data
+    // Helper to safely query tables that might not exist
+    const safeQuery = async (sql: string) => {
+      try {
+        return await pool.query(sql)
+      } catch {
+        return { rows: [] }
+      }
+    }
+
+    // Fetch all tables data in parallel
     const [
       usersResult,
       eventsResult,
+      memberEventsResult,
       transactionsResult,
       membershipPaymentsResult,
       systemSettingsResult,
@@ -54,26 +64,30 @@ export async function GET(req: NextRequest) {
       memberGroupsResult,
       paymentKeywordsResult,
       scheduledNotificationsResult,
+      communityDocumentsResult,
     ] = await Promise.all([
       pool.query('SELECT * FROM users'),
       pool.query('SELECT * FROM events'),
+      safeQuery('SELECT * FROM member_events'),
       pool.query('SELECT * FROM transactions'),
       pool.query('SELECT * FROM membership_payments'),
       pool.query('SELECT * FROM system_settings'),
       pool.query('SELECT * FROM financial_accounts'),
       pool.query('SELECT * FROM bank_statements'),
-      pool.query('SELECT * FROM member_groups').catch(() => ({ rows: [] })),
-      pool.query('SELECT * FROM payment_keywords').catch(() => ({ rows: [] })),
-      pool.query('SELECT * FROM scheduled_notifications').catch(() => ({ rows: [] })),
+      safeQuery('SELECT * FROM member_groups'),
+      safeQuery('SELECT * FROM payment_keywords'),
+      safeQuery('SELECT * FROM scheduled_notifications'),
+      safeQuery('SELECT * FROM community_documents'),
     ])
 
     const backupData = {
-      version: '1.0',
+      version: '2.0',
       created_at: new Date().toISOString(),
       created_by: userId,
       tables: {
         users: usersResult.rows,
         events: eventsResult.rows,
+        member_events: memberEventsResult.rows,
         transactions: transactionsResult.rows,
         membership_payments: membershipPaymentsResult.rows,
         system_settings: systemSettingsResult.rows,
@@ -82,10 +96,12 @@ export async function GET(req: NextRequest) {
         member_groups: memberGroupsResult.rows,
         payment_keywords: paymentKeywordsResult.rows,
         scheduled_notifications: scheduledNotificationsResult.rows,
+        community_documents: communityDocumentsResult.rows,
       },
       counts: {
         users: usersResult.rows.length,
         events: eventsResult.rows.length,
+        member_events: memberEventsResult.rows.length,
         transactions: transactionsResult.rows.length,
         membership_payments: membershipPaymentsResult.rows.length,
         system_settings: systemSettingsResult.rows.length,
@@ -94,6 +110,7 @@ export async function GET(req: NextRequest) {
         member_groups: memberGroupsResult.rows.length,
         payment_keywords: paymentKeywordsResult.rows.length,
         scheduled_notifications: scheduledNotificationsResult.rows.length,
+        community_documents: communityDocumentsResult.rows.length,
       }
     }
 
@@ -139,141 +156,179 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please type "confirm" to proceed with restore' }, { status: 400 })
     }
 
-    if (!backup || !backup.version || !backup.tables) {
+    if (!backup || !backup.tables) {
       return NextResponse.json({ error: 'Invalid backup file format' }, { status: 400 })
     }
 
     console.log('🔄 Starting restore from backup created at:', backup.created_at)
 
-    // Begin transaction
     const client = await pool.connect()
+    const results: Record<string, { restored: number; skipped: number }> = {}
+    
     try {
       await client.query('BEGIN')
 
-      // Helper to safely execute queries that might fail (table doesn't exist)
-      const safeQuery = async (sql: string, params?: any[]) => {
+      // Helper to restore a table with one savepoint per table (FAST)
+      const restoreTable = async (
+        tableName: string,
+        data: any[],
+        insertFn: (item: any) => Promise<void>
+      ) => {
+        results[tableName] = { restored: 0, skipped: 0 }
+        if (!data || data.length === 0) return
+
         try {
-          await client.query('SAVEPOINT safe_query')
-          await client.query(sql, params)
-          await client.query('RELEASE SAVEPOINT safe_query')
+          await client.query(`SAVEPOINT restore_${tableName}`)
+          
+          for (const item of data) {
+            try {
+              await insertFn(item)
+              results[tableName].restored++
+            } catch (err: any) {
+              results[tableName].skipped++
+              // Continue with next item, don't fail the whole table
+            }
+          }
+          
+          await client.query(`RELEASE SAVEPOINT restore_${tableName}`)
+          console.log(`✅ ${tableName}: ${results[tableName].restored} restored, ${results[tableName].skipped} skipped`)
         } catch (err: any) {
-          await client.query('ROLLBACK TO SAVEPOINT safe_query')
-          console.log(`⚠️ Query skipped (table may not exist): ${sql.substring(0, 50)}...`)
+          await client.query(`ROLLBACK TO SAVEPOINT restore_${tableName}`)
+          console.log(`⚠️ ${tableName}: table restore failed, skipping`)
         }
       }
 
-      // Track skipped items
-      let skippedCount = 0
-
-      // Clear existing data in reverse dependency order - all use safeQuery
-      await safeQuery('DELETE FROM membership_payments')
-      await safeQuery('DELETE FROM transactions')
-      await safeQuery('DELETE FROM bank_statements')
-      await safeQuery('DELETE FROM events')
-      await safeQuery('DELETE FROM scheduled_notifications')
-      await safeQuery('DELETE FROM payment_keywords')
-      await safeQuery('DELETE FROM member_groups')
-      
-      // Keep financial accounts but clear and restore
-      await safeQuery('DELETE FROM financial_accounts')
-      
-      // Keep system settings
-      await safeQuery('DELETE FROM system_settings')
-      
-      // Clear users last (except current user for safety)
-      await safeQuery('DELETE FROM users WHERE id != $1', [userId])
-
-      // Restore in dependency order - ALL inserts use safeQuery to handle schema differences
-      
-      // 1. System settings
-      for (const setting of backup.tables.system_settings || []) {
-        await safeQuery(
-          'INSERT INTO system_settings (key, value, updated_at, updated_by) VALUES ($1, $2, $3, $4) ON CONFLICT (key) DO UPDATE SET value = $2',
-          [setting.key, setting.value, setting.updated_at, setting.updated_by]
-        )
+      // Helper to safely delete from table
+      const safeDelete = async (sql: string, params?: any[]) => {
+        try {
+          await client.query(sql, params)
+        } catch {
+          // Table might not exist, ignore
+        }
       }
+
+      // Clear existing data in reverse dependency order
+      console.log('🗑️ Clearing existing data...')
+      await safeDelete('DELETE FROM member_events')
+      await safeDelete('DELETE FROM membership_payments')
+      await safeDelete('DELETE FROM transactions')
+      await safeDelete('DELETE FROM bank_statements')
+      await safeDelete('DELETE FROM events')
+      await safeDelete('DELETE FROM community_documents')
+      await safeDelete('DELETE FROM scheduled_notifications')
+      await safeDelete('DELETE FROM payment_keywords')
+      await safeDelete('DELETE FROM member_groups')
+      await safeDelete('DELETE FROM financial_accounts')
+      await safeDelete('DELETE FROM system_settings')
+      await safeDelete('DELETE FROM users WHERE id != $1', [userId])
+
+      // 1. System settings
+      await restoreTable('system_settings', backup.tables.system_settings, async (s) => {
+        await client.query(
+          'INSERT INTO system_settings (key, value, updated_at, updated_by) VALUES ($1, $2, $3, $4) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+          [s.key, s.value, s.updated_at, s.updated_by]
+        )
+      })
 
       // 2. Financial accounts
-      for (const account of backup.tables.financial_accounts || []) {
-        await safeQuery(
+      await restoreTable('financial_accounts', backup.tables.financial_accounts, async (a) => {
+        await client.query(
           `INSERT INTO financial_accounts (id, account_name, account_number, bsb, current_balance, currency, is_donation_account, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING`,
-          [account.id, account.account_name, account.account_number, account.bsb, account.current_balance, account.currency, account.is_donation_account, account.created_at]
+          [a.id, a.account_name, a.account_number, a.bsb, a.current_balance, a.currency || 'AUD', a.is_donation_account, a.created_at]
         )
-      }
+      })
 
       // 3. Users (except current user)
-      for (const user of backup.tables.users || []) {
-        if (user.id === userId) continue // Skip current user
-        await safeQuery(
+      const usersToRestore = (backup.tables.users || []).filter((u: any) => u.id !== userId)
+      await restoreTable('users', usersToRestore, async (u) => {
+        await client.query(
           `INSERT INTO users (id, name, email, phone, password_hash, address, role, member_id, household_members, date_joined, created_at, group_name, is_group_leader, image, banking_name)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT (id) DO NOTHING`,
-          [user.id, user.name, user.email, user.phone, user.password_hash, user.address, user.role, user.member_id, user.household_members, user.date_joined, user.created_at, user.group_name, user.is_group_leader, user.image, user.banking_name]
+          [u.id, u.name, u.email, u.phone, u.password_hash, u.address, u.role, u.member_id, u.household_members, u.date_joined, u.created_at, u.group_name, u.is_group_leader, u.image, u.banking_name]
         )
-      }
+      })
 
-      // 4. Bank statements - handle different column sets
-      for (const stmt of backup.tables.bank_statements || []) {
-        await safeQuery(
+      // 4. Bank statements
+      await restoreTable('bank_statements', backup.tables.bank_statements, async (s) => {
+        await client.query(
           `INSERT INTO bank_statements (id, account_id, file_name, file_url, statement_date_from, statement_date_to, uploaded_at, uploaded_by, file_size, file_type, transaction_count)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING`,
-          [stmt.id, stmt.account_id, stmt.file_name, stmt.file_url, stmt.statement_date_from, stmt.statement_date_to, stmt.uploaded_at, stmt.uploaded_by, stmt.file_size || 0, stmt.file_type || 'application/pdf', stmt.transaction_count || stmt.transactions_imported || 0]
+          [s.id, s.account_id, s.file_name, s.file_url, s.statement_date_from, s.statement_date_to, s.uploaded_at, s.uploaded_by, s.file_size || 0, s.file_type || 'application/pdf', s.transaction_count || s.transactions_imported || 0]
         )
-      }
+      })
 
       // 5. Transactions
-      for (const txn of backup.tables.transactions || []) {
-        await safeQuery(
+      await restoreTable('transactions', backup.tables.transactions, async (t) => {
+        await client.query(
           `INSERT INTO transactions (id, account_id, transaction_date, transaction_name, description, category, amount, transaction_type, reference, balance_after, source, matched_member_id, statement_id, created_by, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT (id) DO NOTHING`,
-          [txn.id, txn.account_id, txn.transaction_date, txn.transaction_name, txn.description, txn.category, txn.amount, txn.transaction_type, txn.reference, txn.balance_after, txn.source, txn.matched_member_id, txn.statement_id, txn.created_by, txn.created_at]
+          [t.id, t.account_id, t.transaction_date, t.transaction_name, t.description, t.category, t.amount, t.transaction_type, t.reference, t.balance_after, t.source, t.matched_member_id, t.statement_id, t.created_by, t.created_at]
         )
-      }
+      })
 
       // 6. Events
-      for (const event of backup.tables.events || []) {
-        await safeQuery(
+      await restoreTable('events', backup.tables.events, async (e) => {
+        await client.query(
           `INSERT INTO events (id, title, description, event_date, start_time, end_time, address, cost, event_type, organizing_group, is_completed, created_at, created_by)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (id) DO NOTHING`,
-          [event.id, event.title, event.description, event.event_date, event.start_time, event.end_time, event.address, event.cost, event.event_type, event.organizing_group, event.is_completed, event.created_at, event.created_by]
+          [e.id, e.title, e.description, e.event_date, e.start_time, e.end_time, e.address, e.cost || e.estimated_cost, e.event_type, e.organizing_group, e.is_completed, e.created_at, e.created_by]
         )
-      }
+      })
 
-      // 7. Membership payments - handle both amount and amount_paid columns
-      for (const payment of backup.tables.membership_payments || []) {
-        await safeQuery(
+      // 7. Member events (attendance)
+      await restoreTable('member_events', backup.tables.member_events, async (me) => {
+        await client.query(
+          `INSERT INTO member_events (id, user_id, event_id, attended, created_at)
+           VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id, event_id) DO NOTHING`,
+          [me.id, me.user_id, me.event_id, me.attended, me.created_at]
+        )
+      })
+
+      // 8. Membership payments
+      await restoreTable('membership_payments', backup.tables.membership_payments, async (p) => {
+        await client.query(
           `INSERT INTO membership_payments (id, user_id, payment_month, amount, transaction_id, payment_date, status, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
-          [payment.id, payment.user_id, payment.payment_month, payment.amount || payment.amount_paid, payment.transaction_id, payment.payment_date, payment.status, payment.created_at]
+          [p.id, p.user_id, p.payment_month, p.amount || p.amount_paid, p.transaction_id, p.payment_date, p.status, p.created_at]
         )
-      }
+      })
 
-      // 8. Payment keywords (if exists)
-      for (const keyword of backup.tables.payment_keywords || []) {
-        await safeQuery(
+      // 9. Payment keywords
+      await restoreTable('payment_keywords', backup.tables.payment_keywords, async (k) => {
+        await client.query(
           `INSERT INTO payment_keywords (id, keyword, payment_type, created_at, created_by)
            VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-          [keyword.id, keyword.keyword, keyword.payment_type, keyword.created_at, keyword.created_by]
+          [k.id, k.keyword, k.payment_type, k.created_at, k.created_by]
         )
-      }
+      })
 
-      // 9. Member groups (if exists)
-      for (const group of backup.tables.member_groups || []) {
-        await safeQuery(
+      // 10. Member groups
+      await restoreTable('member_groups', backup.tables.member_groups, async (g) => {
+        await client.query(
           `INSERT INTO member_groups (id, name, description, created_at)
            VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-          [group.id, group.name, group.description, group.created_at]
+          [g.id, g.name, g.description, g.created_at]
         )
-      }
+      })
 
-      // 10. Scheduled notifications (if exists)
-      for (const notification of backup.tables.scheduled_notifications || []) {
-        await safeQuery(
+      // 11. Scheduled notifications
+      await restoreTable('scheduled_notifications', backup.tables.scheduled_notifications, async (n) => {
+        await client.query(
           `INSERT INTO scheduled_notifications (id, title, message, scheduled_date, status, created_by, created_at, sent_at, recipients_count, error_message)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING`,
-          [notification.id, notification.title, notification.message, notification.scheduled_date, notification.status, notification.created_by, notification.created_at, notification.sent_at, notification.recipients_count, notification.error_message]
+          [n.id, n.title, n.message, n.scheduled_date, n.status, n.created_by, n.created_at, n.sent_at, n.recipients_count, n.error_message]
         )
-      }
+      })
+
+      // 12. Community documents
+      await restoreTable('community_documents', backup.tables.community_documents, async (d) => {
+        await client.query(
+          `INSERT INTO community_documents (id, title, description, file_name, file_url, file_size, file_type, uploaded_by, uploaded_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id) DO NOTHING`,
+          [d.id, d.title, d.description, d.file_name, d.file_url, d.file_size, d.file_type, d.uploaded_by, d.uploaded_at, d.created_at]
+        )
+      })
 
       await client.query('COMMIT')
       console.log('✅ Restore completed successfully')
@@ -281,7 +336,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         success: true, 
         message: 'Backup restored successfully',
-        restored: backup.counts
+        results
       })
     } catch (err) {
       await client.query('ROLLBACK')
