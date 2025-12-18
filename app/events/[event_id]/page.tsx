@@ -6,8 +6,8 @@ import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { IconArrowLeft, IconCalendar, IconClock, IconUsers, IconMapPin, IconCurrencyDollar, IconCheck, IconPhoto, IconFileText } from '@tabler/icons-react'
-import Image from 'next/image'
+import { IconArrowLeft, IconCalendar, IconClock, IconUsers, IconMapPin, IconCurrencyDollar, IconCheck, IconPhoto, IconFileText, IconUsersGroup } from '@tabler/icons-react'
+import EventActions from './EventActions'
 
 export default async function EventDetailPage({ params }: { params: { event_id: string } }) {
   const token = cookies().get('auth_token')?.value
@@ -118,8 +118,19 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
                     <Link href={`/events/${event.id}/complete`}>
                       <Button variant="outline">Mark as Completed</Button>
                     </Link>
-                    <Button variant="destructive">Delete</Button>
+                    <EventActions 
+                      eventId={event.id} 
+                      eventTitle={event.title} 
+                      backUrl={backUrl} 
+                    />
                   </>
+                )}
+                {isAdminOrBoard && event.completed && (
+                  <EventActions 
+                    eventId={event.id} 
+                    eventTitle={event.title} 
+                    backUrl={backUrl} 
+                  />
                 )}
               </div>
             </div>
@@ -160,6 +171,16 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
                 <div>
                   <div className="font-medium">Estimated Cost</div>
                   <div className="text-sm text-muted-foreground">${parseFloat(event.estimated_cost).toFixed(2)}</div>
+                </div>
+              </div>
+            )}
+
+            {event.organizing_group && (
+              <div className="flex items-start gap-3 p-4 border rounded-lg">
+                <IconUsersGroup className="size-5 text-primary mt-0.5" />
+                <div>
+                  <div className="font-medium">Organizing Group</div>
+                  <div className="text-sm text-muted-foreground">{event.organizing_group}</div>
                 </div>
               </div>
             )}

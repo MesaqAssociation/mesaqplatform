@@ -559,36 +559,42 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
       break
 
     case 'date':
-      // Validate date format DD-MM-YYYY
-      if (!/^\d{2}-\d{2}-\d{4}$/.test(text)) {
-        await sendTelegramMessage(chatId, '❌ Invalid date format. Please use DD-MM-YYYY (e.g., 25-12-2024):')
+      // Validate date format D-M-YYYY or DD-MM-YYYY (allow single digits)
+      if (!/^\d{1,2}-\d{1,2}-\d{4}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid date format. Please use D-M-YYYY or DD-MM-YYYY (e.g., 5-1-2025 or 25-12-2024):')
         return
       }
-      // Convert DD-MM-YYYY to YYYY-MM-DD for database
+      // Convert D-M-YYYY to YYYY-MM-DD for database (pad with zeros)
       const [day, month, year] = text.split('-')
-      state.data.event_date = `${year}-${month}-${day}`
+      const paddedDay = day.padStart(2, '0')
+      const paddedMonth = month.padStart(2, '0')
+      state.data.event_date = `${year}-${paddedMonth}-${paddedDay}`
       state.step = 'start_time'
       await sendTelegramMessage(chatId, '🕐 Enter start time (HH:MM in 24-hour format):\n\nExample: 14:30')
       break
 
     case 'start_time':
-      // Validate time format
-      if (!/^\d{2}:\d{2}$/.test(text)) {
-        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 14:30):')
+      // Validate time format (allow H:MM or HH:MM)
+      if (!/^\d{1,2}:\d{2}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 14:30 or 9:00):')
         return
       }
-      state.data.start_time = text
+      // Pad hour with zero if needed
+      const [startHour, startMin] = text.split(':')
+      state.data.start_time = `${startHour.padStart(2, '0')}:${startMin}`
       state.step = 'end_time'
       await sendTelegramMessage(chatId, '🕐 Enter end time (HH:MM in 24-hour format):\n\nExample: 16:30')
       break
 
     case 'end_time':
-      // Validate time format
-      if (!/^\d{2}:\d{2}$/.test(text)) {
-        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 16:30):')
+      // Validate time format (allow H:MM or HH:MM)
+      if (!/^\d{1,2}:\d{2}$/.test(text)) {
+        await sendTelegramMessage(chatId, '❌ Invalid time format. Please use HH:MM (e.g., 16:30 or 9:00):')
         return
       }
-      state.data.end_time = text
+      // Pad hour with zero if needed
+      const [endHour, endMin] = text.split(':')
+      state.data.end_time = `${endHour.padStart(2, '0')}:${endMin}`
       state.step = 'cost'
       await sendTelegramMessage(chatId, '💰 What is the total cost for this event? (Enter amount in dollars, or type "0" for free):')
       break

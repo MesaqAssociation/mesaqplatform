@@ -5,6 +5,7 @@ import './globals.css'
 import { I18nProvider } from '@/components/I18nProvider'
 import { Locale } from '@/lib/i18n'
 import { cookies } from 'next/headers'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'Mesaq Association',
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body autoComplete="off">
         <I18nProvider initialLocale={initialLocale}>
           {children}
+          <Toaster />
         </I18nProvider>
       </body>
     </html>

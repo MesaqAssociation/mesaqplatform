@@ -34,27 +34,30 @@ export async function GET(req: NextRequest) {
 
     let members: Array<{ id: string, name: string }> = []
 
-    // Query by BOTH group_id AND group_name to catch all cases
-    // Some users may have group_id set, others may have group_name
-    if (groupId && groupName) {
+    // Query members based on group ID or group name
+    // Use DISTINCT to avoid duplicates if user matches both conditions
+    if (groupId) {
+      // Primary: Query by group_id (new schema)
       const { rows } = await pool.query(`
-        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
-        WHERE group_id = $1 OR group_name = $2
-        ORDER BY is_group_leader DESC, name ASC
-      `, [groupId, groupName])
-      members = rows
-    } else if (groupId) {
-      // Query by group_id only
-      const { rows } = await pool.query(`
-        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
+        SELECT DISTINCT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_id = $1
         ORDER BY is_group_leader DESC, name ASC
       `, [groupId])
       members = rows
+      
+      // If no results and we have a name, fallback to group_name
+      if (members.length === 0 && groupName) {
+        const { rows: legacyRows } = await pool.query(`
+          SELECT DISTINCT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
+          WHERE group_name = $1 AND (group_id IS NULL OR group_id != $2)
+          ORDER BY is_group_leader DESC, name ASC
+        `, [groupName, groupId])
+        members = legacyRows
+      }
     } else if (groupName) {
-      // Query by group_name only (legacy)
+      // Legacy: Query by group_name only
       const { rows } = await pool.query(`
-        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
+        SELECT DISTINCT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_name = $1
         ORDER BY is_group_leader DESC, name ASC
       `, [groupName])

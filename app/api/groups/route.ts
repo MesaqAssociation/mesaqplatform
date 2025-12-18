@@ -126,19 +126,21 @@ export async function POST(req: NextRequest) {
       )
 
       const groupId = newGroup[0].id
+      const groupNameTrimmed = name.trim()
 
       // If memberIds provided, update those members to be in this group
+      // Set BOTH group_id and group_name for compatibility
       if (memberIds && memberIds.length > 0) {
         await pool.query(
-          `UPDATE users SET group_id = $1, is_group_leader = false WHERE id = ANY($2::uuid[])`,
-          [groupId, memberIds]
+          `UPDATE users SET group_id = $1, group_name = $2, is_group_leader = false WHERE id = ANY($3::uuid[])`,
+          [groupId, groupNameTrimmed, memberIds]
         )
       }
 
-      // Set the leader
+      // Set the leader - also set BOTH group_id and group_name
       await pool.query(
-        `UPDATE users SET group_id = $1, is_group_leader = true WHERE id = $2`,
-        [groupId, leaderId]
+        `UPDATE users SET group_id = $1, group_name = $2, is_group_leader = true WHERE id = $3`,
+        [groupId, groupNameTrimmed, leaderId]
       )
 
       return NextResponse.json({ 
