@@ -162,28 +162,32 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Clear existing data in reverse dependency order
-      await client.query('DELETE FROM membership_payments')
-      await client.query('DELETE FROM transactions')
-      await client.query('DELETE FROM bank_statements')
-      await client.query('DELETE FROM events')
+      // Track skipped items
+      let skippedCount = 0
+
+      // Clear existing data in reverse dependency order - all use safeQuery
+      await safeQuery('DELETE FROM membership_payments')
+      await safeQuery('DELETE FROM transactions')
+      await safeQuery('DELETE FROM bank_statements')
+      await safeQuery('DELETE FROM events')
       await safeQuery('DELETE FROM scheduled_notifications')
       await safeQuery('DELETE FROM payment_keywords')
       await safeQuery('DELETE FROM member_groups')
       
       // Keep financial accounts but clear and restore
-      await client.query('DELETE FROM financial_accounts')
+      await safeQuery('DELETE FROM financial_accounts')
       
       // Keep system settings
-      await client.query('DELETE FROM system_settings')
+      await safeQuery('DELETE FROM system_settings')
       
       // Clear users last (except current user for safety)
-      await client.query('DELETE FROM users WHERE id != $1', [userId])
+      await safeQuery('DELETE FROM users WHERE id != $1', [userId])
 
-      // Restore in dependency order
+      // Restore in dependency order - ALL inserts use safeQuery to handle schema differences
+      
       // 1. System settings
       for (const setting of backup.tables.system_settings || []) {
-        await client.query(
+        await safeQuery(
           'INSERT INTO system_settings (key, value, updated_at, updated_by) VALUES ($1, $2, $3, $4) ON CONFLICT (key) DO UPDATE SET value = $2',
           [setting.key, setting.value, setting.updated_at, setting.updated_by]
         )
@@ -191,7 +195,7 @@ export async function POST(req: NextRequest) {
 
       // 2. Financial accounts
       for (const account of backup.tables.financial_accounts || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO financial_accounts (id, account_name, account_number, bsb, current_balance, currency, is_donation_account, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING`,
           [account.id, account.account_name, account.account_number, account.bsb, account.current_balance, account.currency, account.is_donation_account, account.created_at]
@@ -201,25 +205,25 @@ export async function POST(req: NextRequest) {
       // 3. Users (except current user)
       for (const user of backup.tables.users || []) {
         if (user.id === userId) continue // Skip current user
-        await client.query(
-          `INSERT INTO users (id, name, email, phone, password_hash, address, role, member_id, household_members, date_joined, created_at, group_name, is_group_leader, image)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING`,
-          [user.id, user.name, user.email, user.phone, user.password_hash, user.address, user.role, user.member_id, user.household_members, user.date_joined, user.created_at, user.group_name, user.is_group_leader, user.image]
+        await safeQuery(
+          `INSERT INTO users (id, name, email, phone, password_hash, address, role, member_id, household_members, date_joined, created_at, group_name, is_group_leader, image, banking_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT (id) DO NOTHING`,
+          [user.id, user.name, user.email, user.phone, user.password_hash, user.address, user.role, user.member_id, user.household_members, user.date_joined, user.created_at, user.group_name, user.is_group_leader, user.image, user.banking_name]
         )
       }
 
-      // 4. Bank statements
+      // 4. Bank statements - handle different column sets
       for (const stmt of backup.tables.bank_statements || []) {
-        await client.query(
-          `INSERT INTO bank_statements (id, account_id, file_name, file_url, statement_date_from, statement_date_to, uploaded_at, uploaded_by, transactions_imported)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING`,
-          [stmt.id, stmt.account_id, stmt.file_name, stmt.file_url, stmt.statement_date_from, stmt.statement_date_to, stmt.uploaded_at, stmt.uploaded_by, stmt.transactions_imported]
+        await safeQuery(
+          `INSERT INTO bank_statements (id, account_id, file_name, file_url, statement_date_from, statement_date_to, uploaded_at, uploaded_by, file_size, file_type, transaction_count)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING`,
+          [stmt.id, stmt.account_id, stmt.file_name, stmt.file_url, stmt.statement_date_from, stmt.statement_date_to, stmt.uploaded_at, stmt.uploaded_by, stmt.file_size || 0, stmt.file_type || 'application/pdf', stmt.transaction_count || stmt.transactions_imported || 0]
         )
       }
 
       // 5. Transactions
       for (const txn of backup.tables.transactions || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO transactions (id, account_id, transaction_date, transaction_name, description, category, amount, transaction_type, reference, balance_after, source, matched_member_id, statement_id, created_by, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT (id) DO NOTHING`,
           [txn.id, txn.account_id, txn.transaction_date, txn.transaction_name, txn.description, txn.category, txn.amount, txn.transaction_type, txn.reference, txn.balance_after, txn.source, txn.matched_member_id, txn.statement_id, txn.created_by, txn.created_at]
@@ -228,28 +232,28 @@ export async function POST(req: NextRequest) {
 
       // 6. Events
       for (const event of backup.tables.events || []) {
-        await client.query(
+        await safeQuery(
           `INSERT INTO events (id, title, description, event_date, start_time, end_time, address, cost, event_type, organizing_group, is_completed, created_at, created_by)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (id) DO NOTHING`,
           [event.id, event.title, event.description, event.event_date, event.start_time, event.end_time, event.address, event.cost, event.event_type, event.organizing_group, event.is_completed, event.created_at, event.created_by]
         )
       }
 
-      // 7. Membership payments
+      // 7. Membership payments - handle both amount and amount_paid columns
       for (const payment of backup.tables.membership_payments || []) {
-        await client.query(
-          `INSERT INTO membership_payments (id, user_id, payment_month, amount_paid, transaction_id, payment_date, status, created_at)
+        await safeQuery(
+          `INSERT INTO membership_payments (id, user_id, payment_month, amount, transaction_id, payment_date, status, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
-          [payment.id, payment.user_id, payment.payment_month, payment.amount_paid, payment.transaction_id, payment.payment_date, payment.status, payment.created_at]
+          [payment.id, payment.user_id, payment.payment_month, payment.amount || payment.amount_paid, payment.transaction_id, payment.payment_date, payment.status, payment.created_at]
         )
       }
 
       // 8. Payment keywords (if exists)
       for (const keyword of backup.tables.payment_keywords || []) {
         await safeQuery(
-          `INSERT INTO payment_keywords (id, keyword, payment_type, created_at)
-           VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-          [keyword.id, keyword.keyword, keyword.payment_type, keyword.created_at]
+          `INSERT INTO payment_keywords (id, keyword, payment_type, created_at, created_by)
+           VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+          [keyword.id, keyword.keyword, keyword.payment_type, keyword.created_at, keyword.created_by]
         )
       }
 
