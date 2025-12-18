@@ -160,9 +160,9 @@ export async function GET(req: NextRequest) {
 
 // Create a manual transaction
 export async function POST(req: NextRequest) {
-  const auth = await verifyAuth()
+  const auth = await verifyAuth(req)
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -180,11 +180,11 @@ export async function POST(req: NextRequest) {
 
     // Validation
     if (!accountId || !transactionDate || !transactionName || !amount || !transactionType) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders })
     }
 
     if (!['credit', 'debit'].includes(transactionType)) {
-      return NextResponse.json({ error: 'Invalid transaction type' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid transaction type' }, { status: 400, headers: corsHeaders })
     }
 
     // Get current balance
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
     )
 
     if (accountRows.length === 0) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Account not found' }, { status: 404, headers: corsHeaders })
     }
 
     const currentBalance = parseFloat(accountRows[0].current_balance)
@@ -299,18 +299,18 @@ export async function POST(req: NextRequest) {
         creator_name: userRows[0]?.name || null,
         matched_member_name: matchedMemberName
       }
-    })
+    }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Create transaction error:', err)
-    return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500, headers: corsHeaders })
   }
 }
 
 // Match a transaction to a member
 export async function PATCH(req: NextRequest) {
-  const auth = await verifyAuth()
+  const auth = await verifyAuth(req)
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -320,7 +320,7 @@ export async function PATCH(req: NextRequest) {
     console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId, 'category:', category)
 
     if (!transactionId) {
-      return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400, headers: corsHeaders })
     }
 
     // First check if the column exists
@@ -331,7 +331,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ 
         error: 'Database schema not updated. Please run the migration: supabase-add-matched-member.sql',
         details: colErr.message 
-      }, { status: 500 })
+      }, { status: 500, headers: corsHeaders })
     }
 
     // Handle category-only update
@@ -359,7 +359,7 @@ export async function PATCH(req: NextRequest) {
       `, [category, transactionId])
 
       if (updatedTransaction.length === 0) {
-        return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+        return NextResponse.json({ error: 'Transaction not found' }, { status: 404, headers: corsHeaders })
       }
 
       const transaction = updatedTransaction[0]
@@ -412,7 +412,7 @@ export async function PATCH(req: NextRequest) {
           ...updatedTransaction[0],
           matched_member_name: matchedMemberName
         }
-      })
+      }, { headers: corsHeaders })
     }
 
     // Handle member match update
@@ -438,7 +438,7 @@ export async function PATCH(req: NextRequest) {
     `, [memberId || null, transactionId])
 
     if (updatedTransaction.length === 0) {
-      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404, headers: corsHeaders })
     }
 
     const transaction = updatedTransaction[0]
@@ -496,22 +496,22 @@ export async function PATCH(req: NextRequest) {
         creator_name: userRows[0]?.name || null,
         matched_member_name: matchedMemberName
       }
-    })
+    }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Match transaction error:', err)
     console.error('Error details:', err.message, err.code)
     return NextResponse.json({ 
       error: 'Failed to match transaction',
       details: err.message 
-    }, { status: 500 })
+    }, { status: 500, headers: corsHeaders })
   }
 }
 
 // DELETE transaction
 export async function DELETE(req: NextRequest) {
-  const auth = await verifyAuth()
+  const auth = await verifyAuth(req)
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -519,7 +519,7 @@ export async function DELETE(req: NextRequest) {
     const transactionId = searchParams.get('id')
 
     if (!transactionId) {
-      return NextResponse.json({ error: 'Transaction ID required' }, { status: 400 })
+      return NextResponse.json({ error: 'Transaction ID required' }, { status: 400, headers: corsHeaders })
     }
 
     // Get transaction details before deletion (for balance recalculation)
@@ -529,7 +529,7 @@ export async function DELETE(req: NextRequest) {
     )
 
     if (txnRows.length === 0) {
-      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404, headers: corsHeaders })
     }
 
     const transaction = txnRows[0]
@@ -565,13 +565,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ 
       success: true,
       newBalance: accountRows[0]?.current_balance
-    })
+    }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Delete transaction error:', err)
     return NextResponse.json({ 
       error: 'Failed to delete transaction',
       details: err.message 
-    }, { status: 500 })
+    }, { status: 500, headers: corsHeaders })
   }
 }
 

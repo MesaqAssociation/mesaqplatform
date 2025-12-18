@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle, HeadingLevel } from 'docx'
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle, HeadingLevel, Header, Footer, PageNumber } from 'docx'
 
 export const runtime = 'nodejs'
 
@@ -125,40 +125,62 @@ export async function GET(req: NextRequest) {
         // Calculate total balance
         const totalBalance = memberData.reduce((sum, m) => sum + parseFloat(m.balance), 0)
 
-        // Create table header row
+        // Create table header row with navy blue background
         const headerRow = new TableRow({
             children: [
                 new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Name', bold: true })] })],
-                    shading: { fill: 'E0E0E0' },
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: 'Name', bold: true, color: 'FFFFFF', size: 24 })] ,
+                        alignment: AlignmentType.LEFT,
+                    })],
+                    shading: { fill: '1E3A5F' },
+                    width: { size: 40, type: WidthType.PERCENTAGE },
                 }),
                 new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Phone', bold: true })] })],
-                    shading: { fill: 'E0E0E0' },
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: 'Phone', bold: true, color: 'FFFFFF', size: 24 })],
+                        alignment: AlignmentType.LEFT,
+                    })],
+                    shading: { fill: '1E3A5F' },
+                    width: { size: 30, type: WidthType.PERCENTAGE },
                 }),
                 new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Balance', bold: true })] })],
-                    shading: { fill: 'E0E0E0' },
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: 'Balance Owed', bold: true, color: 'FFFFFF', size: 24 })],
+                        alignment: AlignmentType.RIGHT,
+                    })],
+                    shading: { fill: '1E3A5F' },
+                    width: { size: 30, type: WidthType.PERCENTAGE },
                 }),
             ],
+            tableHeader: true,
         })
 
-        // Create data rows
-        const dataRows = memberData.map(member => new TableRow({
+        // Create data rows with alternating colors
+        const dataRows = memberData.map((member, index) => new TableRow({
             children: [
                 new TableCell({
-                    children: [new Paragraph({ text: member.name || 'Unknown' })],
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: member.name || 'Unknown', size: 22 })]
+                    })],
+                    shading: { fill: index % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
                 }),
                 new TableCell({
-                    children: [new Paragraph({ text: member.phone || '-' })],
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: member.phone || '-', size: 22 })]
+                    })],
+                    shading: { fill: index % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
                 }),
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
                             text: `$${parseFloat(member.balance).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
-                            color: parseFloat(member.balance) > 0 ? 'FF0000' : '000000'
-                        })]
+                            color: parseFloat(member.balance) > 0 ? 'DC2626' : '16A34A',
+                            size: 22,
+                        })],
+                        alignment: AlignmentType.RIGHT,
                     })],
+                    shading: { fill: index % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
                 }),
             ],
         }))
@@ -167,52 +189,133 @@ export async function GET(req: NextRequest) {
         const totalRow = new TableRow({
             children: [
                 new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Total', bold: true })] })],
-                    shading: { fill: 'F5F5F5' },
-                }),
-                new TableCell({
-                    children: [new Paragraph({ text: '' })],
-                    shading: { fill: 'F5F5F5' },
+                    children: [new Paragraph({ 
+                        children: [new TextRun({ text: 'TOTAL', bold: true, size: 24 })]
+                    })],
+                    shading: { fill: 'E2E8F0' },
+                    columnSpan: 2,
                 }),
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
                             text: `$${totalBalance.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
                             bold: true,
-                            color: totalBalance > 0 ? 'FF0000' : '000000'
-                        })]
+                            color: totalBalance > 0 ? 'DC2626' : '16A34A',
+                            size: 24,
+                        })],
+                        alignment: AlignmentType.RIGHT,
                     })],
-                    shading: { fill: 'F5F5F5' },
+                    shading: { fill: 'E2E8F0' },
                 }),
             ],
         })
 
+        // Count members with outstanding balance
+        const membersWithBalance = memberData.filter(m => parseFloat(m.balance) > 0).length
+
         // Create the document
         const doc = new Document({
             sections: [{
-                properties: {},
+                properties: {
+                    page: {
+                        margin: {
+                            top: 720,    // 0.5 inch in twips
+                            right: 720,
+                            bottom: 720,
+                            left: 720,
+                        },
+                    },
+                },
+                headers: {
+                    default: new Header({
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'MESAQ Association', bold: true, size: 20, color: '64748B' }),
+                                ],
+                                alignment: AlignmentType.RIGHT,
+                            }),
+                        ],
+                    }),
+                },
+                footers: {
+                    default: new Footer({
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'Page ', size: 18, color: '64748B' }),
+                                    new TextRun({ children: [PageNumber.CURRENT], size: 18, color: '64748B' }),
+                                    new TextRun({ text: ' of ', size: 18, color: '64748B' }),
+                                    new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 18, color: '64748B' }),
+                                ],
+                                alignment: AlignmentType.CENTER,
+                            }),
+                        ],
+                    }),
+                },
                 children: [
                     // Title
                     new Paragraph({
-                        text: 'Board Member Report',
-                        heading: HeadingLevel.HEADING_1,
+                        children: [
+                            new TextRun({ text: 'Board Member Report', bold: true, size: 48, color: '1E3A5F' })
+                        ],
                         alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
                     }),
-                    // Date
+                    // Subtitle
                     new Paragraph({
-                        text: `Generated: ${getMelbourneDate()}`,
+                        children: [
+                            new TextRun({ text: `Generated: ${getMelbourneDate()}`, italics: true, size: 22, color: '64748B' })
+                        ],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 400 },
+                    }),
+                    // Summary section
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Summary', bold: true, size: 28, color: '1E3A5F' })
+                        ],
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `Total Members: ${memberData.length}`, size: 22 }),
+                            new TextRun({ text: '   |   ', size: 22, color: '94A3B8' }),
+                            new TextRun({ text: `With Outstanding Balance: ${membersWithBalance}`, size: 22 }),
+                            new TextRun({ text: '   |   ', size: 22, color: '94A3B8' }),
+                            new TextRun({ text: `Total Owed: $${totalBalance.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: totalBalance > 0 ? 'DC2626' : '16A34A', bold: true }),
+                        ],
+                        spacing: { after: 300 },
                     }),
                     // Table
                     new Table({
                         width: { size: 100, type: WidthType.PERCENTAGE },
                         rows: [headerRow, ...dataRows, totalRow],
+                        borders: {
+                            top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                            bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                            left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                            right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                            insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                            insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                        },
                     }),
-                    // Summary
+                    // Notes
                     new Paragraph({
-                        text: `Total Members: ${memberData.length}`,
-                        spacing: { before: 400 },
+                        children: [
+                            new TextRun({ text: 'Notes:', bold: true, size: 20, color: '64748B' })
+                        ],
+                        spacing: { before: 300, after: 50 },
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: '• Red amounts indicate outstanding balances owed by members', size: 18, color: '64748B' })
+                        ],
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: '• Green amounts indicate members who are paid up or have credit', size: 18, color: '64748B' })
+                        ],
                     }),
                 ],
             }],

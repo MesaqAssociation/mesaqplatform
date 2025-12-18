@@ -259,10 +259,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
             <div className="mb-4 p-3 bg-muted/50 rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
               <p className="text-lg font-bold">
-                ${accounts.find(a => a.id === selectedAccountId)!.current_balance.toLocaleString('en-AU', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
+                {formatCurrency(accounts.find(a => a.id === selectedAccountId)!.current_balance)}
               </p>
             </div>
           )}
