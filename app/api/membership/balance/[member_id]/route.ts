@@ -112,8 +112,26 @@ export async function GET(
       status = 'behind'
     }
 
-    // Get all SPECIAL PAYMENT transactions (category = 'Special Payment')
-    const { rows: specialTxns } = await pool.query(`
+    // Get all EVENT PAYMENT transactions (category = 'Event Payment' or 'Special Payment' but NOT 'Donation')
+    const { rows: eventTxns } = await pool.query(`
+      SELECT 
+        t.id,
+        to_char(t.transaction_date, 'YYYY-MM-DD') as date,
+        t.transaction_name as name,
+        t.description,
+        t.amount,
+        t.category
+      FROM transactions t
+      WHERE t.matched_member_id = $1
+        AND t.category IN ('Event Payment', 'Special Payment')
+        AND t.transaction_type = 'credit'
+      ORDER BY t.transaction_date DESC
+    `, [member.id])
+
+    const totalEventPayments = eventTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
+
+    // Get all DONATION transactions
+    const { rows: donationTxns } = await pool.query(`
       SELECT 
         t.id,
         to_char(t.transaction_date, 'YYYY-MM-DD') as date,
@@ -122,12 +140,12 @@ export async function GET(
         t.amount
       FROM transactions t
       WHERE t.matched_member_id = $1
-        AND t.category = 'Special Payment'
+        AND t.category = 'Donation'
         AND t.transaction_type = 'credit'
       ORDER BY t.transaction_date DESC
     `, [member.id])
 
-    const totalSpecialPayments = specialTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
+    const totalDonations = donationTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
 
     // Build month-by-month breakdown
     const monthsBreakdown = months.map(m => {
@@ -152,9 +170,18 @@ export async function GET(
       status,
       monthsBreakdown
       },
+      eventPaymentBalance: {
+        totalEventPayments,
+        transactions: eventTxns
+      },
+      donationBalance: {
+        totalDonations,
+        transactions: donationTxns
+      },
+      // Keep for backwards compatibility
       specialPaymentBalance: {
-        totalSpecialPayments,
-        transactions: specialTxns
+        totalSpecialPayments: totalEventPayments + totalDonations,
+        transactions: [...eventTxns, ...donationTxns]
       }
     }, { headers: corsHeaders })
   } catch (err: any) {

@@ -98,7 +98,7 @@ export default function FinanceClient({
   const [newTransactionDescription, setNewTransactionDescription] = useState('')
   const [newTransactionAmount, setNewTransactionAmount] = useState('')
   const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
-  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Special Payment'>('Membership Payment')
+  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Event Payment' | 'Donation'>('Membership Payment')
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
@@ -1326,7 +1326,7 @@ export default function FinanceClient({
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Select 
-                          value={txn.category || 'Special Payment'}
+                          value={txn.category || 'Event Payment'}
                           onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                         >
                           <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
@@ -1334,7 +1334,8 @@ export default function FinanceClient({
                           </SelectTrigger>
                           <SelectContent className="bg-background border-input">
                             <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
-                            <SelectItem value="Special Payment" className="text-foreground cursor-pointer">Special Payment</SelectItem>
+                            <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
+                            <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
@@ -1437,7 +1438,8 @@ export default function FinanceClient({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                    <SelectItem value="Special Payment">Special Payment</SelectItem>
+                    <SelectItem value="Event Payment">Event Payment</SelectItem>
+                    <SelectItem value="Donation">Donation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1839,13 +1841,14 @@ export default function FinanceClient({
 
           <div>
             <Label htmlFor="txn-category">Category *</Label>
-            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Special Payment') => setNewTransactionCategory(value)}>
+            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Event Payment' | 'Donation') => setNewTransactionCategory(value)}>
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                <SelectItem value="Special Payment">Special Payment</SelectItem>
+                <SelectItem value="Event Payment">Event Payment</SelectItem>
+                <SelectItem value="Donation">Donation</SelectItem>
               </SelectContent>
             </Select>
           </div>

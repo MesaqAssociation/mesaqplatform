@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Keyword is required' }, { status: 400 })
     }
 
-    if (!paymentType || !['Special Payment', 'Membership Payment'].includes(paymentType)) {
+    if (!paymentType || !['Event Payment', 'Donation', 'Membership Payment'].includes(paymentType)) {
       return NextResponse.json({ error: 'Valid payment type is required' }, { status: 400 })
     }
 

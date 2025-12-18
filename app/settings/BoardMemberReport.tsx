@@ -53,9 +53,9 @@ export default function BoardMemberReport() {
 
     return (
         <div className="border rounded-lg p-6">
-            <h2 className="text-lg font-medium mb-4">Board Member Report</h2>
+            <h2 className="text-lg font-medium mb-4">Annual Financial Report</h2>
             <p className="text-sm text-muted-foreground mb-4">
-                Generate a comprehensive report of all members with their current balance status
+                Generate a comprehensive annual report (January 1 to present) with member ID, name, membership payments, event payments (excludes donations), total sum, and current balance.
             </p>
             <Button
                 onClick={handleDownload}
@@ -70,7 +70,7 @@ export default function BoardMemberReport() {
                 ) : (
                     <>
                         <Download className="h-4 w-4" />
-                        Download Report
+                        Download Annual Report
                     </>
                 )}
             </Button>

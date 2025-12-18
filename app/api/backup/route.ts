@@ -125,11 +125,11 @@ export async function POST(req: NextRequest) {
     const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
     const userId = decoded.sub
 
-    // Check if user is admin
+    // Check if user is admin or board member
     const { rows: roleRows } = await pool.query('SELECT role FROM users WHERE id = $1', [userId])
     const role = (roleRows[0]?.role || '').toLowerCase()
-    if (!['admin'].includes(role)) {
-      return NextResponse.json({ error: 'Only admins can restore backups' }, { status: 403 })
+    if (!['admin', 'board', 'manager'].includes(role)) {
+      return NextResponse.json({ error: 'Only board members can restore backups' }, { status: 403 })
     }
 
     const { backup, confirmText } = await req.json()

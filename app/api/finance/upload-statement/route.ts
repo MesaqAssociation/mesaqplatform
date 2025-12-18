@@ -289,7 +289,8 @@ export async function POST(req: NextRequest) {
         }
 
         // SMART CLASSIFICATION LOGIC
-        let category = isDonationAccount ? 'Donation' : 'Special Payment' // Default
+        // Default: Event Payment (instead of Special Payment)
+        let category = isDonationAccount ? 'Donation' : 'Event Payment'
 
         // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY - regardless of member match)
         // ONLY check description for keywords (case-insensitive)
@@ -354,22 +355,22 @@ export async function POST(req: NextRequest) {
                 category = 'Membership Payment'
                 console.log(`✓ Advance payment (multiple of fee) → Membership Payment`)
               } else {
-                category = 'Special Payment'
-                console.log(`✗ Payment doesn't match pattern → Special Payment`)
+                category = 'Event Payment'
+                console.log(`✗ Payment doesn't match pattern → Event Payment`)
               }
             } catch (balanceErr) {
               console.error('Failed to calculate member balance:', balanceErr)
               // Fallback: if multiple of fee, assume membership
-              category = isMultiple ? 'Membership Payment' : 'Special Payment'
+              category = isMultiple ? 'Membership Payment' : 'Event Payment'
             }
           } else {
             // Not a multiple of monthly fee
-            category = 'Special Payment'
-            console.log(`✗ Not a multiple of $${monthlyFee} → Special Payment`)
+            category = 'Event Payment'
+            console.log(`✗ Not a multiple of $${monthlyFee} → Event Payment`)
           }
         } else if (!keywordMatch && !isDonationAccount) {
           // No keyword match and no member match
-          console.log(`✗ No keyword or member match → Special Payment`)
+          console.log(`✗ No keyword or member match → Event Payment`)
         }
 
         const { rows: inserted } = await pool.query(
