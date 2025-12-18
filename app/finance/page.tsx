@@ -59,6 +59,12 @@ export default async function FinancePage() {
 
   const firstAccount = accounts[0]
 
+  // Get monthly fee for membership payment validation
+  const { rows: feeRows } = await pool.query(
+    "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+  )
+  const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+
   return (
     <MainLayout user={user}>
       <LandscapeCheck>
@@ -66,6 +72,7 @@ export default async function FinancePage() {
         <FinanceClient 
           account={firstAccount} 
           allAccounts={accounts}
+          monthlyFee={monthlyFee}
         />
       </div>
       </LandscapeCheck>

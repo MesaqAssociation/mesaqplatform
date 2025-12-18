@@ -3,6 +3,7 @@
 import { useI18n } from '@/components/I18nProvider'
 import { IconCash, IconCalendarEvent, IconUser, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
 import Link from 'next/link'
+import { formatCurrency } from '@/lib/utils'
 
 type MemberData = {
   id: string
@@ -100,7 +101,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
           </div>
           <div className="space-y-2">
             <p className={`text-3xl font-bold ${memberData.current_balance < 0 ? 'text-red-500' : 'text-green-500'}`}>
-              ${Math.abs(memberData.current_balance).toFixed(2)}
+              {formatCurrency(memberData.current_balance)}
             </p>
             <p className="text-sm text-muted-foreground">
               {memberData.current_balance < 0 ? 'Outstanding balance' : 'Credit balance'}
@@ -122,7 +123,7 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
             </p>
             {paymentStatus && (
               <p className="text-sm text-muted-foreground">
-                Paid: ${paymentStatus.total_paid.toFixed(2)} / ${paymentStatus.monthly_fee.toFixed(2)}
+                Paid: {formatCurrency(paymentStatus.total_paid)} / {formatCurrency(paymentStatus.monthly_fee)}
               </p>
             )}
           </div>
@@ -166,9 +167,9 @@ export default function MemberDashboardClient({ memberData, recentTransactions, 
                     </div>
                     <div className="text-sm font-semibold ml-2">
                       {tx.transaction_type === 'credit' ? (
-                        <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
+                        <span className="text-green-500">+{formatCurrency(tx.amount)}</span>
                       ) : (
-                        <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
+                        <span className="text-red-500">-{formatCurrency(tx.amount)}</span>
                       )}
                     </div>
                   </div>

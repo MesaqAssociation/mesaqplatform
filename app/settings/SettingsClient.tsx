@@ -7,6 +7,7 @@ import UserSettings from './UserSettings'
 import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
 import BoardMemberReport from './BoardMemberReport'
+import BackupRestore from './BackupRestore'
 
 export default function SettingsClient({
   user,
@@ -39,7 +40,7 @@ export default function SettingsClient({
           {fullUserData && fullUserData.id ? (
             <UserSettings user={fullUserData} />
           ) : (
-            <div className="border rounded-lg p-6">
+            <div className="border rounded-lg p-6 shadow-md">
               <p className="text-sm text-muted-foreground">Unable to load user profile. Please try refreshing the page.</p>
             </div>
           )}
@@ -48,7 +49,7 @@ export default function SettingsClient({
         {/* Community Settings Tab - Admin Only */}
         {isAdmin && (
           <TabsContent value="community" className="space-y-6 mt-6">
-            <div className="border rounded-lg p-6">
+            <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Set the monthly membership fee for all members
@@ -56,7 +57,7 @@ export default function SettingsClient({
               <MonthlyFeeSettings initialFee={currentFee} />
             </div>
 
-            <div className="border rounded-lg p-6">
+            <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Late Payment Fines</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Configure automatic fines for late payments
@@ -67,7 +68,7 @@ export default function SettingsClient({
               />
             </div>
 
-            <div className="border rounded-lg p-6">
+            <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Payment Keywords</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Manage keywords for automatic payment classification. Payments with these keywords in their description will be marked as "Special Payment"
@@ -75,12 +76,20 @@ export default function SettingsClient({
               <PaymentKeywords />
             </div>
 
-            <div className="border rounded-lg p-6">
+            <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Export Data</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Export member, event, or finance data to CSV or Excel format
               </p>
               <ExportData />
+            </div>
+
+            <div className="border rounded-lg p-6 shadow-md">
+              <h2 className="text-lg font-medium mb-4">Backup & Restore</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Create a backup of all your data or restore from a previous backup
+              </p>
+              <BackupRestore />
             </div>
 
             <BoardMemberReport />

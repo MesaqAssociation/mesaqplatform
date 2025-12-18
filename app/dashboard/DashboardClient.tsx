@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
 import Link from 'next/link'
 import { showToast } from '@/lib/toast'
+import { formatCurrency } from '@/lib/utils'
 
 type Transaction = {
   id: number
@@ -286,9 +287,9 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                     </div>
                     <div className="text-sm font-semibold ml-2 flex-shrink-0">
                       {tx.transaction_type === 'debit' || tx.amount < 0 ? (
-                        <span className="text-red-500">-${Math.abs(tx.amount).toFixed(2)}</span>
+                        <span className="text-red-500">-{formatCurrency(tx.amount)}</span>
                       ) : (
-                        <span className="text-green-500">+${Math.abs(tx.amount).toFixed(2)}</span>
+                        <span className="text-green-500">+{formatCurrency(tx.amount)}</span>
                       )}
                     </div>
                   </div>
@@ -421,7 +422,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                   )}
                 </div>
                 <div className="text-sm font-bold ml-4 flex-shrink-0 text-green-500">
-                  +${Math.abs(payment.amount).toFixed(2)}
+                  +{formatCurrency(payment.amount)}
                 </div>
               </button>
             ))}
@@ -461,7 +462,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Amount</span>
-                  <span className="text-sm font-bold text-green-500">+${Math.abs(selectedReviewPayment.amount).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-500">+{formatCurrency(selectedReviewPayment.amount)}</span>
                 </div>
                 {selectedReviewPayment.description && (
                   <div className="pt-2 border-t border-border">
@@ -526,7 +527,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                 <div className={`text-sm font-bold ml-2 flex-shrink-0 ${
                   member.current_balance < 0 ? 'text-red-500' : 'text-green-500'
                 }`}>
-                  {member.current_balance < 0 ? '-' : '+'}${Math.abs(member.current_balance).toFixed(2)}
+                  {member.current_balance < 0 ? '-' : '+'}{formatCurrency(member.current_balance)}
                 </div>
               </Link>
             ))}

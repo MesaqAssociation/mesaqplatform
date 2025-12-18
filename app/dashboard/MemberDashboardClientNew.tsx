@@ -6,6 +6,7 @@ import { IconCash, IconCalendarEvent, IconUser, IconArrowRight } from '@tabler/i
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatCurrency } from '@/lib/utils'
 
 type MemberData = {
   id: string
@@ -157,7 +158,7 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
                   const isNegative = currentBalance < 0
                   return (
                     <p className={`text-3xl font-bold ${isNegative ? 'text-red-500' : 'text-green-500'}`}>
-                      ${Math.abs(currentBalance).toFixed(2)}
+                      {formatCurrency(currentBalance)}
                     </p>
                   )
                 })()}
@@ -256,9 +257,9 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
                       <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
                     </div>
                     {tx.transaction_type === 'credit' ? (
-                      <span className="text-green-500">+${Math.abs(Number(tx.amount) || 0).toFixed(2)}</span>
+                      <span className="text-green-500">+{formatCurrency(Number(tx.amount) || 0)}</span>
                     ) : (
-                      <span className="text-red-500">-${Math.abs(Number(tx.amount) || 0).toFixed(2)}</span>
+                      <span className="text-red-500">-{formatCurrency(Number(tx.amount) || 0)}</span>
                     )}
                   </div>
                 </div>

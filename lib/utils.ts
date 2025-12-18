@@ -6,6 +6,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Format a number as currency with commas (e.g., 2,190.45)
+ * @param amount - The amount to format
+ * @param includeDollarSign - Whether to include $ sign (default: true)
+ * @returns Formatted currency string
+ */
+export function formatCurrency(amount: number, includeDollarSign = true): string {
+  const formatted = new Intl.NumberFormat('en-AU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(amount))
+  
+  return includeDollarSign ? `$${formatted}` : formatted
+}
+
+/**
  * Get initials from a name (first letter of first name + first letter of last name)
  * @param name - Full name (e.g., "John Doe")
  * @returns Initials (e.g., "JD") or fallback character

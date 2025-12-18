@@ -185,7 +185,7 @@ export default function UserSettings({ user }: Props) {
 
   if (!user || !user.id) {
     return (
-      <div className="border rounded-lg p-6">
+      <div className="border rounded-lg p-6 shadow-md">
         <p className="text-sm text-muted-foreground">Loading profile...</p>
       </div>
     )
@@ -194,7 +194,7 @@ export default function UserSettings({ user }: Props) {
   return (
     <>
       {/* Profile Picture Section */}
-      <div className="border rounded-lg p-6">
+      <div className="border rounded-lg p-6 shadow-md">
         <h2 className="text-lg font-medium mb-4">Profile Picture</h2>
         <div className="flex items-center gap-6">
           <div className="relative">
@@ -234,7 +234,7 @@ export default function UserSettings({ user }: Props) {
       </div>
 
       {/* Profile Information Section */}
-      <div className="border rounded-lg p-6">
+      <div className="border rounded-lg p-6 shadow-md">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium">Your Profile</h2>
           {!editing && (
@@ -358,7 +358,7 @@ export default function UserSettings({ user }: Props) {
       </div>
 
       {/* Change Password Section */}
-      <div className="border rounded-lg p-6">
+      <div className="border rounded-lg p-6 shadow-md">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium">Change Password</h2>
           {!showPasswordSection && (

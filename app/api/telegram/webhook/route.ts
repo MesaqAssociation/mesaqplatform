@@ -762,9 +762,22 @@ async function showGroupSelection(chatId: number): Promise<void> {
 // Show organizing group selection
 async function showOrgGroupSelection(chatId: number): Promise<void> {
   try {
-    const { rows: groups } = await pool.query(`
-      SELECT id, name FROM member_groups ORDER BY name ASC
-    `)
+    // Try member_groups table first, fall back to users.group_name
+    let groups: any[] = []
+    try {
+      const { rows } = await pool.query(`
+        SELECT id, name FROM member_groups ORDER BY name ASC
+      `)
+      groups = rows
+    } catch {
+      // Fall back to unique group_name values from users
+      const { rows } = await pool.query(`
+        SELECT DISTINCT group_name as name FROM users 
+        WHERE group_name IS NOT NULL AND group_name != ''
+        ORDER BY group_name ASC
+      `)
+      groups = rows.map(r => ({ id: null, name: r.name }))
+    }
     
     const buttons = groups.map((g: any) => [{
       text: g.name,
@@ -776,11 +789,12 @@ async function showOrgGroupSelection(chatId: number): Promise<void> {
     await sendTelegramMessage(chatId, '👥 Select organizing group (optional):', { reply_markup: keyboard })
   } catch (err) {
     console.error('Error loading groups:', err)
+    // On error, skip group selection and continue to date
     const state = userStates.get(chatId)
     if (state?.type === 'event') {
       state.data.organizing_group = null
-      await createEvent(chatId, state.data)
-      userStates.delete(chatId)
+      state.step = 'date'
+      await sendTelegramMessage(chatId, '📆 Enter the event date (DD-MM-YYYY):\n\nExample: 25-12-2024')
     }
   }
 }

@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -55,10 +54,12 @@ type Member = {
 
 export default function FinanceClient({ 
   account, 
-  allAccounts
+  allAccounts,
+  monthlyFee = 40
 }: { 
   account: Account
   allAccounts: Account[]
+  monthlyFee?: number
 }) {
   // Account management
   const [accounts, setAccounts] = useState<Account[]>(allAccounts)
@@ -83,7 +84,6 @@ export default function FinanceClient({
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(true)
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [showTransactionDialog, setShowTransactionDialog] = useState(false)
   
@@ -415,7 +415,6 @@ export default function FinanceClient({
     if (!file) return
 
     setUploading(true)
-    setUploadProgress(0)
     
     try {
       const formData = new FormData()
@@ -426,18 +425,12 @@ export default function FinanceClient({
       const xhr = new XMLHttpRequest()
       
       // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 90) // 0-90% for upload
-          setUploadProgress(percentComplete)
-        }
-      })
+      // Progress tracking removed - using indeterminate animation instead
 
       // Handle completion
       const uploadPromise = new Promise<any>((resolve, reject) => {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadProgress(95) // 95% for processing
             try {
               const data = JSON.parse(xhr.responseText)
               resolve({ ok: true, data })
@@ -467,27 +460,18 @@ export default function FinanceClient({
       xhr.send(formData)
 
       const result = await uploadPromise
-      setUploadProgress(100)
 
       if (result.ok) {
         showToast(`✅ Uploaded ${result.data.transactionsImported || 0} transactions successfully!`, 'success')
-        
-        // Clear upload state and hide progress
-        setTimeout(() => {
-          setUploadProgress(null)
-          setUploading(false)
-        }, 500)
-
+        setUploading(false)
         // Load transactions immediately
         loadTransactions()
       } else {
-        setUploadProgress(null)
         setUploading(false)
         showToast(`Error: ${result.data.error}`, 'error')
       }
     } catch (err: any) {
       console.error('Failed to upload statement', err)
-      setUploadProgress(null)
       setUploading(false)
       showToast('Failed to upload statement. Please try again.', 'error')
     } finally {
@@ -1008,16 +992,28 @@ export default function FinanceClient({
         </CardContent>
       </Card>
 
-      {/* Upload Progress */}
-      {uploadProgress !== null && (
+      {/* Upload Progress - Indeterminate Loading Animation */}
+      {uploading && (
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Uploading...</p>
-                <p className="text-sm text-muted-foreground">{uploadProgress}%</p>
+              <p className="text-sm font-medium">Uploading & Processing...</p>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary rounded-full animate-pulse"
+                  style={{
+                    width: '40%',
+                    animation: 'indeterminate 1.5s ease-in-out infinite'
+                  }}
+                />
               </div>
-              <Progress value={uploadProgress} className="w-full" />
+              <style jsx>{`
+                @keyframes indeterminate {
+                  0% { transform: translateX(-100%); }
+                  50% { transform: translateX(150%); }
+                  100% { transform: translateX(-100%); }
+                }
+              `}</style>
             </div>
           </CardContent>
         </Card>
@@ -1343,7 +1339,10 @@ export default function FinanceClient({
                         </Select>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
-                        txn.transaction_type === 'credit' 
+                        // Mark membership payments under the fee in red
+                        txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
+                          ? 'text-red-600 dark:text-red-400'
+                          : txn.transaction_type === 'credit' 
                           ? 'text-green-600 dark:text-green-400' 
                           : txn.transaction_type === 'debit'
                           ? 'text-red-600 dark:text-red-400'

@@ -150,11 +150,39 @@ export default function CreateMemberForm() {
     }
   }
 
+  // Validation helpers
+  const validatePhone = (phone: string): boolean => {
+    // Remove spaces, dashes, parentheses
+    const cleaned = phone.replace(/[\s\-\(\)]/g, '')
+    // Check if it's 10 digits (Australian format) or starts with +61 and has appropriate length
+    return /^0\d{9}$/.test(cleaned) || /^\+61\d{9}$/.test(cleaned) || /^61\d{9}$/.test(cleaned)
+  }
+
+  const validateEmail = (email: string): boolean => {
+    // Standard email regex
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (loading) return // Prevent double submission
     setLoading(true)
     setError(null)
+
+    // Validate phone if provided
+    if (formData.phone && !validatePhone(formData.phone)) {
+      setError('Invalid phone number. Please enter a valid 10-digit Australian phone number (e.g., 0412345678)')
+      setLoading(false)
+      return
+    }
+
+    // Validate email if provided
+    if (formData.email && !validateEmail(formData.email)) {
+      setError('Invalid email address. Please enter a valid email (e.g., example@email.com)')
+      setLoading(false)
+      return
+    }
+
     try {
       // Create member
       const res = await fetch('/api/members/create', {
