@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Try to get from member_groups table first
+    // Count members by BOTH group_id and group_name to catch all cases
     const { rows: groups } = await pool.query(`
       SELECT 
         mg.id,
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
         mg.created_at,
         COUNT(u.id) as member_count
       FROM member_groups mg
-      LEFT JOIN users u ON u.group_id = mg.id
+      LEFT JOIN users u ON u.group_id = mg.id OR u.group_name = mg.name
       GROUP BY mg.id, mg.name, mg.description, mg.created_at
       ORDER BY mg.name ASC
     `)

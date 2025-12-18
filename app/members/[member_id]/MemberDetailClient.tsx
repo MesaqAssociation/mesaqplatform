@@ -356,6 +356,20 @@ export default function MemberDetailClient({
 
   const handleSaveInfo = async () => {
     if (!isAdmin || savingInfo) return
+    
+    // Validate phone number (10 digits)
+    const phoneDigits = draft.phone.replace(/\D/g, '')
+    if (phoneDigits.length !== 10) {
+      showToast('Phone number must be exactly 10 digits', 'error')
+      return
+    }
+    
+    // Validate email if provided
+    if (draft.email && !draft.email.includes('@')) {
+      showToast('Email must contain @', 'error')
+      return
+    }
+    
     setSavingInfo(true)
     try {
       const res = await fetch(`/api/members/${member.id}`, {

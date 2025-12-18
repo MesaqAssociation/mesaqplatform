@@ -30,49 +30,77 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files).map(file => ({
+      const newFilesToAdd = Array.from(e.target.files).map(file => ({
         file,
         progress: 0,
         uploaded: false
       }))
       
-      setFiles(prev => [...prev, ...newFiles])
+      // Add files to state first
+      const startIndex = files.length
+      setFiles(prev => [...prev, ...newFilesToAdd])
       
-      // Upload each file immediately
-      for (let i = files.length; i < files.length + newFiles.length; i++) {
-        uploadFile(i)
+      // Upload each new file
+      for (let i = 0; i < newFilesToAdd.length; i++) {
+        uploadFile(startIndex + i, newFilesToAdd[i].file)
       }
     }
   }
 
-  const uploadFile = async (index: number) => {
-    const fileItem = files[index]
-    if (!fileItem) return
-
+  const uploadFile = async (index: number, file: File) => {
     try {
-      // Simulate upload with progress
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        setFiles(prev => {
-          const updated = [...prev]
-          if (updated[index]) {
-            updated[index] = { ...updated[index], progress }
-          }
-          return updated
-        })
-      }
+      // Create FormData for upload
+      const formData = new FormData()
+      formData.append('file', file)
 
-      // Mark as uploaded
-      const uploadedUrl = `/uploads/${fileItem.file.name}`
+      // Start progress
       setFiles(prev => {
         const updated = [...prev]
         if (updated[index]) {
-          updated[index] = { ...updated[index], uploaded: true, url: uploadedUrl }
+          updated[index] = { ...updated[index], progress: 10 }
+        }
+        return updated
+      })
+
+      // Upload to R2 via our API
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      // Update progress to 70%
+      setFiles(prev => {
+        const updated = [...prev]
+        if (updated[index]) {
+          updated[index] = { ...updated[index], progress: 70 }
+        }
+        return updated
+      })
+
+      if (!response.ok) {
+        throw new Error('Upload failed')
+      }
+
+      const { url } = await response.json()
+
+      // Complete upload
+      setFiles(prev => {
+        const updated = [...prev]
+        if (updated[index]) {
+          updated[index] = { ...updated[index], progress: 100, uploaded: true, url }
         }
         return updated
       })
     } catch (error) {
       console.error('Upload error:', error)
+      // Mark as failed
+      setFiles(prev => {
+        const updated = [...prev]
+        if (updated[index]) {
+          updated[index] = { ...updated[index], progress: 0, uploaded: false }
+        }
+        return updated
+      })
     }
   }
 

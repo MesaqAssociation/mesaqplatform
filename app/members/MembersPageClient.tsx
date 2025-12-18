@@ -38,6 +38,7 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   const [selectedLeader, setSelectedLeader] = useState<string>('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [additionalMemberSearchQuery, setAdditionalMemberSearchQuery] = useState('')
   
   // View groups state
   const [showViewGroupsDialog, setShowViewGroupsDialog] = useState(false)
@@ -88,7 +89,9 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
         setShowGroupDialog(false)
         setGroupName('')
         setSelectedMembers([])
+        setSelectedLeader('')
         setMemberSearchQuery('')
+        setAdditionalMemberSearchQuery('')
         router.refresh()
       } else {
         toast(data.error || 'Failed to create group', 'error')
@@ -129,14 +132,12 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   const loadGroupMembers = async (groupName: string, groupId: string | null) => {
     setLoadingGroupMembers(groupId || groupName)
     try {
-      // Get members in this group from our initial list or fetch from API
-      const groupMembers = initial.filter(m => {
-        // Check if member's group_name matches (need to get this from members data)
-        return false // Will be populated from API
-      })
+      // Fetch from API - pass both id and name for accurate lookup
+      const params = new URLSearchParams()
+      if (groupId) params.append('id', groupId)
+      params.append('name', groupName)
       
-      // Fetch from API for accurate data
-      const res = await fetch(`/api/groups/members?name=${encodeURIComponent(groupName)}`)
+      const res = await fetch(`/api/groups/members?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
         setGroups(prev => prev.map(g => 
@@ -267,9 +268,20 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
 
             <div>
               <Label>Add Additional Members (optional)</Label>
+              <Input
+                placeholder="Search members to add..."
+                value={additionalMemberSearchQuery}
+                onChange={(e) => setAdditionalMemberSearchQuery(e.target.value)}
+                className="mt-1"
+              />
               <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
                 {initial
                   .filter(m => m.id !== selectedLeader)
+                  .filter(m => 
+                    !additionalMemberSearchQuery || 
+                    m.name?.toLowerCase().includes(additionalMemberSearchQuery.toLowerCase()) ||
+                    m.phone?.toLowerCase().includes(additionalMemberSearchQuery.toLowerCase())
+                  )
                   .map((member) => (
                     <label key={member.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
                       <Checkbox

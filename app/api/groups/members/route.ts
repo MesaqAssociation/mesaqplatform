@@ -34,18 +34,25 @@ export async function GET(req: NextRequest) {
 
     let members: Array<{ id: string, name: string }> = []
 
-    if (groupId) {
-      // Query by group_id (new schema)
+    // Query by BOTH group_id AND group_name to catch all cases
+    // Some users may have group_id set, others may have group_name
+    if (groupId && groupName) {
+      const { rows } = await pool.query(`
+        SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
+        WHERE group_id = $1 OR group_name = $2
+        ORDER BY is_group_leader DESC, name ASC
+      `, [groupId, groupName])
+      members = rows
+    } else if (groupId) {
+      // Query by group_id only
       const { rows } = await pool.query(`
         SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_id = $1
         ORDER BY is_group_leader DESC, name ASC
       `, [groupId])
       members = rows
-    }
-    
-    // If no results from group_id, try group_name (legacy)
-    if (members.length === 0 && groupName) {
+    } else if (groupName) {
+      // Query by group_name only (legacy)
       const { rows } = await pool.query(`
         SELECT id, name, COALESCE(is_group_leader, false) as is_group_leader FROM users 
         WHERE group_name = $1
