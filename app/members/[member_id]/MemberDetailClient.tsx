@@ -579,7 +579,9 @@ export default function MemberDetailClient({
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{member.group_name || '-'}</p>
                       {member.is_group_leader && member.group_name && (
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Leader</span>
+                        <span className="inline-flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full font-semibold">
+                          ⭐ Group Leader
+                        </span>
                       )}
                     </div>
                   )}
