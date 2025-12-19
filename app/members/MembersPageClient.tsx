@@ -130,6 +130,7 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
 
   // Load members for a specific group
   const loadGroupMembers = async (groupName: string, groupId: string | null) => {
+    console.log('🔵 Loading members for:', { groupName, groupId })
     setLoadingGroupMembers(groupId || groupName)
     try {
       // Fetch from API - pass both id and name for accurate lookup
@@ -137,14 +138,20 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
       if (groupId) params.append('id', groupId)
       params.append('name', groupName)
       
-      const res = await fetch(`/api/groups/members?${params.toString()}`)
+      const url = `/api/groups/members?${params.toString()}`
+      console.log('🔵 Fetching from:', url)
+      
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
-        setGroups(prev => prev.map(g => 
-          (g.id === groupId || g.name === groupName) 
-            ? { ...g, members: data.members } 
-            : g
-        ))
+        console.log('🔵 Received members:', data.members.length, 'for group:', groupName)
+        setGroups(prev => prev.map(g => {
+          const shouldUpdate = (g.id === groupId || g.name === groupName)
+          if (shouldUpdate) {
+            console.log('🔵 Updating group:', g.name, 'with', data.members.length, 'members')
+          }
+          return shouldUpdate ? { ...g, members: data.members } : g
+        }))
       }
     } catch (err) {
       console.error('Failed to load group members:', err)
