@@ -52,12 +52,10 @@ export default function CreateEventForm() {
     title: '',
     description: '',
     address: '',
-    attendees: [] as string[],
     estimated_cost: '',
     event_date: new Date().toISOString().split('T')[0],
     start_time: '09:00',
     end_time: '10:00',
-    email_attendees: false,
     organizing_group: '',
   })
 
@@ -161,15 +159,6 @@ export default function CreateEventForm() {
     ))
   }
 
-  function toggleAttendee(value: string) {
-    setFormData(prev => ({
-      ...prev,
-      attendees: prev.attendees.includes(value)
-        ? prev.attendees.filter(a => a !== value)
-        : [...prev.attendees, value]
-    }))
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (loading) return
@@ -260,64 +249,6 @@ export default function CreateEventForm() {
         <p className="text-xs text-muted-foreground mt-1">
           Members of this group will receive a WhatsApp notification about organizing this event
         </p>
-      </div>
-
-      <Separator />
-
-      <div>
-        <Label>Attendees *</Label>
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="manager" 
-              checked={formData.attendees.includes('Manager')}
-              onCheckedChange={() => toggleAttendee('Manager')}
-            />
-            <label htmlFor="manager" className="text-sm cursor-pointer">
-              Manager
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="public-officer" 
-              checked={formData.attendees.includes('Public Officer')}
-              onCheckedChange={() => toggleAttendee('Public Officer')}
-            />
-            <label htmlFor="public-officer" className="text-sm cursor-pointer">
-              Public Officer
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="finance-officer" 
-              checked={formData.attendees.includes('Finance Officer')}
-              onCheckedChange={() => toggleAttendee('Finance Officer')}
-            />
-            <label htmlFor="finance-officer" className="text-sm cursor-pointer">
-              Finance Officer
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="logistics-officer" 
-              checked={formData.attendees.includes('Logistics Officer')}
-              onCheckedChange={() => toggleAttendee('Logistics Officer')}
-            />
-            <label htmlFor="logistics-officer" className="text-sm cursor-pointer">
-              Logistics Officer
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="community-members" 
-              checked={formData.attendees.includes('Community Members')}
-              onCheckedChange={() => toggleAttendee('Community Members')}
-            />
-            <label htmlFor="community-members" className="text-sm cursor-pointer">
-              Community Members
-            </label>
-          </div>
-        </div>
       </div>
 
       <Separator />
@@ -455,21 +386,6 @@ export default function CreateEventForm() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="email_attendees" 
-            checked={formData.email_attendees}
-            onCheckedChange={(checked) => setFormData({ ...formData, email_attendees: checked as boolean })}
-          />
-          <label htmlFor="email_attendees" className="text-sm cursor-pointer">
-            Email Attendees
-          </label>
         </div>
       </div>
 

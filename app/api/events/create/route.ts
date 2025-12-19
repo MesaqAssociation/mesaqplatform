@@ -38,12 +38,10 @@ export async function POST(req: NextRequest) {
       title, 
       description,
       address,
-      attendees, 
       estimated_cost, 
       event_date, 
       start_time, 
       end_time, 
-      email_attendees, 
       event_type,
       agenda,
       organizing_group 
@@ -65,8 +63,6 @@ export async function POST(req: NextRequest) {
         start_time, 
         end_time, 
         estimated_cost, 
-        email_attendees,
-        attendees,
         agenda,
         organizing_group
       ) VALUES (
@@ -79,10 +75,8 @@ export async function POST(req: NextRequest) {
         $6, 
         $7, 
         $8, 
-        $9, 
-        $10,
-        $11,
-        $12
+        $9,
+        $10
       ) RETURNING id, title, event_type, event_date`,
       [
         title, 
@@ -93,8 +87,6 @@ export async function POST(req: NextRequest) {
         start_time, 
         end_time, 
         estimated_cost ? parseFloat(estimated_cost) : null, 
-        email_attendees || false,
-        JSON.stringify(attendees || []),
         JSON.stringify(agenda || []),
         organizing_group || null
       ]

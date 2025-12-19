@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { IconCalendar, IconClock, IconMapPin, IconUsers } from '@tabler/icons-react'
+import { IconCalendar, IconClock, IconMapPin } from '@tabler/icons-react'
 import { Badge } from '@/components/ui/badge'
 
 type Event = {
@@ -15,7 +15,6 @@ type Event = {
   end_time: string
   event_type: string
   estimated_cost: number | null
-  attendees: string[]
   completed?: boolean
   completed_at?: string
 }
@@ -102,12 +101,6 @@ export default function EventsClient({ initial, userRole }: Props) {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <IconMapPin className="size-4" />
                     <span className="line-clamp-1">{event.address}</span>
-                  </div>
-                )}
-                {event.attendees && event.attendees.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <IconUsers className="size-4" />
-                    <span>{event.attendees.join(', ')}</span>
                   </div>
                 )}
               </CardContent>

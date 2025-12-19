@@ -360,12 +360,14 @@ export default function MemberDetailClient({
     // Validate phone number (10 digits)
     const phoneDigits = draft.phone.replace(/\D/g, '')
     if (phoneDigits.length !== 10) {
+      console.log('Phone validation failed:', phoneDigits.length, 'digits')
       showToast('Phone number must be exactly 10 digits', 'error')
       return
     }
     
     // Validate email if provided
     if (draft.email && !draft.email.includes('@')) {
+      console.log('Email validation failed:', draft.email)
       showToast('Email must contain @', 'error')
       return
     }
@@ -606,7 +608,7 @@ export default function MemberDetailClient({
                         setSettingLeader(false)
                       }
                     }}
-                    disabled={settingLeader || member.is_group_leader}
+                    disabled={settingLeader || Boolean(member.is_group_leader)}
                   >
                     {settingLeader ? 'Setting...' : member.is_group_leader ? 'Current Leader' : 'Make Group Leader'}
                   </Button>

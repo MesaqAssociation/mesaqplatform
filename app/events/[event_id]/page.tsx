@@ -6,7 +6,7 @@ import { getUserFromToken } from '@/lib/getUserFromToken'
 import { Pool } from 'pg'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { IconArrowLeft, IconCalendar, IconClock, IconUsers, IconMapPin, IconCurrencyDollar, IconCheck, IconPhoto, IconFileText, IconUsersGroup } from '@tabler/icons-react'
+import { IconArrowLeft, IconCalendar, IconClock, IconMapPin, IconCurrencyDollar, IconCheck, IconPhoto, IconFileText, IconUsersGroup } from '@tabler/icons-react'
 import EventActions from './EventActions'
 
 export default async function EventDetailPage({ params }: { params: { event_id: string } }) {
@@ -26,7 +26,6 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
   
   let event: any = null
-  let attendeeNames: string[] = []
   
   try {
     const pool = new (require('pg').Pool)({
@@ -44,28 +43,6 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
     }
 
     event = rows[0]
-    
-    // Fetch attendee names if attendees exist
-    if (event.attendees) {
-      let attendeeIds: string[] = []
-      if (Array.isArray(event.attendees)) {
-        attendeeIds = event.attendees
-      } else if (typeof event.attendees === 'string') {
-        try {
-          attendeeIds = JSON.parse(event.attendees)
-        } catch {
-          attendeeIds = event.attendees.split(',').map((s: string) => s.trim())
-        }
-      }
-      
-      if (attendeeIds.length > 0) {
-        const { rows: memberRows } = await pool.query(
-          'SELECT name FROM users WHERE id = ANY($1) ORDER BY name ASC',
-          [attendeeIds]
-        )
-        attendeeNames = memberRows.map(r => r.name).filter(Boolean)
-      }
-    }
   } catch (error) {
     console.error('Error fetching event:', error)
     redirect('/events')
@@ -181,18 +158,6 @@ export default async function EventDetailPage({ params }: { params: { event_id: 
                 <div>
                   <div className="font-medium">Organizing Group</div>
                   <div className="text-sm text-muted-foreground">{event.organizing_group}</div>
-                </div>
-              </div>
-            )}
-
-            {attendeeNames.length > 0 && (
-              <div className="flex items-start gap-3 p-4 border rounded-lg col-span-full">
-                <IconUsers className="size-5 text-primary mt-0.5" />
-                <div>
-                  <div className="font-medium">Attendees ({attendeeNames.length})</div>
-                  <div className="text-sm text-muted-foreground">
-                    {attendeeNames.join(', ')}
-                  </div>
                 </div>
               </div>
             )}

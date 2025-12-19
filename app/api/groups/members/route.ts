@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
     const groupName = searchParams.get('name')
     const groupId = searchParams.get('id')
 
+    console.log('🔍 Fetching members for group:', { groupId, groupName })
+
     if (!groupName && !groupId) {
       return NextResponse.json({ members: [] })
     }
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
         ORDER BY is_group_leader DESC, name ASC
       `, [groupId])
       members = rows
+      console.log(`  Found ${members.length} members by group_id`)
       
       // If no results and we have a name, fallback to group_name
       if (members.length === 0 && groupName) {
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
           ORDER BY is_group_leader DESC, name ASC
         `, [groupName, groupId])
         members = legacyRows
+        console.log(`  Found ${members.length} members by group_name (fallback)`)
       }
     } else if (groupName) {
       // Legacy: Query by group_name only
@@ -62,6 +66,7 @@ export async function GET(req: NextRequest) {
         ORDER BY is_group_leader DESC, name ASC
       `, [groupName])
       members = rows
+      console.log(`  Found ${members.length} members by group_name only`)
     }
 
     return NextResponse.json({ members })

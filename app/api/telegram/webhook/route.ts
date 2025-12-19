@@ -782,7 +782,7 @@ async function showOrgGroupSelection(chatId: number): Promise<void> {
         WHERE group_name IS NOT NULL AND group_name != ''
         ORDER BY group_name ASC
       `)
-      groups = rows.map(r => ({ id: null, name: r.name }))
+      groups = rows.map((r: any) => ({ id: null, name: r.name }))
     }
     
     const buttons = groups.map((g: any) => [{
@@ -842,18 +842,12 @@ async function createEvent(chatId: number, data: any): Promise<void> {
   try {
     await sendTelegramMessage(chatId, '⏳ Creating event...')
 
-    // Get all members as attendees
-    const { rows: allMembers } = await pool.query(`
-      SELECT id FROM users ORDER BY name ASC
-    `)
-    const attendees = allMembers.map((m: any) => m.id)
-
     const result = await pool.query(
       `INSERT INTO events (
         id, title, description, address, event_date, 
-        start_time, end_time, estimated_cost, organizing_group, attendees
+        start_time, end_time, estimated_cost, organizing_group
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8
       ) RETURNING id, title, event_date`,
       [
         data.title,
@@ -864,7 +858,6 @@ async function createEvent(chatId: number, data: any): Promise<void> {
         data.end_time,
         data.estimated_cost || 0,
         data.organizing_group || null,
-        JSON.stringify(attendees),
       ]
     )
 
