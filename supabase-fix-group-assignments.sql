@@ -36,23 +36,19 @@ END $$;
 -- UPDATE users SET group_name = 'Group 02' WHERE name IN ('Member1', 'Member2', 'Member3');
 -- UPDATE users SET group_name = 'Group 03' WHERE name IN ('Member4', 'Member5', 'Member6');
 
--- 4. If you want to use the new group_id system, sync group_name to group_id:
--- First, ensure member_groups table has all your groups
--- Then run this to sync:
-/*
-UPDATE users u
-SET group_id = mg.id
-FROM member_groups mg
-WHERE u.group_name = mg.name
-  AND u.group_id IS NULL;
-*/
+-- 4. Note: Your database uses the legacy system (group_name only)
+-- The new system uses group_id + member_groups table
+-- To upgrade, you would need to:
+-- 1. Create member_groups table
+-- 2. Add group_id column to users
+-- 3. Migrate data
+-- For now, just use group_name assignments above
 
--- 5. Verify the fix (works without member_groups table)
+-- 5. Verify the fix (legacy system - group_name only)
 SELECT 
   u.name,
   u.group_name,
-  u.group_id,
-  u.is_group_leader
+  COALESCE(u.is_group_leader, false) as is_group_leader
 FROM users u
 WHERE u.group_name IS NOT NULL
 ORDER BY u.group_name, u.is_group_leader DESC NULLS LAST, u.name;
