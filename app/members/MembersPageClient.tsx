@@ -146,7 +146,8 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
         const data = await res.json()
         console.log('🔵 Received members:', data.members.length, 'for group:', groupName)
         setGroups(prev => prev.map(g => {
-          const shouldUpdate = (g.id === groupId || g.name === groupName)
+          // Match by name only (since groupId is null for legacy groups)
+          const shouldUpdate = g.name === groupName
           if (shouldUpdate) {
             console.log('🔵 Updating group:', g.name, 'with', data.members.length, 'members')
           }
