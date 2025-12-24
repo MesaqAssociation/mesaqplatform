@@ -79,7 +79,7 @@ export async function sendPickyAssistTemplates(
   testNumber?: string
 ): Promise<{ success: boolean; sent: number; failed: number }> {
   const apiKey = process.env.PICKY_ASSIST_API_KEY
-  const applicationId = process.env.PICKY_ASSIST_APPLICATION_ID || '121'
+  const applicationId = process.env.PICKY_ASSIST_PAYMENT_APPLICATION_ID || '121'
 
   if (!apiKey) {
     console.error('❌ Picky Assist API key not configured')

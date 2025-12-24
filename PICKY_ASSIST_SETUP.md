@@ -9,7 +9,7 @@ Add these to your `.env.local` file (or Vercel environment variables):
 ```env
 # Picky Assist Configuration
 PICKY_ASSIST_API_KEY=your_api_key_here
-PICKY_ASSIST_APPLICATION_ID=121
+PICKY_ASSIST_PAYMENT_APPLICATION_ID=121
 
 # Template IDs
 PICKY_ASSIST_PAYMENT_TEMPLATE_ID=XA185499179
