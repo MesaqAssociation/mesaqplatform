@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 import { 
   sendWhatsAppMessage, 
   formatPhoneNumber,
-} from '@/lib/whatsapp'
+} from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 

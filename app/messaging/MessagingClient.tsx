@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { IconSend, IconUsers, IconSearch } from '@tabler/icons-react'
+import { IconSend, IconUsers, IconSearch, IconMessage, IconRefresh } from '@tabler/icons-react'
 import { Progress } from '@/components/ui/progress'
 import { showToast } from '@/lib/toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type Member = {
   id: string
@@ -16,6 +17,15 @@ type Member = {
   phone: string | null
   email: string
   member_id: string
+}
+
+type IncomingMessage = {
+  id: string
+  phone: string
+  message: string
+  timestamp: string
+  type: string
+  status: string
 }
 
 export default function MessagingClient() {
@@ -27,10 +37,28 @@ export default function MessagingClient() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sendProgress, setSendProgress] = useState(0)
   const [sendStatus, setSendStatus] = useState<string>('')
+  const [incomingMessages, setIncomingMessages] = useState<IncomingMessage[]>([])
+  const [loadingIncoming, setLoadingIncoming] = useState(false)
 
   useEffect(() => {
     loadMembers()
+    loadIncomingMessages()
   }, [])
+
+  const loadIncomingMessages = async () => {
+    setLoadingIncoming(true)
+    try {
+      const res = await fetch('/api/messaging/incoming?limit=50')
+      if (res.ok) {
+        const data = await res.json()
+        setIncomingMessages(data.messages || [])
+      }
+    } catch (err) {
+      console.error('Failed to load incoming messages:', err)
+    } finally {
+      setLoadingIncoming(false)
+    }
+  }
 
   const loadMembers = async () => {
     try {
@@ -129,16 +157,37 @@ export default function MessagingClient() {
     )
   })
 
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleString('en-AU', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return timestamp
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Send Messages</h1>
+        <h1 className="text-3xl font-bold">Messages</h1>
         <p className="text-muted-foreground mt-1">
-          Send WhatsApp messages to members
+          Send and view WhatsApp messages
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Tabs defaultValue="send" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="send">Send Messages</TabsTrigger>
+          <TabsTrigger value="incoming">Incoming Messages</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="send">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Member Selection */}
         <Card>
           <CardHeader>
@@ -258,7 +307,72 @@ You can use these variables:
             </div>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="incoming">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconMessage className="size-5" />
+                    Incoming Messages
+                  </CardTitle>
+                  <CardDescription>
+                    Recent messages received from members (read-only)
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={loadIncomingMessages}
+                  disabled={loadingIncoming}
+                >
+                  <IconRefresh className={`size-4 mr-2 ${loadingIncoming ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingIncoming ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading messages...
+                </div>
+              ) : incomingMessages.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <IconMessage className="size-12 mx-auto mb-3 opacity-30" />
+                  <p>No incoming messages yet</p>
+                  <p className="text-sm mt-1">Messages from members will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {incomingMessages.map((msg) => (
+                    <div 
+                      key={msg.id} 
+                      className="p-4 border rounded-lg bg-muted/30"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{msg.phone}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatTimestamp(msg.timestamp)}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {msg.message}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

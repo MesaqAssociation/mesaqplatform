@@ -72,6 +72,18 @@ export default function EventsClient({ initial, userRole }: Props) {
     return { label: 'Scheduled', color: 'bg-blue-100 text-blue-700' }
   }
 
+  if (initial.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <IconCalendar className="size-16 text-muted-foreground/30 mb-4" />
+        <h3 className="text-lg font-medium text-muted-foreground">No events yet</h3>
+        <p className="text-sm text-muted-foreground/70 mt-1 max-w-sm">
+          Events will appear here once created. Create your first event to get started!
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {initial.map(event => {

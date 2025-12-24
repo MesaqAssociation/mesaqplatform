@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes max
@@ -53,11 +53,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Member IDs and message are required' }, { status: 400 })
     }
 
-    // Check if Wasender API is configured
-    if (!process.env.WASENDER_API_KEY) {
+    // Check if Picky Assist API is configured
+    if (!process.env.PICKY_ASSIST_API_KEY || !process.env.PICKY_ASSIST_PROJECT_ID) {
       return NextResponse.json({ 
-        error: 'Wasender API not configured',
-        message: 'WASENDER_API_KEY must be set'
+        error: 'Picky Assist API not configured',
+        message: 'PICKY_ASSIST_API_KEY and PICKY_ASSIST_PROJECT_ID must be set'
       }, { status: 400 })
     }
 

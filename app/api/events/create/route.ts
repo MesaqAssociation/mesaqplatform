@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 

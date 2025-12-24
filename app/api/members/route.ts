@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       ? await pool.query(query, [`%${searchQuery.trim()}%`])
       : await pool.query(query)
 
-    return NextResponse.json(rows, { headers: corsHeaders })
+    return NextResponse.json({ members: rows }, { headers: corsHeaders })
   } catch (e) {
     console.error('Get members error:', e)
     return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500, headers: corsHeaders })

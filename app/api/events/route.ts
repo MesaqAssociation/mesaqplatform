@@ -31,9 +31,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url)
-    const type = searchParams.get('type') || 'Event'
-
     const { rows } = await pool.query(`
       SELECT 
         id, 
@@ -41,17 +38,17 @@ export async function GET(req: NextRequest) {
         description, 
         address, 
         to_char(event_date, 'YYYY-MM-DD') as event_date,
-        start_time, 
+        start_time as event_time, 
         end_time, 
         event_type, 
+        organizing_group,
         estimated_cost, 
         completed,
         completed_at
       FROM events 
-      WHERE event_type = $1
       ORDER BY event_date ASC, start_time ASC 
       LIMIT 200
-    `, [type])
+    `)
 
     return NextResponse.json({ events: rows }, { headers: corsHeaders })
   } catch (err: any) {
