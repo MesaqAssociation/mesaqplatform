@@ -1326,7 +1326,15 @@ export default function FinanceClient({
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Select 
-                          value={txn.category || 'Event Payment'}
+                          value={
+                            // Normalize category to valid dropdown options
+                            txn.category === 'Membership Payment' ? 'Membership Payment' :
+                            txn.category === 'Donation' ? 'Donation' :
+                            txn.category === 'Event Payment' ? 'Event Payment' :
+                            txn.category === 'Special Payment' ? 'Special Payment' :
+                            !txn.category || txn.category.trim() === '' ? 'Event Payment' :
+                            'Event Payment' // Default fallback
+                          }
                           onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                         >
                           <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
@@ -1336,6 +1344,9 @@ export default function FinanceClient({
                             <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
                             <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
                             <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
+                            {txn.category === 'Special Payment' && (
+                              <SelectItem value="Special Payment" className="text-foreground cursor-pointer text-muted-foreground">Special Payment (Legacy)</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </td>

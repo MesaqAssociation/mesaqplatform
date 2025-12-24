@@ -8,6 +8,7 @@ import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
 import BoardMemberReport from './BoardMemberReport'
 import BackupRestore from './BackupRestore'
+import PaymentReminders from './PaymentReminders'
 
 export default function SettingsClient({
   user,
@@ -91,6 +92,8 @@ export default function SettingsClient({
               </p>
               <BackupRestore />
             </div>
+
+            <PaymentReminders />
 
             <BoardMemberReport />
           </TabsContent>
