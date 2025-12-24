@@ -35,20 +35,31 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const unreadOnly = searchParams.get('unread') === 'true'
 
-    // Fetch messages from database
+    // Fetch messages from database and try to match to members
     const query = `
       SELECT 
-        id,
-        from_phone as phone,
-        message_text as message,
-        contact_name,
-        message_type as type,
-        timestamp,
-        read,
-        created_at
-      FROM incoming_messages
-      ${unreadOnly ? 'WHERE read = false' : ''}
-      ORDER BY timestamp DESC
+        im.id,
+        im.from_phone as phone,
+        im.message_text as message,
+        im.contact_name,
+        im.message_type as type,
+        im.timestamp,
+        im.read,
+        im.created_at,
+        u.id as member_id,
+        u.name as member_name,
+        u.member_id as member_code
+      FROM incoming_messages im
+      LEFT JOIN users u ON (
+        -- Match by phone number (try various formats)
+        REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '+', ''), '-', '') 
+        LIKE '%' || RIGHT(REPLACE(REPLACE(REPLACE(im.from_phone, ' ', ''), '+', ''), '-', ''), 9)
+        OR
+        REPLACE(REPLACE(REPLACE(im.from_phone, ' ', ''), '+', ''), '-', '')
+        LIKE '%' || RIGHT(REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '+', ''), '-', ''), 9)
+      )
+      ${unreadOnly ? 'WHERE im.read = false' : ''}
+      ORDER BY im.timestamp DESC
       LIMIT $1
     `
 
@@ -62,7 +73,10 @@ export async function GET(req: NextRequest) {
       contactName: msg.contact_name,
       timestamp: msg.timestamp,
       type: msg.type,
-      read: msg.read
+      read: msg.read,
+      memberId: msg.member_id,
+      memberName: msg.member_name,
+      memberCode: msg.member_code
     }))
 
     return NextResponse.json({ 

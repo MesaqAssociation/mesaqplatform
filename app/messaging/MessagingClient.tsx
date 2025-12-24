@@ -27,6 +27,9 @@ type IncomingMessage = {
   timestamp: string
   type: string
   read: boolean
+  memberId: string | null
+  memberName: string | null
+  memberCode: string | null
 }
 
 export default function MessagingClient() {
@@ -358,7 +361,7 @@ You can use these variables:
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             {!msg.read && (
                               <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                             )}
@@ -368,6 +371,11 @@ You can use these variables:
                             {msg.contactName && (
                               <span className="text-xs text-muted-foreground font-mono">
                                 {msg.phone}
+                              </span>
+                            )}
+                            {msg.memberName && (
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                👤 {msg.memberName}
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground ml-auto">

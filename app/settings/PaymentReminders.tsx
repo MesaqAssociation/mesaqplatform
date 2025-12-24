@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { IconSend, IconRefresh, IconAlertCircle, IconCheck, IconTestPipe } from '@tabler/icons-react'
+import { IconSend, IconRefresh, IconAlertCircle, IconTestPipe } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Member = {
@@ -30,7 +29,6 @@ export default function PaymentReminders() {
   const [account, setAccount] = useState<Account | null>(null)
   const [testNumber, setTestNumber] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
-  const [testMode, setTestMode] = useState(true)
 
   useEffect(() => {
     loadPreview()
@@ -90,43 +88,6 @@ export default function PaymentReminders() {
     }
   }
 
-  const handleSendAll = async () => {
-    if (members.length === 0) {
-      showToast('No members with negative balance to remind', 'error')
-      return
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to send payment reminders to ${members.length} members with negative balance?`
-    )
-
-    if (!confirmed) return
-
-    setSending(true)
-    try {
-      const res = await fetch('/api/payment-reminders/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          testMode: false
-        })
-      })
-
-      const data = await res.json()
-      
-      if (res.ok && data.success) {
-        showToast(`Sent ${data.sent} reminders (${data.skipped} skipped, ${data.failed} failed)`, 'success')
-      } else {
-        showToast(data.error || 'Failed to send reminders', 'error')
-      }
-    } catch (err) {
-      console.error('Send reminders error:', err)
-      showToast('Failed to send reminders', 'error')
-    } finally {
-      setSending(false)
-    }
-  }
-
   const selectedMember = members.find(m => m.id === selectedMemberId)
 
   return (
@@ -136,10 +97,10 @@ export default function PaymentReminders() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <IconSend className="size-5" />
-              Payment Reminders
+              Payment Reminders (Test)
             </CardTitle>
             <CardDescription>
-              Send WhatsApp payment reminders to members with negative balance
+              Test WhatsApp payment reminder messages before sending to members
             </CardDescription>
           </div>
           <Button variant="ghost" size="sm" onClick={loadPreview} disabled={loading}>
@@ -172,7 +133,7 @@ export default function PaymentReminders() {
           </Badge>
           {testNumber && (
             <Badge variant="outline" className="font-mono">
-              Test: {testNumber}
+              Test Number: {testNumber}
             </Badge>
           )}
         </div>
@@ -181,11 +142,11 @@ export default function PaymentReminders() {
         <div className="border rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-2">
             <IconTestPipe className="size-5 text-yellow-500" />
-            <h4 className="font-medium">Test Mode</h4>
+            <h4 className="font-medium">Send Test Message</h4>
           </div>
           
           <p className="text-sm text-muted-foreground">
-            Select a member to send their actual reminder message to your test number.
+            Select a member below. Their actual reminder message will be sent to your test number ({testNumber || 'not configured'}).
           </p>
 
           <div className="flex gap-3">
@@ -205,45 +166,30 @@ export default function PaymentReminders() {
             <Button 
               onClick={handleSendTest} 
               disabled={sending || !selectedMemberId || !testNumber}
-              variant="outline"
             >
               <IconTestPipe className="size-4 mr-2" />
               {sending ? 'Sending...' : 'Send Test'}
             </Button>
           </div>
 
-          {selectedMember && (
-            <div className="text-sm p-3 bg-muted rounded-md">
-              <p className="font-medium mb-1">Preview:</p>
-              <p className="text-muted-foreground">
-                "Hi {selectedMember.name}, your membership balance is ${Math.abs(selectedMember.balance).toFixed(0)}. 
-                Please pay to BSB: {account?.bsb}, Acc: {account?.account_number}"
-              </p>
+          {selectedMember && account && (
+            <div className="text-sm p-3 bg-muted rounded-md space-y-2">
+              <p className="font-medium">Message Preview:</p>
+              <div className="text-muted-foreground space-y-1">
+                <p>• Name: <span className="text-foreground">{selectedMember.name}</span></p>
+                <p>• Balance: <span className="text-foreground">{Math.abs(selectedMember.balance).toFixed(0)}</span></p>
+                <p>• BSB: <span className="text-foreground">{account.bsb}</span></p>
+                <p>• Account: <span className="text-foreground">{account.account_number}</span></p>
+              </div>
             </div>
           )}
-        </div>
-
-        {/* Send to All */}
-        <div className="border-t pt-4">
-          <Button 
-            onClick={handleSendAll}
-            disabled={sending || members.length === 0}
-            className="w-full"
-            variant="default"
-          >
-            <IconSend className="size-4 mr-2" />
-            {sending ? 'Sending...' : `Send Reminders to All ${members.length} Members`}
-          </Button>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            This will send real WhatsApp messages to all members with negative balance
-          </p>
         </div>
 
         {/* Members List Preview */}
         {members.length > 0 && (
           <div className="border rounded-lg">
             <div className="p-3 border-b bg-muted/30">
-              <h4 className="font-medium text-sm">Members to Remind</h4>
+              <h4 className="font-medium text-sm">Members with Negative Balance</h4>
             </div>
             <div className="max-h-[200px] overflow-y-auto">
               {members.slice(0, 20).map(m => (
@@ -276,4 +222,3 @@ export default function PaymentReminders() {
     </Card>
   )
 }
-

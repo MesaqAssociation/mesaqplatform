@@ -107,7 +107,7 @@ export async function sendPickyAssistTemplates(
   try {
     console.log(`📤 Sending ${processedMessages.length} template messages via Picky Assist`)
     
-    const response = await fetch('https://app.pickyassist.com/api/v2/send', {
+    const response = await fetch('https://app.pickyassist.com/api/v2/push', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
