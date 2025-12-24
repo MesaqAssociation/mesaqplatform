@@ -23,9 +23,10 @@ type IncomingMessage = {
   id: string
   phone: string
   message: string
+  contactName: string | null
   timestamp: string
   type: string
-  status: string
+  read: boolean
 }
 
 export default function MessagingClient() {
@@ -343,20 +344,33 @@ You can use these variables:
                 <div className="text-center py-8 text-muted-foreground">
                   <IconMessage className="size-12 mx-auto mb-3 opacity-30" />
                   <p>No incoming messages yet</p>
-                  <p className="text-sm mt-1">Messages from members will appear here</p>
+                  <p className="text-sm mt-1">Messages from members will appear here once Picky Assist webhook is configured</p>
+                  <p className="text-xs mt-3 font-mono bg-muted p-2 rounded">
+                    Webhook URL: /api/messaging/webhook
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {incomingMessages.map((msg) => (
                     <div 
                       key={msg.id} 
-                      className="p-4 border rounded-lg bg-muted/30"
+                      className={`p-4 border rounded-lg ${msg.read ? 'bg-muted/30' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">{msg.phone}</span>
-                            <span className="text-xs text-muted-foreground">
+                            {!msg.read && (
+                              <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                            )}
+                            <span className="font-medium text-sm">
+                              {msg.contactName || msg.phone}
+                            </span>
+                            {msg.contactName && (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {msg.phone}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-auto">
                               {formatTimestamp(msg.timestamp)}
                             </span>
                           </div>

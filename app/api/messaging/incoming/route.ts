@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { corsHeaders } from '@/lib/cors'
 
 export const runtime = 'nodejs'
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+})
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders })
 }
 
+/**
+ * GET: Fetch incoming messages from database
+ */
 export async function GET(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) {
@@ -22,61 +31,95 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const apiKey = process.env.PICKY_ASSIST_API_KEY
-    const projectId = process.env.PICKY_ASSIST_PROJECT_ID
-
-    if (!apiKey || !projectId) {
-      return NextResponse.json({ 
-        error: 'Picky Assist not configured',
-        messages: [] 
-      }, { headers: corsHeaders })
-    }
-
     const { searchParams } = new URL(req.url)
-    const limit = searchParams.get('limit') || '50'
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const unreadOnly = searchParams.get('unread') === 'true'
 
-    // Fetch incoming messages from Picky Assist
-    const endpoint = `https://app.pickyassist.com/app/api/v2/messages?project_id=${projectId}&limit=${limit}&direction=inbound`
-    
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      }
-    })
+    // Fetch messages from database
+    const query = `
+      SELECT 
+        id,
+        from_phone as phone,
+        message_text as message,
+        contact_name,
+        message_type as type,
+        timestamp,
+        read,
+        created_at
+      FROM incoming_messages
+      ${unreadOnly ? 'WHERE read = false' : ''}
+      ORDER BY timestamp DESC
+      LIMIT $1
+    `
 
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('Failed to fetch incoming messages:', error)
-      return NextResponse.json({ 
-        error: 'Failed to fetch messages',
-        messages: [] 
-      }, { headers: corsHeaders })
-    }
-
-    const result = await response.json()
-    const messages = result.messages || result.data || []
+    const { rows: messages } = await pool.query(query, [limit])
 
     // Format messages for display
     const formattedMessages = messages.map((msg: any) => ({
-      id: msg.id || msg.message_id,
-      phone: msg.phone || msg.from || msg.sender,
-      message: msg.message || msg.body || msg.text,
-      timestamp: msg.timestamp || msg.created_at || msg.date,
-      type: msg.type || 'text',
-      status: msg.status || 'received'
+      id: msg.id,
+      phone: msg.phone,
+      message: msg.message,
+      contactName: msg.contact_name,
+      timestamp: msg.timestamp,
+      type: msg.type,
+      read: msg.read
     }))
 
     return NextResponse.json({ 
-      messages: formattedMessages 
+      messages: formattedMessages,
+      total: formattedMessages.length
     }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Get incoming messages error:', err)
+    
+    // Check if table doesn't exist
+    if (err.code === '42P01') {
+      return NextResponse.json({ 
+        messages: [],
+        error: 'Table not created yet. Run supabase-incoming-messages.sql first.',
+        total: 0
+      }, { headers: corsHeaders })
+    }
+    
     return NextResponse.json({ 
       error: 'Failed to fetch messages',
       messages: [] 
-    }, { headers: corsHeaders })
+    }, { status: 500, headers: corsHeaders })
   }
 }
 
+/**
+ * PATCH: Mark message(s) as read
+ */
+export async function PATCH(req: NextRequest) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+  
+  try {
+    jwt.verify(token, process.env.AUTH_SECRET)
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
+  try {
+    const body = await req.json()
+    const { messageId, markAllRead } = body
+
+    if (markAllRead) {
+      await pool.query('UPDATE incoming_messages SET read = true WHERE read = false')
+      return NextResponse.json({ success: true, message: 'All messages marked as read' }, { headers: corsHeaders })
+    }
+
+    if (messageId) {
+      await pool.query('UPDATE incoming_messages SET read = true WHERE id = $1', [messageId])
+      return NextResponse.json({ success: true }, { headers: corsHeaders })
+    }
+
+    return NextResponse.json({ error: 'No messageId or markAllRead provided' }, { status: 400, headers: corsHeaders })
+  } catch (err: any) {
+    console.error('Mark read error:', err)
+    return NextResponse.json({ error: 'Failed to mark as read' }, { status: 500, headers: corsHeaders })
+  }
+}
