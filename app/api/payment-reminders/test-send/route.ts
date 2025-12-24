@@ -31,11 +31,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check if Wasender API is configured
-    if (!process.env.WASENDER_API_KEY || !process.env.WHATSAPP_TEST_NUMBER) {
+    // Check if Picky Assist API is configured
+    if (!process.env.PICKY_ASSIST_API_KEY || !process.env.WHATSAPP_TEST_NUMBER) {
       return NextResponse.json({ 
-        error: 'Wasender API or test number not configured',
-        message: 'WASENDER_API_KEY and WHATSAPP_TEST_NUMBER must be set'
+        error: 'Picky Assist API or test number not configured',
+        message: 'PICKY_ASSIST_API_KEY and WHATSAPP_TEST_NUMBER must be set'
       }, { status: 400 })
     }
 
