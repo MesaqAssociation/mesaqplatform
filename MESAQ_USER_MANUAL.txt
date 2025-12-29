@@ -1,0 +1,1172 @@
+================================================================================
+                    MESAQ ASSOCIATION MANAGEMENT SYSTEM
+                           USER MANUAL & GUIDE
+================================================================================
+
+                         Version 1.0 | December 2024
+
+================================================================================
+                            TABLE OF CONTENTS
+================================================================================
+
+1.  GETTING STARTED
+    1.1  Logging In
+    1.2  Dashboard Overview
+    1.3  Navigation
+    1.4  User Roles & Permissions
+
+2.  MEMBER MANAGEMENT
+    2.1  Viewing All Members
+    2.2  Creating a New Member
+    2.3  Viewing Member Details
+    2.4  Editing Member Information
+    2.5  Changing Member Roles
+    2.6  Setting Group Leaders
+    2.7  Resetting Member Passwords
+    2.8  Member Payment Status
+
+3.  FINANCE MANAGEMENT
+    3.1  Finance Overview
+    3.2  Bank Accounts
+    3.3  Uploading Bank Statements
+    3.4  Manual Transactions
+    3.5  Matching Payments to Members
+    3.6  Transaction Categories
+    3.7  Advance Payments
+    3.8  Main Membership Payment Account
+    3.9  Adjusting Balance
+
+4.  EVENTS MANAGEMENT
+    4.1  Viewing All Events
+    4.2  Creating a New Event
+    4.3  Event Details & Attendance
+    4.4  Assigning Organizing Groups
+    4.5  Completing an Event
+    4.6  Event Notifications
+
+5.  CALENDAR & NOTIFICATIONS
+    5.1  Calendar Overview
+    5.2  Scheduling Notifications
+    5.3  Cancelling Notifications
+    5.4  Deleting Notifications
+
+6.  MESSAGING (WHATSAPP)
+    6.1  Sending Messages to Members
+    6.2  Message Template Format
+    6.3  Viewing Incoming Messages
+    6.4  Payment Reminders
+    6.5  Test Mode
+
+7.  DOCUMENTS
+    7.1  Uploading Documents
+    7.2  Viewing & Downloading Documents
+    7.3  Deleting Documents
+
+8.  SETTINGS
+    8.1  Personal Settings
+    8.2  Changing Your Password
+    8.3  Updating Your Profile
+    8.4  Community Settings (Admin Only)
+    8.5  Monthly Membership Fee
+    8.6  Late Payment Fines
+    8.7  Payment Keywords
+    8.8  Export Data
+    8.9  Backup & Restore
+    8.10 Payment Reminders
+    8.11 Board Member Report
+
+9.  REPORTS & EXPORTS
+    9.1  Exporting Member Data
+    9.2  Exporting Finance Data
+    9.3  Annual Reports
+    9.4  Board Member Reports
+
+10. TELEGRAM BOT
+    10.1 Setting Up the Telegram Bot
+    10.2 Member Self-Registration
+    10.3 Bot Commands
+
+11. MEMBER PORTAL (Non-Admin Users)
+    11.1 Member Dashboard
+    11.2 Viewing Payment History
+    11.3 Viewing Events
+
+12. TROUBLESHOOTING & FAQs
+    12.1 Common Issues
+    12.2 Frequently Asked Questions
+
+================================================================================
+                          1. GETTING STARTED
+================================================================================
+
+1.1 LOGGING IN
+--------------
+1. Open your web browser and go to your Mesaq dashboard URL
+2. Enter your email address
+3. Enter your password
+4. Click "Login"
+
+If you forgot your password:
+- Contact an administrator to reset your password
+- Administrators can reset passwords from: Members > [Member Name] > Reset Password
+
+
+1.2 DASHBOARD OVERVIEW
+----------------------
+After logging in, you will see the main dashboard with:
+- Summary statistics (total members, total balance, events, etc.)
+- Quick access cards for common actions
+- Recent activity feed
+
+Admin Dashboard shows:
+- Total Members
+- Total Account Balance
+- Upcoming Events
+- Members with Outstanding Payments
+
+Member Dashboard shows:
+- Your personal payment status
+- Your payment history
+- Upcoming events
+
+
+1.3 NAVIGATION
+--------------
+The sidebar on the left contains all main sections:
+
+For Admins/Board Members:
+- Dashboard       - Main overview page
+- Calendar        - View events and schedule notifications
+- Members         - Manage all members
+- Finance         - Track finances and transactions
+- Events          - Manage community events
+- Documents       - Upload and share documents
+- Messaging       - Send WhatsApp messages to members
+- Settings        - System configuration
+
+For Regular Members:
+- Dashboard       - Personal overview
+- Calendar        - View upcoming events
+- Members         - View member directory
+- Payments        - View your payment history
+- Events          - View events
+- Documents       - Access shared documents
+
+
+1.4 USER ROLES & PERMISSIONS
+----------------------------
+The system has several user roles:
+
+- Admin           Full access to all features
+- Board           Same as Admin (Board members)
+- Manager         Administrative access
+- Finance Officer Access to finance features
+- Logistics Officer Access to event management
+- Public Officer  Access to communications
+- Member          Basic access (view-only for most features)
+
+
+================================================================================
+                        2. MEMBER MANAGEMENT
+================================================================================
+
+2.1 VIEWING ALL MEMBERS
+-----------------------
+Navigation: Sidebar > Members
+
+The Members page displays all registered members with:
+- Name and avatar
+- Group assignment
+- Phone number
+- Household members count
+- Role
+- Payment status (PAID/UNPAID)
+
+Sorting Options:
+- Name (A-Z) - Alphabetical order
+- Most Paid - Members who paid the most first
+- Least Paid - Members who paid the least first
+- Unpaid First - Members with outstanding balances first
+
+To refresh the list: Click the "Refresh" button
+
+
+2.2 CREATING A NEW MEMBER
+-------------------------
+Navigation: Sidebar > Members > "+ Create" button (top right)
+
+Steps:
+1. Click the "+ Create" button
+2. Fill in the member details:
+   - Full Name (required)
+   - Email Address (required, unique)
+   - Phone Number (with country code, e.g., +61412345678)
+   - Address
+   - Role (select from dropdown)
+   - Group (select from Group 1-5)
+   - Household Members (number of family members)
+   - Date Joined
+3. Click "Create Member"
+
+Note: A temporary password will be generated. Share this with the member.
+
+
+2.3 VIEWING MEMBER DETAILS
+--------------------------
+Navigation: Sidebar > Members > Click on any member row
+
+The member detail page shows:
+- Personal information (name, email, phone, address)
+- Payment balance and status
+- Payment history
+- Membership status by month
+- Event attendance history
+
+
+2.4 EDITING MEMBER INFORMATION
+------------------------------
+Navigation: Sidebar > Members > [Member Name]
+
+On the member detail page:
+1. Click "Edit" next to any editable field
+2. Make your changes
+3. Click "Save"
+
+Editable fields:
+- Name
+- Email
+- Phone
+- Address
+- Group
+- Household Members
+- Date Joined
+
+
+2.5 CHANGING MEMBER ROLES
+-------------------------
+Navigation: Sidebar > Members > [Member Name]
+
+Steps:
+1. Find the "Role" section
+2. Click the current role to open dropdown
+3. Select the new role:
+   - Member
+   - Manager
+   - Finance Officer
+   - Logistics Officer
+   - Public Officer
+   - Board
+   - Admin
+4. Confirm the change
+
+Note: Changing roles affects what the member can access.
+
+
+2.6 SETTING GROUP LEADERS
+-------------------------
+Navigation: Sidebar > Members > [Member Name]
+
+Steps:
+1. Open the member's detail page
+2. Find the "Group Leader" option
+3. Toggle ON to make them a group leader
+4. The member will now appear as leader for their group
+
+
+2.7 RESETTING MEMBER PASSWORDS
+------------------------------
+Navigation: Sidebar > Members > [Member Name]
+
+Steps:
+1. Open the member's detail page
+2. Scroll to the bottom
+3. Click "Reset Password"
+4. Confirm the action
+5. A new temporary password will be generated
+6. Share this password with the member securely
+
+
+2.8 MEMBER PAYMENT STATUS
+-------------------------
+Each member has a payment balance calculated as:
+- Expected Payments: Monthly fee × Months since joining
+- Actual Payments: Sum of all membership payments
+- Balance: Actual Payments - Expected Payments
+
+Balance Status:
+- Positive (Green): Member has paid in advance
+- Zero: Member is up to date
+- Negative (Red): Member has outstanding payments
+
+
+================================================================================
+                        3. FINANCE MANAGEMENT
+================================================================================
+
+3.1 FINANCE OVERVIEW
+--------------------
+Navigation: Sidebar > Finance
+
+The Finance page shows:
+- Current account balance
+- Bank account tabs (switch between accounts)
+- Monthly transaction view
+- Search functionality
+- Quick actions (upload statement, add transaction)
+
+
+3.2 BANK ACCOUNTS
+-----------------
+Creating a New Bank Account:
+Navigation: Finance > "Add Account" button
+
+Steps:
+1. Click "Add Account"
+2. Enter Account Name (e.g., "Main Account", "Donations")
+3. Enter Account Number (6 digits)
+4. Enter BSB (format: XXX-XXX)
+5. Check "Donation account" if applicable (donations only, no member matching)
+6. Click "Add Account"
+
+Switching Between Accounts:
+- Click on the account tabs at the top of the Finance page
+
+Deleting an Account:
+1. Select the account to delete
+2. Click "Delete Account"
+3. Type "confirm" to verify
+4. Click "Delete Account"
+
+Note: You cannot delete the last remaining account.
+
+
+3.3 UPLOADING BANK STATEMENTS
+-----------------------------
+Navigation: Finance > "Upload Bank Statement" button
+
+Supported Format: PDF bank statements
+
+Steps:
+1. Click "Upload Bank Statement"
+2. Select your PDF file
+3. Wait for processing (may take a minute)
+4. Transactions will be automatically imported
+5. Review imported transactions
+
+The system will:
+- Extract transaction dates, amounts, and descriptions
+- Attempt to match transactions to members
+- Categorize transactions based on keywords
+
+
+3.4 MANUAL TRANSACTIONS
+-----------------------
+Navigation: Finance > "Add Transaction" dropdown > "Regular Transaction"
+
+Steps:
+1. Click "Add Transaction"
+2. Select "Regular Transaction"
+3. Fill in the details:
+   - Date
+   - Type (Credit/Debit)
+   - Category (Membership Payment, Event Payment, Donation)
+   - Transaction Name
+   - Description (optional)
+   - Amount
+   - Match to Member (optional)
+4. Click "Add Transaction"
+
+
+3.5 MATCHING PAYMENTS TO MEMBERS
+--------------------------------
+Automatic Matching:
+When uploading bank statements, the system attempts to match payments
+to members based on:
+- Banking name in transaction description
+- Member name
+- Keywords
+
+Manual Matching:
+Navigation: Finance > Click on "Unknown" in Member column
+
+Steps:
+1. In the transactions table, find the Member column
+2. Click on the current member name or "Unknown"
+3. Search for the member by name, email, or phone
+4. Click on the correct member to match
+5. The payment will be linked to that member
+
+
+3.6 TRANSACTION CATEGORIES
+--------------------------
+Available Categories:
+- Membership Payment - Monthly membership fees
+- Event Payment - Payments for specific events
+- Donation - Charitable donations
+
+Changing Category:
+1. In the transactions table, find the Category column
+2. Click the dropdown
+3. Select the new category
+4. The change is saved automatically
+
+
+3.7 ADVANCE PAYMENTS
+--------------------
+For members paying multiple months in advance:
+Navigation: Finance > "Add Transaction" > "Advance Payment"
+
+Steps:
+1. Click "Add Transaction"
+2. Select "Advance Payment"
+3. Search and select the member
+4. Enter number of months (1-12)
+5. Add description (optional)
+6. Click "Record Payment"
+
+This will:
+- Create payment records for future months
+- Update member's balance accordingly
+
+
+3.8 MAIN MEMBERSHIP PAYMENT ACCOUNT
+-----------------------------------
+The main membership payment account is used for:
+- Payment reminder messages (BSB and account number in messages)
+- Default account for membership payments
+
+Setting the Main Account:
+Navigation: Finance > Select an account > "Set as Main" button
+
+Steps:
+1. Click on the account tab you want to set as main
+2. Click "Set as Main" button
+3. The account will be marked with a star icon
+
+Note: Only one account can be the main membership account.
+
+
+3.9 ADJUSTING BALANCE
+---------------------
+To manually adjust the account balance:
+Navigation: Finance > Click on the balance amount
+
+Steps:
+1. Click on the large balance number
+2. Enter the new balance
+3. Click the checkmark
+4. Enter a reason for the adjustment
+5. Click "Confirm Adjustment"
+
+An adjustment transaction will be recorded.
+
+
+================================================================================
+                        4. EVENTS MANAGEMENT
+================================================================================
+
+4.1 VIEWING ALL EVENTS
+----------------------
+Navigation: Sidebar > Events
+
+The Events page shows:
+- Upcoming Events (future dates)
+- Past Events
+- Event cards with title, date, time, location, and organizing group
+
+
+4.2 CREATING A NEW EVENT
+------------------------
+Navigation: Sidebar > Events > "Create Event" button
+
+Steps:
+1. Click "Create Event"
+2. Fill in event details:
+   - Event Title (required)
+   - Event Type (Event, Meeting, Workshop, etc.)
+   - Date (required)
+   - Start Time (required)
+   - End Time (required)
+   - Location/Address
+   - Description
+   - Estimated Cost
+   - Organizing Group (Group 1-5)
+   - Agenda Items (click + to add)
+3. Click "Create Event"
+
+If an organizing group is selected:
+- Group members will receive WhatsApp notifications
+- The group is responsible for organizing the event
+
+
+4.3 EVENT DETAILS & ATTENDANCE
+------------------------------
+Navigation: Sidebar > Events > Click on an event
+
+The event detail page shows:
+- Event information
+- Organizing group
+- Attendee list
+- Attendance tracking
+
+To mark attendance:
+1. Open the event
+2. Check the box next to members who attended
+3. Changes are saved automatically
+
+
+4.4 ASSIGNING ORGANIZING GROUPS
+-------------------------------
+When creating or editing an event:
+1. Find the "Organizing Group" dropdown
+2. Select a group (Group 1-5)
+3. All members in that group will be notified
+
+Groups rotate automatically based on the last assigned group.
+
+
+4.5 COMPLETING AN EVENT
+-----------------------
+After an event has occurred:
+Navigation: Events > [Event] > "Complete Event"
+
+Steps:
+1. Open the event
+2. Click "Complete Event"
+3. Mark which members attended
+4. Add any notes or final costs
+5. Click "Complete"
+
+
+4.6 EVENT NOTIFICATIONS
+-----------------------
+When an organizing group is assigned to an event:
+- All group members receive a WhatsApp message
+- Message includes event details, date, and other group members
+
+Message format:
+"Salam [Name],
+
+[Event Name - Event Date]
+Your group ([Group]) is organizing this event.
+Other group members: [Names]
+
+Thank you - Mesaq"
+
+
+================================================================================
+                      5. CALENDAR & NOTIFICATIONS
+================================================================================
+
+5.1 CALENDAR OVERVIEW
+---------------------
+Navigation: Sidebar > Calendar
+
+The Calendar page shows:
+- Interactive calendar with marked dates
+- Upcoming Events (circle border)
+- Scheduled Notifications (shaded background)
+- List of scheduled notifications
+- List of upcoming events
+
+
+5.2 SCHEDULING NOTIFICATIONS
+----------------------------
+Navigation: Sidebar > Calendar > "Schedule Notification" or click a date
+
+Steps:
+1. Click "Schedule Notification" or click on a date
+2. Select the date (must be in the future)
+3. Enter notification title
+4. Enter the message content
+5. Click "Schedule Notification"
+
+Note: Messages will be sent to ALL members on the scheduled date.
+The message follows the admin message template format:
+"Salam [Member Name],
+[Your message]
+Thank you - Mesaq"
+
+
+5.3 CANCELLING NOTIFICATIONS
+----------------------------
+Navigation: Sidebar > Calendar
+
+Steps:
+1. Find the notification in the list
+2. Click the X icon (cancel button)
+3. The notification status changes to "Cancelled"
+
+Cancelled notifications remain visible but won't be sent.
+
+
+5.4 DELETING NOTIFICATIONS
+--------------------------
+Navigation: Sidebar > Calendar
+
+Steps:
+1. Find the notification in the list
+2. Click the trash icon (delete button)
+3. Confirm the deletion
+4. The notification is permanently removed
+
+Note: Deleted notifications cannot be recovered.
+
+
+================================================================================
+                         6. MESSAGING (WHATSAPP)
+================================================================================
+
+6.1 SENDING MESSAGES TO MEMBERS
+-------------------------------
+Navigation: Sidebar > Messaging
+
+Steps:
+1. In the "Select Recipients" panel, check the members to message
+2. Use the search bar to find specific members
+3. Click "Select All" to message everyone
+4. In the "Compose Message" panel, type your message
+5. Click "Send to X Member(s)"
+
+Messages are queued and sent with delays to avoid rate limiting.
+
+
+6.2 MESSAGE TEMPLATE FORMAT
+---------------------------
+All admin messages are sent using a WhatsApp template:
+
+Format:
+"Salam [Member Name],
+
+[Your message content here]
+
+Thank you - Mesaq"
+
+You only write the middle part - the greeting and signature are automatic.
+
+
+6.3 VIEWING INCOMING MESSAGES
+-----------------------------
+Navigation: Sidebar > Messaging > "Incoming Messages" tab
+
+This shows:
+- Messages received from members
+- Contact name and phone number
+- Matched member (if recognized)
+- Timestamp
+- Message content
+
+Click "Refresh" to load new messages.
+
+
+6.4 PAYMENT REMINDERS
+---------------------
+Navigation: Sidebar > Settings > Community Settings > Payment Reminders
+
+To send test reminder:
+1. Go to Settings > Community Settings
+2. Scroll to "Payment Reminders"
+3. Click "Send Test Reminder"
+4. A test message is sent to your test number
+
+Payment reminder format:
+"Salam [Name],
+
+Your balance is [Amount].
+Please pay to:
+BSB: [BSB]
+Account: [Account Number]
+
+Salam [Name],
+[Arabic version of above]
+
+Thank you - Mesaq"
+
+
+6.5 TEST MODE
+-------------
+When PICKY_ASSIST_TEST_MODE is enabled:
+- ALL messages go to the test number
+- No actual members receive messages
+- Original message content is preserved
+
+This is for testing the system before going live.
+
+
+================================================================================
+                            7. DOCUMENTS
+================================================================================
+
+7.1 UPLOADING DOCUMENTS
+-----------------------
+Navigation: Sidebar > Documents > "Upload" button
+
+Steps:
+1. Click "Upload"
+2. Select the file (PDF, Word, Excel, images)
+3. Enter a title/description
+4. Click "Upload"
+
+Supported formats:
+- PDF (.pdf)
+- Word (.doc, .docx)
+- Excel (.xls, .xlsx)
+- Images (.jpg, .png, .webp)
+
+
+7.2 VIEWING & DOWNLOADING DOCUMENTS
+-----------------------------------
+Navigation: Sidebar > Documents
+
+Steps:
+1. Browse the document list
+2. Click on a document to view/download
+3. Click the download icon to save locally
+
+
+7.3 DELETING DOCUMENTS
+----------------------
+Navigation: Sidebar > Documents
+
+Steps:
+1. Find the document
+2. Click the trash/delete icon
+3. Confirm deletion
+
+Note: Deleted documents cannot be recovered.
+
+
+================================================================================
+                            8. SETTINGS
+================================================================================
+
+8.1 PERSONAL SETTINGS
+---------------------
+Navigation: Sidebar > Settings > Personal Settings tab
+
+Available settings:
+- Update profile information
+- Change password
+- View account details
+
+
+8.2 CHANGING YOUR PASSWORD
+--------------------------
+Navigation: Sidebar > Settings > Personal Settings
+
+Steps:
+1. Go to Settings
+2. Find "Change Password" section
+3. Enter your current password
+4. Enter your new password
+5. Confirm new password
+6. Click "Update Password"
+
+Password requirements:
+- Minimum 8 characters
+- Recommended: mix of letters, numbers, symbols
+
+
+8.3 UPDATING YOUR PROFILE
+-------------------------
+Navigation: Sidebar > Settings > Personal Settings
+
+Editable fields:
+- Name
+- Email
+- Phone Number
+- Profile Picture
+
+Steps:
+1. Click "Edit" next to the field
+2. Make your changes
+3. Click "Save"
+
+
+8.4 COMMUNITY SETTINGS (ADMIN ONLY)
+-----------------------------------
+Navigation: Sidebar > Settings > Community Settings tab
+
+Only accessible by Admins and Board members.
+Contains system-wide configuration options.
+
+
+8.5 MONTHLY MEMBERSHIP FEE
+--------------------------
+Navigation: Settings > Community Settings > Membership Fee
+
+Steps:
+1. Enter the new monthly fee amount
+2. Click "Update Fee"
+
+This affects:
+- All future payment calculations
+- Member balance displays
+- Payment status determination
+
+
+8.6 LATE PAYMENT FINES
+----------------------
+Navigation: Settings > Community Settings > Late Payment Fines
+
+Steps:
+1. Toggle "Enable Fines" on/off
+2. Enter the fine amount
+3. Click "Save"
+
+Note: Fines are calculated but not automatically applied.
+A cron job would need to be set up for automatic fines.
+
+
+8.7 PAYMENT KEYWORDS
+--------------------
+Navigation: Settings > Community Settings > Payment Keywords
+
+Keywords help automatically categorize transactions:
+
+Types:
+- Member Keywords: Match transactions to members (e.g., banking names)
+- Donation Keywords: Identify donation transactions
+
+To add a keyword:
+1. Enter the keyword
+2. Select the type
+3. Click "Add"
+
+To remove a keyword:
+1. Click the X next to the keyword
+
+
+8.8 EXPORT DATA
+---------------
+Navigation: Settings > Community Settings > Export Data
+
+Available exports:
+- Members (CSV or Excel)
+- Events (CSV or Excel)
+- Transactions (CSV or Excel)
+
+Steps:
+1. Select what to export
+2. Choose format (CSV or Excel)
+3. Click "Export"
+4. Download the file
+
+
+8.9 BACKUP & RESTORE
+--------------------
+Navigation: Settings > Community Settings > Backup & Restore
+
+Creating a Backup:
+1. Click "Create Backup"
+2. Wait for the backup to generate
+3. Download the backup file (JSON format)
+
+Restoring from Backup:
+1. Click "Restore"
+2. Select your backup file
+3. Confirm the restoration
+4. Wait for the process to complete
+
+WARNING: Restoring a backup will replace current data!
+
+
+8.10 PAYMENT REMINDERS
+----------------------
+Navigation: Settings > Community Settings > Payment Reminders
+
+Options:
+- View members with outstanding payments
+- Send test reminder (to test number)
+- Preview reminder message format
+
+
+8.11 BOARD MEMBER REPORT
+------------------------
+Navigation: Settings > Community Settings > Board Member Report
+
+This generates an official report for:
+- Annual general meetings
+- Regulatory requirements
+- Association records
+
+Steps:
+1. Click "Generate Report"
+2. Review the report
+3. Download or print
+
+
+================================================================================
+                        9. REPORTS & EXPORTS
+================================================================================
+
+9.1 EXPORTING MEMBER DATA
+-------------------------
+Navigation: Settings > Community Settings > Export Data
+
+Steps:
+1. Select "Members" from the dropdown
+2. Choose format: CSV or Excel
+3. Click "Export"
+
+Exported data includes:
+- Member ID
+- Name
+- Email
+- Phone
+- Address
+- Role
+- Group
+- Balance
+- Payment status
+
+
+9.2 EXPORTING FINANCE DATA
+--------------------------
+Navigation: Settings > Community Settings > Export Data
+
+Steps:
+1. Select "Transactions" from the dropdown
+2. Choose format: CSV or Excel
+3. Click "Export"
+
+Exported data includes:
+- Transaction date
+- Description
+- Amount
+- Category
+- Matched member
+- Balance after
+
+
+9.3 ANNUAL REPORTS
+------------------
+For annual reports, combine:
+1. Export member data
+2. Export transaction data
+3. Generate Board Member Report
+
+Use these exports to create:
+- Financial statements
+- Membership reports
+- Activity summaries
+
+
+9.4 BOARD MEMBER REPORTS
+------------------------
+Navigation: Settings > Community Settings > Board Member Report
+
+This generates a formal document listing:
+- Association name
+- Current board members and roles
+- Report date
+- Official formatting for regulatory purposes
+
+
+================================================================================
+                          10. TELEGRAM BOT
+================================================================================
+
+10.1 SETTING UP THE TELEGRAM BOT
+--------------------------------
+The Telegram bot allows members to self-register.
+
+Setup requirements:
+1. Create a bot via @BotFather on Telegram
+2. Get your bot token
+3. Set TELEGRAM_BOT_TOKEN in environment variables
+4. Set up the webhook URL
+
+Webhook URL format:
+https://your-domain.com/api/telegram/webhook
+
+
+10.2 MEMBER SELF-REGISTRATION
+-----------------------------
+Members can register via Telegram by:
+1. Finding your bot on Telegram
+2. Sending /start
+3. Following the registration prompts
+4. Entering their details
+
+The bot will:
+- Create their account
+- Generate a temporary password
+- Link their Telegram to their account
+
+
+10.3 BOT COMMANDS
+-----------------
+Available commands:
+- /start - Begin registration or login
+- /status - Check membership status
+- /help - Get help information
+
+
+================================================================================
+                    11. MEMBER PORTAL (Non-Admin Users)
+================================================================================
+
+11.1 MEMBER DASHBOARD
+---------------------
+Navigation: Sidebar > Dashboard
+
+Regular members see:
+- Their personal payment status
+- Current balance
+- Recent payments
+- Upcoming events they should attend
+
+
+11.2 VIEWING PAYMENT HISTORY
+----------------------------
+Navigation: Sidebar > Payments
+
+Members can view:
+- All their payments
+- Payment dates
+- Payment amounts
+- Current balance
+
+Note: Members cannot modify payment records.
+
+
+11.3 VIEWING EVENTS
+-------------------
+Navigation: Sidebar > Events
+
+Members can view:
+- All upcoming events
+- Event details (date, time, location)
+- Their organizing group assignments
+- Past events they attended
+
+
+================================================================================
+                      12. TROUBLESHOOTING & FAQs
+================================================================================
+
+12.1 COMMON ISSUES
+------------------
+
+ISSUE: Cannot log in
+SOLUTION:
+1. Check your email is correct
+2. Check caps lock is off
+3. Try resetting your password (contact admin)
+4. Clear browser cache and cookies
+
+ISSUE: Page not loading / showing errors
+SOLUTION:
+1. Refresh the page (Ctrl+R or Cmd+R)
+2. Clear browser cache
+3. Try a different browser
+4. Check your internet connection
+
+ISSUE: Transactions not importing from bank statement
+SOLUTION:
+1. Ensure the PDF is from a supported bank
+2. Try uploading a smaller date range
+3. Check if the PDF is not password protected
+4. Contact support for assistance
+
+ISSUE: WhatsApp messages not sending
+SOLUTION:
+1. Check if Picky Assist API is configured
+2. Verify the member has a valid phone number
+3. Check if test mode is enabled (messages go to test number)
+4. Review the console logs for errors
+
+ISSUE: Member not showing correct payment status
+SOLUTION:
+1. Check if payments are matched to the correct member
+2. Verify the payment category is "Membership Payment"
+3. Check the member's join date (affects expected payments)
+4. Refresh the members list
+
+ISSUE: Cannot delete a bank account
+SOLUTION:
+- You cannot delete the last remaining account
+- Create another account first, then delete
+
+ISSUE: Finance page shows wrong transactions when changing months
+SOLUTION:
+- This race condition has been fixed
+- If still occurring, refresh the page
+
+
+12.2 FREQUENTLY ASKED QUESTIONS
+-------------------------------
+
+Q: How do I add a new member?
+A: Sidebar > Members > Click "+ Create" > Fill in details > Click "Create Member"
+
+Q: How do I change the monthly membership fee?
+A: Sidebar > Settings > Community Settings > Membership Fee > Enter new amount > Update
+
+Q: How do I send a message to all members?
+A: Sidebar > Messaging > Check "Select All" > Type message > Click "Send"
+
+Q: How do I export member data to Excel?
+A: Sidebar > Settings > Community Settings > Export Data > Select "Members" > Choose "Excel" > Export
+
+Q: How do I mark an event as completed?
+A: Sidebar > Events > Click on event > Click "Complete Event" > Mark attendance > Complete
+
+Q: How do I change my password?
+A: Sidebar > Settings > Personal Settings > Change Password section
+
+Q: How do I reset another member's password?
+A: Sidebar > Members > Click member name > Scroll down > Click "Reset Password"
+
+Q: How do I add bank transactions manually?
+A: Sidebar > Finance > Click "Add Transaction" > Select "Regular Transaction" > Fill details
+
+Q: How do I match a payment to a member?
+A: Sidebar > Finance > Find the transaction > Click member column > Search and select member
+
+Q: How do I schedule a notification to all members?
+A: Sidebar > Calendar > Click "Schedule Notification" or click a date > Fill details > Schedule
+
+Q: How do I create a backup?
+A: Sidebar > Settings > Community Settings > Backup & Restore > Click "Create Backup"
+
+Q: How do I set which bank account is used for payment reminders?
+A: Sidebar > Finance > Select the account > Click "Set as Main" button
+
+Q: How do I assign a group to organize an event?
+A: When creating/editing an event > Select "Organizing Group" > Choose a group
+
+Q: What does the star on a bank account mean?
+A: It indicates the "Main Membership Payment Account" - used in payment reminder messages
+
+Q: How do I view incoming WhatsApp messages?
+A: Sidebar > Messaging > Click "Incoming Messages" tab
+
+Q: How do I check if messages are in test mode?
+A: Check if PICKY_ASSIST_TEST_MODE=true in environment variables
+
+Q: Can regular members see other members' payment information?
+A: No, regular members can only see their own payment history
+
+Q: How do I generate an annual report?
+A: Export member and transaction data, then use the Board Member Report generator
+
+
+================================================================================
+                            CONTACT & SUPPORT
+================================================================================
+
+For technical support or questions about this system:
+- Contact your system administrator
+- Email: [Your support email]
+
+For association-related inquiries:
+- Contact your board members
+- Email: [Association email]
+
+
+================================================================================
+                         END OF USER MANUAL
+================================================================================
+
