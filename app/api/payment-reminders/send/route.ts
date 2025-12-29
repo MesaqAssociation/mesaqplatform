@@ -55,13 +55,25 @@ export async function POST(req: NextRequest) {
     const { testMode = false, memberId } = body
     const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
-    // Get main account BSB and account number
+    // Get main membership account BSB and account number
     const { rows: accountRows } = await pool.query(`
       SELECT bsb, account_number FROM financial_accounts 
-      WHERE is_donation_account = false 
-      ORDER BY created_at ASC 
+      WHERE is_main_membership_account = true
       LIMIT 1
     `)
+    
+    // Fallback to first non-donation account if no main account is set
+    if (accountRows.length === 0) {
+      const { rows: fallbackRows } = await pool.query(`
+        SELECT bsb, account_number FROM financial_accounts 
+        WHERE is_donation_account = false 
+        ORDER BY created_at ASC 
+        LIMIT 1
+      `)
+      if (fallbackRows.length > 0) {
+        accountRows.push(fallbackRows[0])
+      }
+    }
 
     if (accountRows.length === 0) {
       return NextResponse.json({ 

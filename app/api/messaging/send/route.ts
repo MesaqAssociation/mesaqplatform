@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendAdminMessage, formatPhoneNumber } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 
@@ -25,13 +25,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Only admins/board can send messages
-  const userId = decoded.userId
+  const userId = decoded.userId || decoded.sub
   const { rows: userRows } = await pool.query(
     'SELECT role FROM users WHERE id = $1',
     [userId]
   )
   
-  if (userRows.length === 0 || !['admin', 'board', 'Manager'].includes(userRows[0].role)) {
+  const userRole = (userRows[0]?.role || '').toLowerCase()
+  if (userRows.length === 0 || !['admin', 'board', 'manager'].includes(userRole)) {
     return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 })
   }
 
@@ -44,12 +45,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY || !process.env.PICKY_ASSIST_PROJECT_ID) {
+    if (!process.env.PICKY_ASSIST_API_KEY) {
       return NextResponse.json({ 
         error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY and PICKY_ASSIST_PROJECT_ID must be set'
+        message: 'PICKY_ASSIST_API_KEY must be set'
       }, { status: 400 })
     }
+
+    // Check if admin message template is configured
+    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
+      return NextResponse.json({ 
+        error: 'Admin message template not configured',
+        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
+      }, { status: 400 })
+    }
+
+    // Check if we're in test mode
+    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
     // Get member details
     const placeholders = memberIds.map((_: any, i: number) => `$${i + 1}`).join(',')
@@ -71,27 +84,25 @@ export async function POST(req: NextRequest) {
           const progress = Math.round(((i + 1) / members.length) * 100)
 
           try {
-            // Replace variables in message
-            let personalizedMessage = message
-              .replace(/\{\{name\}\}/g, member.name)
-              .replace(/\{\{phone\}\}/g, member.phone || '')
-              .replace(/\{\{email\}\}/g, member.email || '')
-
-            const phone = formatPhoneNumber(member.phone)
-            
             // Send status update
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ 
                 progress, 
-                status: `Sending to ${member.name}...` 
+                status: `Sending to ${member.name}...`,
+                testMode: isTestMode
               })}\n\n`)
             )
 
-            // Send WhatsApp message
-            const success = await sendWhatsAppMessage({
-              to: phone,
-              body: personalizedMessage
-            })
+            // Send using admin message template
+            // Template format: "Salam {{1}}, {{2}} Thank you - Mesaq"
+            const success = await sendAdminMessage(
+              {
+                memberName: member.name,
+                message: message.trim(),
+                phone: member.phone
+              },
+              isTestMode ? testNumber : undefined
+            )
 
             if (success) {
               sent++
@@ -114,7 +125,8 @@ export async function POST(req: NextRequest) {
             progress: 100,
             status: 'Complete',
             sent,
-            failed
+            failed,
+            testMode: isTestMode
           })}\n\n`)
         )
 
@@ -137,4 +149,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

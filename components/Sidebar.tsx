@@ -92,8 +92,9 @@ export function Sidebar({ user }: SidebarProps) {
       <aside className={`fixed left-0 top-0 z-40 h-screen ${sidebarWidth} bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300`}>
         {/* Header with Logo and Mobile Toggle */}
         <div className="p-4 flex items-center justify-between flex-shrink-0">
-        <Link href="/dashboard" className="flex items-center">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <img src="/crop-logo.webp" alt="Mesaq" width="48" height="48" className="object-contain" />
+          {showText && <span className="font-bold text-lg">Mesaq Association</span>}
         </Link>
           {isMobile && (
             <button

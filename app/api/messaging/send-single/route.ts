@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendAdminMessage, formatPhoneNumber } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 
@@ -53,10 +53,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY || !process.env.PICKY_ASSIST_PROJECT_ID) {
+    if (!process.env.PICKY_ASSIST_API_KEY) {
       return NextResponse.json({ 
         error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY and PICKY_ASSIST_PROJECT_ID must be set'
+        message: 'PICKY_ASSIST_API_KEY must be set'
+      }, { status: 400 })
+    }
+
+    // Check if admin message template is configured
+    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
+      return NextResponse.json({ 
+        error: 'Admin message template not configured',
+        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
       }, { status: 400 })
     }
 
@@ -73,22 +81,30 @@ export async function POST(req: NextRequest) {
 
     const member = members[0]
 
-    // Replace variables in message
-    let personalizedMessage = message
-      .replace(/\{\{name\}\}/g, member.name)
-      .replace(/\{\{phone\}\}/g, member.phone || '')
-      .replace(/\{\{email\}\}/g, member.email || '')
+    if (!member.phone) {
+      return NextResponse.json({ error: 'Member has no phone number' }, { status: 400 })
+    }
 
-    const phone = formatPhoneNumber(member.phone)
-    
-    // Send WhatsApp message
-    const success = await sendWhatsAppMessage({
-      to: phone,
-      body: personalizedMessage
-    })
+    // Check if we're in test mode
+    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
+    // Send using the admin message template
+    // Template format: "Salam {{1}}, {{2}} Thank you - Mesaq"
+    const success = await sendAdminMessage(
+      {
+        memberName: member.name,
+        message: message.trim(),
+        phone: member.phone
+      },
+      isTestMode ? testNumber : undefined
+    )
 
     if (success) {
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ 
+        success: true,
+        testMode: isTestMode
+      })
     } else {
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
     }
@@ -100,4 +116,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

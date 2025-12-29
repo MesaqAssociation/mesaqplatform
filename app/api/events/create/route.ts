@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendBulkEventNotifications, formatPhoneNumber, EventNotificationData } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 
@@ -10,15 +10,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 })
-
-// Helper function to format time in 12-hour format
-function formatTime(time24: string): string {
-  const [hours, minutes] = time24.split(':')
-  const hour = parseInt(hours)
-  const ampm = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour % 12 || 12
-  return `${displayHour}:${minutes} ${ampm}`
-}
 
 export async function POST(req: NextRequest) {
   // Verify admin
@@ -103,7 +94,7 @@ export async function POST(req: NextRequest) {
         SET value = EXCLUDED.value
       `, [organizing_group])
 
-      // Send WhatsApp notifications to group members
+      // Send WhatsApp notifications to group members using event template
       try {
         const { rows: groupMembers } = await pool.query(`
           SELECT id, name, phone 
@@ -112,21 +103,50 @@ export async function POST(req: NextRequest) {
         `, [organizing_group])
 
         if (groupMembers.length > 0) {
+          // Format the event date for display
           const eventDate = new Date(event_date)
-          const formattedDate = eventDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-          const formattedTime = start_time ? formatTime(start_time) : ''
-          
-          const message = `🎉 *Event Organization Assignment*\n\nYour group (*${organizing_group}*) has been assigned to organize the upcoming event!\n\n📅 *Event:* ${title}\n📆 *Date:* ${formattedDate}\n🕐 *Time:* ${formattedTime}\n📍 *Location:* ${address || 'TBD'}\n\n${description ? `📝 *Details:*\n${description}\n\n` : ''}Please coordinate with your group members to prepare for this event. Thank you for your service to the community! 🙏`
+          const formattedDate = eventDate.toLocaleDateString('en-AU', { 
+            weekday: 'long', 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+          })
 
-          // Send to each member in the group using the WhatsApp helper (respects test mode)
-          for (const member of groupMembers) {
-            await sendWhatsAppMessage({
-              to: formatPhoneNumber(member.phone),
-              body: message
+          // Get all member names for the "other members" field
+          const allMemberNames = groupMembers.map(m => m.name)
+
+          // Prepare event notification data for each member
+          const eventNotifications: EventNotificationData[] = groupMembers
+            .filter(member => member.phone)
+            .map(member => {
+              // Get other members (exclude current member)
+              const otherMembers = allMemberNames
+                .filter(name => name !== member.name)
+                .join(', ')
+
+              return {
+                memberName: member.name,
+                eventName: title,
+                eventDate: formattedDate,
+                groupName: organizing_group,
+                otherGroupMembers: otherMembers || 'None',
+                phone: member.phone
+              }
             })
+
+          if (eventNotifications.length > 0) {
+            // Check if we're in test mode
+            const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+            const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
+            const result = await sendBulkEventNotifications(
+              eventNotifications,
+              isTestMode,
+              testNumber
+            )
+
+            console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
           }
-          
-          console.log(`✅ Sent event organization notifications to ${groupMembers.length} members in ${organizing_group}`)
         }
       } catch (whatsappErr) {
         console.error('Failed to send WhatsApp notifications:', whatsappErr)
@@ -143,4 +163,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

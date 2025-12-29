@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE - Cancel a notification
+// DELETE - Delete a notification (permanently remove from database)
 export async function DELETE(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) {
@@ -106,20 +106,27 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
+    const action = searchParams.get('action') // 'cancel' or 'delete'
 
     if (!id) {
       return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 })
     }
 
-    await pool.query(`
-      UPDATE scheduled_notifications 
-      SET status = 'cancelled' 
-      WHERE id = $1 AND status = 'pending'
-    `, [id])
-
-    return NextResponse.json({ success: true })
+    if (action === 'delete') {
+      // Permanently delete the notification
+      await pool.query('DELETE FROM scheduled_notifications WHERE id = $1', [id])
+      return NextResponse.json({ success: true, action: 'deleted' })
+    } else {
+      // Default: cancel the notification (mark as cancelled)
+      await pool.query(`
+        UPDATE scheduled_notifications 
+        SET status = 'cancelled' 
+        WHERE id = $1 AND status = 'pending'
+      `, [id])
+      return NextResponse.json({ success: true, action: 'cancelled' })
+    }
   } catch (err: any) {
     console.error('Delete notification error:', err)
-    return NextResponse.json({ error: 'Failed to cancel notification' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete notification' }, { status: 500 })
   }
 }

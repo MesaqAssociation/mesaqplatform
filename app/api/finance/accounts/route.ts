@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
         current_balance,
         currency,
         is_donation_account,
+        COALESCE(is_main_membership_account, FALSE) as is_main_membership_account,
         created_at
       FROM financial_accounts
       ORDER BY created_at ASC
@@ -118,6 +119,47 @@ export async function POST(req: NextRequest) {
     }
     
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+  }
+}
+
+// PATCH - Update account (set as main membership account)
+export async function PATCH(req: NextRequest) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
+  try {
+    jwt.verify(token, process.env.AUTH_SECRET)
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const { accountId, isMainMembershipAccount } = body
+
+    if (!accountId) {
+      return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
+    }
+
+    if (isMainMembershipAccount === true) {
+      // First, unset any existing main account
+      await pool.query('UPDATE financial_accounts SET is_main_membership_account = FALSE WHERE is_main_membership_account = TRUE')
+      
+      // Then set this account as main
+      await pool.query('UPDATE financial_accounts SET is_main_membership_account = TRUE WHERE id = $1', [accountId])
+      
+      return NextResponse.json({ 
+        success: true,
+        message: 'Account set as main membership payment account'
+      })
+    }
+
+    return NextResponse.json({ error: 'Invalid update' }, { status: 400 })
+  } catch (err: any) {
+    console.error('Update account error:', err)
+    return NextResponse.json({ error: 'Failed to update account' }, { status: 500 })
   }
 }
 

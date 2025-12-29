@@ -1,6 +1,17 @@
 /**
  * Picky Assist WhatsApp API Integration
  * Sends messages via Picky Assist's WhatsApp Business Platform using templates
+ * 
+ * Template Types:
+ * 1. Payment Reminders (PICKY_ASSIST_PAYMENT_TEMPLATE_ID)
+ *    Placeholders: {{1}} Name, {{2}} Balance, {{3}} BSB, {{4}} Account Number, {{5-8}} duplicates for Arabic
+ * 
+ * 2. Event Notifications (PICKY_ASSIST_EVENT_TEMPLATE_ID)
+ *    Placeholders: {{1}} Name, {{2}} Event Name - Date, {{3}} Group, {{4}} Other group members, {{5-8}} duplicates
+ * 
+ * 3. Admin Messages (PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID)
+ *    Placeholders: {{1}} Name, {{2}} Admin message
+ *    Note: Messages come prefilled with "Salam {{name}}" and end with "Thank you - Mesaq"
  */
 
 export type PickyAssistTemplateMessage = {
@@ -12,6 +23,21 @@ export type PickyAssistTemplateMessage = {
 export type PaymentReminderData = {
   name: string
   balance: number // Negative balance (owes money)
+  phone: string
+}
+
+export type EventNotificationData = {
+  memberName: string
+  eventName: string
+  eventDate: string
+  groupName: string
+  otherGroupMembers: string // Comma-separated list of other member names
+  phone: string
+}
+
+export type AdminMessageData = {
+  memberName: string
+  message: string
   phone: string
 }
 
@@ -64,6 +90,23 @@ export function formatPhoneNumber(phone: string): string {
 }
 
 /**
+ * Check if test mode is enabled
+ */
+function isTestMode(): boolean {
+  return process.env.PICKY_ASSIST_TEST_MODE === 'true'
+}
+
+/**
+ * Get the test number if test mode is enabled
+ */
+function getTestNumber(): string | undefined {
+  if (isTestMode()) {
+    return process.env.WHATSAPP_TEST_NUMBER
+  }
+  return undefined
+}
+
+/**
  * Send template messages using Picky Assist API
  * API Format:
  * {
@@ -79,22 +122,25 @@ export async function sendPickyAssistTemplates(
   testNumber?: string
 ): Promise<{ success: boolean; sent: number; failed: number }> {
   const apiKey = process.env.PICKY_ASSIST_API_KEY
-  const applicationId = process.env.PICKY_ASSIST_PAYMENT_APPLICATION_ID || '121'
+  const applicationId = process.env.PICKY_ASSIST_APPLICATION_ID || '121'
 
   if (!apiKey) {
     console.error('❌ Picky Assist API key not configured')
     return { success: false, sent: 0, failed: messages.length }
   }
 
+  // Check if we're in test mode - if so, override with test number
+  const effectiveTestNumber = testNumber || getTestNumber()
+
   // If test number provided, redirect all messages to it but keep original content
   const processedMessages = messages.map(msg => ({
-    number: testNumber ? formatPhoneNumber(testNumber) : msg.number,
+    number: effectiveTestNumber ? formatPhoneNumber(effectiveTestNumber) : msg.number,
     template_message: msg.template_message,
     language: msg.language || 'en'
   }))
 
-  if (testNumber) {
-    console.log(`🧪 TEST MODE: Redirecting ${messages.length} messages to ${testNumber}`)
+  if (effectiveTestNumber) {
+    console.log(`🧪 TEST MODE: Redirecting ${messages.length} messages to ${effectiveTestNumber}`)
   }
 
   const payload = {
@@ -106,6 +152,7 @@ export async function sendPickyAssistTemplates(
 
   try {
     console.log(`📤 Sending ${processedMessages.length} template messages via Picky Assist`)
+    console.log(`   Template: ${templateId}, Application: ${applicationId}`)
     
     const response = await fetch('https://app.pickyassist.com/api/v2/push', {
       method: 'POST',
@@ -141,7 +188,12 @@ export async function sendPickyAssistTemplates(
 
 /**
  * Send payment reminder to a single member
- * Uses template XA185499179 with params: [Name, Balance, BSB, Account Number]
+ * Template placeholders:
+ * {{1}} - Name
+ * {{2}} - Balance (no $ sign)
+ * {{3}} - BSB (Main account)
+ * {{4}} - Account number (Main account)
+ * {{5-8}} - Same as above (for Arabic duplicate)
  */
 export async function sendPaymentReminder(
   data: PaymentReminderData,
@@ -158,16 +210,20 @@ export async function sendPaymentReminder(
 
   const templateId = process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID || 'XA185499179'
   
-  // Format balance as positive number (amount owed)
+  // Format balance as positive number (amount owed) - NO $ sign
   const balanceOwed = Math.abs(data.balance).toFixed(0)
   
   const message: PickyAssistTemplateMessage = {
     number: phone,
     template_message: [
-      data.name,
-      balanceOwed,
-      bsb,
-      accountNumber
+      data.name,           // {{1}} - Name
+      balanceOwed,         // {{2}} - Balance (no $ sign)
+      bsb,                 // {{3}} - BSB
+      accountNumber,       // {{4}} - Account number
+      data.name,           // {{5}} - Name (Arabic)
+      balanceOwed,         // {{6}} - Balance (Arabic)
+      bsb,                 // {{7}} - BSB (Arabic)
+      accountNumber        // {{8}} - Account number (Arabic)
     ],
     language: 'en'
   }
@@ -203,10 +259,14 @@ export async function sendBulkPaymentReminders(
     .map(m => ({
       number: formatPhoneNumber(m.phone),
       template_message: [
-        m.name,
-        Math.abs(m.balance).toFixed(0), // Amount owed (positive)
-        bsb,
-        accountNumber
+        m.name,                              // {{1}} - Name
+        Math.abs(m.balance).toFixed(0),      // {{2}} - Balance (no $ sign)
+        bsb,                                 // {{3}} - BSB
+        accountNumber,                       // {{4}} - Account number
+        m.name,                              // {{5}} - Name (Arabic)
+        Math.abs(m.balance).toFixed(0),      // {{6}} - Balance (Arabic)
+        bsb,                                 // {{7}} - BSB (Arabic)
+        accountNumber                        // {{8}} - Account number (Arabic)
       ],
       language: 'en'
     }))
@@ -217,6 +277,195 @@ export async function sendBulkPaymentReminders(
     console.log('⚠️ No valid phone numbers to send to')
     return { success: true, sent: 0, failed: 0, skipped: membersWithDebt.length }
   }
+
+  const result = await sendPickyAssistTemplates(
+    templateId, 
+    messages, 
+    testMode ? testNumber : undefined
+  )
+
+  return {
+    success: result.success,
+    sent: result.sent,
+    failed: result.failed,
+    skipped
+  }
+}
+
+/**
+ * Send event notification to group members
+ * Template placeholders:
+ * {{1}} - Name
+ * {{2}} - Name of event - (date) e.g. "Eid Celebration - January 15, 2025"
+ * {{3}} - Group, e.g. "Group 1"
+ * {{4}} - All other group members e.g. "Mark, Smith, James"
+ * {{5-8}} - Same as above (for Arabic duplicate)
+ */
+export async function sendEventNotification(
+  data: EventNotificationData,
+  testNumber?: string
+): Promise<boolean> {
+  const phone = formatPhoneNumber(data.phone)
+  
+  if (!isValidPhoneNumber(phone)) {
+    console.log(`⏭️ Skipping invalid phone number: ${data.phone}`)
+    return false
+  }
+
+  const templateId = process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID
+  
+  if (!templateId) {
+    console.error('❌ PICKY_ASSIST_EVENT_TEMPLATE_ID not configured')
+    return false
+  }
+  
+  // Format event with date: "Event Name - Date"
+  const eventWithDate = `${data.eventName} - ${data.eventDate}`
+  
+  const message: PickyAssistTemplateMessage = {
+    number: phone,
+    template_message: [
+      data.memberName,        // {{1}} - Name
+      eventWithDate,          // {{2}} - Event name - date
+      data.groupName,         // {{3}} - Group name
+      data.otherGroupMembers, // {{4}} - Other group members
+      data.memberName,        // {{5}} - Name (Arabic)
+      eventWithDate,          // {{6}} - Event name - date (Arabic)
+      data.groupName,         // {{7}} - Group name (Arabic)
+      data.otherGroupMembers  // {{8}} - Other group members (Arabic)
+    ],
+    language: 'en'
+  }
+
+  const result = await sendPickyAssistTemplates(templateId, [message], testNumber)
+  return result.success
+}
+
+/**
+ * Send bulk event notifications to group members
+ */
+export async function sendBulkEventNotifications(
+  members: EventNotificationData[],
+  testMode: boolean = false,
+  testNumber?: string
+): Promise<{ success: boolean; sent: number; failed: number; skipped: number }> {
+  const templateId = process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID
+  
+  if (!templateId) {
+    console.error('❌ PICKY_ASSIST_EVENT_TEMPLATE_ID not configured')
+    return { success: false, sent: 0, failed: members.length, skipped: 0 }
+  }
+
+  const validMembers = members.filter(m => isValidPhoneNumber(formatPhoneNumber(m.phone)))
+  const skipped = members.length - validMembers.length
+
+  if (validMembers.length === 0) {
+    console.log('⚠️ No valid phone numbers to send to')
+    return { success: true, sent: 0, failed: 0, skipped: members.length }
+  }
+
+  const messages: PickyAssistTemplateMessage[] = validMembers.map(m => {
+    const eventWithDate = `${m.eventName} - ${m.eventDate}`
+    return {
+      number: formatPhoneNumber(m.phone),
+      template_message: [
+        m.memberName,        // {{1}} - Name
+        eventWithDate,       // {{2}} - Event name - date
+        m.groupName,         // {{3}} - Group name
+        m.otherGroupMembers, // {{4}} - Other group members
+        m.memberName,        // {{5}} - Name (Arabic)
+        eventWithDate,       // {{6}} - Event name - date (Arabic)
+        m.groupName,         // {{7}} - Group name (Arabic)
+        m.otherGroupMembers  // {{8}} - Other group members (Arabic)
+      ],
+      language: 'en'
+    }
+  })
+
+  const result = await sendPickyAssistTemplates(
+    templateId, 
+    messages, 
+    testMode ? testNumber : undefined
+  )
+
+  return {
+    success: result.success,
+    sent: result.sent,
+    failed: result.failed,
+    skipped
+  }
+}
+
+/**
+ * Send admin message to a member
+ * Template placeholders:
+ * {{1}} - Name of member
+ * {{2}} - Admin message
+ * 
+ * Note: The message comes prefilled with "Salam {{name}}" and ends with "Thank you - Mesaq"
+ */
+export async function sendAdminMessage(
+  data: AdminMessageData,
+  testNumber?: string
+): Promise<boolean> {
+  const phone = formatPhoneNumber(data.phone)
+  
+  if (!isValidPhoneNumber(phone)) {
+    console.log(`⏭️ Skipping invalid phone number: ${data.phone}`)
+    return false
+  }
+
+  const templateId = process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID
+  
+  if (!templateId) {
+    console.error('❌ PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID not configured')
+    return false
+  }
+  
+  const message: PickyAssistTemplateMessage = {
+    number: phone,
+    template_message: [
+      data.memberName,  // {{1}} - Name
+      data.message      // {{2}} - Admin message
+    ],
+    language: 'en'
+  }
+
+  const result = await sendPickyAssistTemplates(templateId, [message], testNumber)
+  return result.success
+}
+
+/**
+ * Send bulk admin messages to members
+ */
+export async function sendBulkAdminMessages(
+  members: AdminMessageData[],
+  testMode: boolean = false,
+  testNumber?: string
+): Promise<{ success: boolean; sent: number; failed: number; skipped: number }> {
+  const templateId = process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID
+  
+  if (!templateId) {
+    console.error('❌ PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID not configured')
+    return { success: false, sent: 0, failed: members.length, skipped: 0 }
+  }
+
+  const validMembers = members.filter(m => isValidPhoneNumber(formatPhoneNumber(m.phone)))
+  const skipped = members.length - validMembers.length
+
+  if (validMembers.length === 0) {
+    console.log('⚠️ No valid phone numbers to send to')
+    return { success: true, sent: 0, failed: 0, skipped: members.length }
+  }
+
+  const messages: PickyAssistTemplateMessage[] = validMembers.map(m => ({
+    number: formatPhoneNumber(m.phone),
+    template_message: [
+      m.memberName,  // {{1}} - Name
+      m.message      // {{2}} - Admin message
+    ],
+    language: 'en'
+  }))
 
   const result = await sendPickyAssistTemplates(
     templateId, 

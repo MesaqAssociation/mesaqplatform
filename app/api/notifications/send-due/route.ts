@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { sendWhatsAppMessage } from '@/lib/picky-assist'
+import { sendBulkAdminMessages, AdminMessageData } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 
@@ -38,31 +38,36 @@ export async function POST(req: NextRequest) {
       SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''
     `)
 
+    if (members.length === 0) {
+      return NextResponse.json({ message: 'No members with phone numbers', sent: 0 })
+    }
+
+    // Check if we're in test mode
+    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
     let totalSent = 0
     const results: Array<{ id: string, title: string, sent: number, failed: number }> = []
 
     for (const notification of dueNotifications) {
-      let sent = 0
-      let failed = 0
+      // Prepare admin messages for all members
+      // Note: The template format is:
+      // "Salam {{1}},
+      // 
+      // {{2}}
+      // 
+      // Thank you - Mesaq"
+      const adminMessages: AdminMessageData[] = members.map(member => ({
+        memberName: member.name,
+        message: `📢 ${notification.title}\n\n${notification.message}`,
+        phone: member.phone
+      }))
 
-      // Send to all members
-      for (const member of members) {
-        try {
-          const success = await sendWhatsAppMessage({
-            to: member.phone,
-            body: `📢 ${notification.title}\n\n${notification.message}`
-          })
-          
-          if (success) {
-            sent++
-          } else {
-            failed++
-          }
-        } catch (err) {
-          console.error(`Failed to send to ${member.phone}:`, err)
-          failed++
-        }
-      }
+      const result = await sendBulkAdminMessages(
+        adminMessages,
+        isTestMode,
+        testNumber
+      )
 
       // Update notification status
       await pool.query(`
@@ -72,16 +77,24 @@ export async function POST(req: NextRequest) {
           sent_at = NOW(),
           recipients_count = $1
         WHERE id = $2
-      `, [sent, notification.id])
+      `, [result.sent, notification.id])
 
-      totalSent += sent
-      results.push({ id: notification.id, title: notification.title, sent, failed })
+      totalSent += result.sent
+      results.push({ 
+        id: notification.id, 
+        title: notification.title, 
+        sent: result.sent, 
+        failed: result.failed 
+      })
+
+      console.log(`✅ Notification "${notification.title}": ${result.sent} sent, ${result.failed} failed`)
     }
 
     return NextResponse.json({ 
       message: 'Notifications sent',
       total_sent: totalSent,
       notifications_processed: dueNotifications.length,
+      testMode: isTestMode,
       results
     })
   } catch (err: any) {

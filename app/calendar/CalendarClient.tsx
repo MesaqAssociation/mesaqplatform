@@ -125,7 +125,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
   const handleCancel = async (id: string) => {
     try {
-      const res = await fetch(`/api/notifications?id=${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/notifications?id=${id}&action=cancel`, { method: 'DELETE' })
       if (res.ok) {
         showToast('Notification cancelled', 'success')
         loadData()
@@ -134,6 +134,23 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       }
     } catch (err) {
       showToast('Failed to cancel notification', 'error')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this notification? This cannot be undone.')) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/notifications?id=${id}&action=delete`, { method: 'DELETE' })
+      if (res.ok) {
+        showToast('Notification deleted', 'success')
+        loadData()
+      } else {
+        showToast('Failed to delete notification', 'error')
+      }
+    } catch (err) {
+      showToast('Failed to delete notification', 'error')
     }
   }
 
@@ -369,15 +386,27 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                             )}
                           </div>
                         </div>
-                        {notification.status === 'pending' && isAdmin && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => handleCancel(notification.id)}
-                            title="Cancel notification"
-                          >
-                            <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
-                          </Button>
+                        {isAdmin && (
+                          <div className="flex gap-1">
+                            {notification.status === 'pending' && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleCancel(notification.id)}
+                                title="Cancel notification"
+                              >
+                                <IconX className="size-4 text-muted-foreground hover:text-orange-500" />
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleDelete(notification.id)}
+                              title="Delete notification permanently"
+                            >
+                              <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>

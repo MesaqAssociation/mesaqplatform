@@ -12,13 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText } from '@tabler/icons-react'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText, IconStar, IconStarFilled } from '@tabler/icons-react'
 
 type Account = {
   id: string | null
   current_balance: number
   account_name?: string
   account_number?: string
+  bsb?: string
+  is_donation_account?: boolean
+  is_main_membership_account?: boolean
 }
 
 type Transaction = {
@@ -182,14 +185,27 @@ export default function FinanceClient({
     setEditValue(currentAccount.current_balance.toString())
   }, [currentAccount])
   
+  // Ref to track the latest request and prevent race conditions
+  const latestRequestRef = useRef<number>(0)
+  
   const loadTransactions = useCallback(async () => {
     if (!selectedAccountId) return
+    
+    // Increment request counter to track the latest request
+    const requestId = ++latestRequestRef.current
     
     setLoadingTransactions(true)
     try {
       const year = currentMonth.getFullYear()
       const month = currentMonth.getMonth() + 1
       const res = await fetch(`/api/finance/transactions?accountId=${selectedAccountId}&year=${year}&month=${month}`)
+      
+      // Only update state if this is still the latest request
+      if (requestId !== latestRequestRef.current) {
+        console.log('Ignoring stale response for month:', month)
+        return
+      }
+      
       if (res.ok) {
         const data = await res.json()
         setTransactions(data.transactions)
@@ -198,9 +214,15 @@ export default function FinanceClient({
         }
       }
     } catch (err) {
-      console.error('Failed to load transactions', err)
+      // Only log error if this is still the latest request
+      if (requestId === latestRequestRef.current) {
+        console.error('Failed to load transactions', err)
+      }
     } finally {
-      setLoadingTransactions(false)
+      // Only set loading to false if this is still the latest request
+      if (requestId === latestRequestRef.current) {
+        setLoadingTransactions(false)
+      }
     }
   }, [selectedAccountId, currentMonth])
   
@@ -917,15 +939,18 @@ export default function FinanceClient({
             <button
               key={acc.id}
               onClick={() => setSelectedAccountId(acc.id)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
                 selectedAccountId === acc.id
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted hover:bg-muted/80'
               }`}
             >
+              {acc.is_main_membership_account && (
+                <IconStarFilled className="size-4 text-yellow-500" title="Main Membership Payment Account" />
+              )}
               {acc.account_name}
               {acc.account_number && (
-                <span className="ml-2 text-xs opacity-70">
+                <span className="ml-1 text-xs opacity-70">
                   •••{acc.account_number.slice(-4)}
                 </span>
               )}
@@ -933,6 +958,41 @@ export default function FinanceClient({
           ))}
         </div>
         <div className="flex gap-2">
+          {currentAccount && !currentAccount.is_donation_account && !currentAccount.is_main_membership_account && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/finance/accounts', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      accountId: selectedAccountId,
+                      isMainMembershipAccount: true
+                    })
+                  })
+                  if (res.ok) {
+                    showToast('Account set as main membership payment account', 'success')
+                    // Update local state
+                    setAccounts(accounts.map(a => ({
+                      ...a,
+                      is_main_membership_account: a.id === selectedAccountId
+                    })))
+                  } else {
+                    showToast('Failed to set main account', 'error')
+                  }
+                } catch {
+                  showToast('Failed to set main account', 'error')
+                }
+              }}
+              disabled={loading}
+              title="Set this account as the main membership payment account (used in payment reminders)"
+            >
+              <IconStar className="mr-2 size-4" />
+              Set as Main
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -953,6 +1013,16 @@ export default function FinanceClient({
         </Button>
         </div>
       </div>
+      
+      {/* Main account info */}
+      {currentAccount.is_main_membership_account && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+            <IconStarFilled className="size-4 text-yellow-500" />
+            <span><strong>Main Membership Payment Account</strong> - This account's BSB and account number are used in payment reminder messages to members.</span>
+          </p>
+        </div>
+      )}
 
       {/* Bank Balance */}
       <Card>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendWhatsAppMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendBulkAdminMessages, formatPhoneNumber, AdminMessageData } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes max
@@ -54,10 +54,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY || !process.env.PICKY_ASSIST_PROJECT_ID) {
+    if (!process.env.PICKY_ASSIST_API_KEY) {
       return NextResponse.json({ 
         error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY and PICKY_ASSIST_PROJECT_ID must be set'
+        message: 'PICKY_ASSIST_API_KEY must be set'
+      }, { status: 400 })
+    }
+
+    // Check if admin message template is configured
+    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
+      return NextResponse.json({ 
+        error: 'Admin message template not configured',
+        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
       }, { status: 400 })
     }
 
@@ -69,67 +77,55 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    console.log(`📤 Queuing ${members.length} messages with 5-second delays...`)
+    console.log(`📤 Sending admin messages to ${members.length} members...`)
 
-    // Start sending in background (function will continue after response)
-    const sendMessages = async () => {
-      let sent = 0
-      let failed = 0
+    // Prepare admin message data for each member
+    // Note: The template has the format:
+    // "Salam {{1}},
+    // 
+    // {{2}}
+    // 
+    // Thank you - Mesaq"
+    const adminMessages: AdminMessageData[] = members
+      .filter(member => member.phone)
+      .map(member => ({
+        memberName: member.name,
+        message: message.trim(),  // The admin's message content
+        phone: member.phone
+      }))
 
-      for (let i = 0; i < members.length; i++) {
-        const member = members[i]
-        
-        try {
-          // Replace variables in message
-          let personalizedMessage = message
-            .replace(/\{\{name\}\}/g, member.name)
-            .replace(/\{\{phone\}\}/g, member.phone || '')
-            .replace(/\{\{email\}\}/g, member.email || '')
-
-          const phone = formatPhoneNumber(member.phone)
-          
-          // Send WhatsApp message
-          const success = await sendWhatsAppMessage({
-            to: phone,
-            body: personalizedMessage
-          })
-
-          if (success) {
-            sent++
-            console.log(`✅ (${i + 1}/${members.length}) Sent to ${member.name}`)
-          } else {
-            failed++
-            console.log(`❌ (${i + 1}/${members.length}) Failed to send to ${member.name}`)
-          }
-        } catch (err) {
-          failed++
-          console.error(`❌ (${i + 1}/${members.length}) Error sending to ${member.name}:`, err)
-        }
-
-        // Wait 5 seconds before next message (except for the last one)
-        if (i < members.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 5000))
-        }
-      }
-      
-      console.log(`✅ Batch complete: ${sent} sent, ${failed} failed`)
+    if (adminMessages.length === 0) {
+      return NextResponse.json({ 
+        error: 'No members with valid phone numbers found' 
+      }, { status: 400 })
     }
 
-    // Start sending (don't await - let it run in background)
-    sendMessages()
+    // Check if we're in test mode
+    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
-    // Return immediately to user
+    const result = await sendBulkAdminMessages(
+      adminMessages,
+      isTestMode,
+      testNumber
+    )
+
+    console.log(`✅ Admin messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+
     return NextResponse.json({ 
-      success: true,
-      queued: members.length,
-      message: `Sending ${members.length} messages with 5-second intervals. You can close this page.`
+      success: result.success,
+      queued: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      message: isTestMode 
+        ? `Test mode: ${result.sent} messages sent to test number`
+        : `${result.sent} messages sent successfully`
     })
   } catch (err: any) {
     console.error('Send batch error:', err)
     return NextResponse.json({ 
-      error: 'Failed to queue messages',
+      error: 'Failed to send messages',
       details: err.message 
     }, { status: 500 })
   }
 }
-

@@ -266,30 +266,45 @@ export default function MessagingClient() {
           <CardHeader>
             <CardTitle>Compose Message</CardTitle>
             <CardDescription>
-              Write your message (sent individually to each member)
+              Write your message (sent individually to each member via WhatsApp template)
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Template preview header */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                  📝 Message Template Format
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Each message is automatically prefilled with:
+                </p>
+                <div className="bg-white dark:bg-gray-800 mt-2 p-2 rounded text-xs font-mono border">
+                  <p className="text-green-600 dark:text-green-400">Salam [Member Name],</p>
+                  <p className="text-muted-foreground my-1">[Your message here]</p>
+                  <p className="text-green-600 dark:text-green-400">Thank you - Mesaq</p>
+                </div>
+              </div>
+              
               <Textarea
-                placeholder="Type your message here...
+                placeholder="Type your message content here...
 
-You can use these variables:
-- {{name}} - Member's name
-- {{phone}} - Member's phone
-- {{email}} - Member's email"
+This will appear between 'Salam [Name],' and 'Thank you - Mesaq'
+
+Example: We are pleased to inform you about our upcoming community event..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                rows={12}
+                rows={10}
                 className="resize-none"
               />
 
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-1">Example:</p>
-                <p className="bg-muted p-2 rounded text-xs">
-                  Hi {`{{name}}`}, this is a message from Mesaq Association. 
-                  Your membership status is updated.
-                </p>
+                <p className="font-medium mb-1">Preview for selected member:</p>
+                <div className="bg-muted p-3 rounded text-xs space-y-1">
+                  <p><strong>Salam {selectedMembers.size > 0 ? '[Member Name]' : 'Ahmad'},</strong></p>
+                  <p className="whitespace-pre-wrap">{message || 'Your message content will appear here...'}</p>
+                  <p className="mt-2"><strong>Thank you - Mesaq</strong></p>
+                </div>
               </div>
 
               {sending && (
