@@ -91,17 +91,25 @@ export function formatPhoneNumber(phone: string): string {
 
 /**
  * Check if test mode is enabled
+ * Test mode can be enabled by:
+ * - PICKY_ASSIST_TEST_MODE=true
+ * - PICKY_ASSIST_TEST_MODE=1
+ * - PICKY_ASSIST_TEST_MODE=yes
  */
 function isTestMode(): boolean {
-  return process.env.PICKY_ASSIST_TEST_MODE === 'true'
+  const testMode = process.env.PICKY_ASSIST_TEST_MODE?.toLowerCase()
+  return testMode === 'true' || testMode === '1' || testMode === 'yes'
 }
 
 /**
- * Get the test number if test mode is enabled
+ * Get the test number - ALWAYS returns test number if test mode is enabled
+ * This ensures ALL messages go to test number when in test mode
  */
 function getTestNumber(): string | undefined {
-  if (isTestMode()) {
-    return process.env.WHATSAPP_TEST_NUMBER
+  const testNumber = process.env.WHATSAPP_TEST_NUMBER
+  if (isTestMode() && testNumber) {
+    console.log(`🧪 TEST MODE ACTIVE - All messages will be sent to: ${testNumber}`)
+    return testNumber
   }
   return undefined
 }
@@ -129,19 +137,25 @@ export async function sendPickyAssistTemplates(
     return { success: false, sent: 0, failed: messages.length }
   }
 
-  // Check if we're in test mode - if so, override with test number
-  const effectiveTestNumber = testNumber || getTestNumber()
+  // CRITICAL: Check if we're in test mode FIRST - always override with test number
+  // This ensures ALL messages go to test number when PICKY_ASSIST_TEST_MODE is enabled
+  const globalTestNumber = getTestNumber() // This checks PICKY_ASSIST_TEST_MODE
+  const effectiveTestNumber = globalTestNumber || testNumber // Global takes priority
+  
+  if (isTestMode()) {
+    console.log(`🧪 ==========================================`)
+    console.log(`🧪 TEST MODE IS ENABLED!`)
+    console.log(`🧪 All ${messages.length} messages will go to: ${effectiveTestNumber}`)
+    console.log(`🧪 Original recipients will NOT receive messages`)
+    console.log(`🧪 ==========================================`)
+  }
 
-  // If test number provided, redirect all messages to it but keep original content
+  // If test number is set (either globally or passed), redirect ALL messages to it
   const processedMessages = messages.map(msg => ({
     number: effectiveTestNumber ? formatPhoneNumber(effectiveTestNumber) : msg.number,
     template_message: msg.template_message,
     language: msg.language || 'en'
   }))
-
-  if (effectiveTestNumber) {
-    console.log(`🧪 TEST MODE: Redirecting ${messages.length} messages to ${effectiveTestNumber}`)
-  }
 
   const payload = {
     token: apiKey,
