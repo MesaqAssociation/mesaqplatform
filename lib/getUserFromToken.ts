@@ -15,7 +15,7 @@ export async function getUserFromToken() {
     })
 
     const { rows } = await pool.query(
-      'SELECT name, email, image, role FROM users WHERE id = $1 LIMIT 1',
+      'SELECT id, name, email, image, role FROM users WHERE id = $1 LIMIT 1',
       [decoded.sub]
     )
 
