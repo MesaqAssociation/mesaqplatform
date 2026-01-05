@@ -38,7 +38,14 @@ export async function POST(req: NextRequest) {
     const isIncoming = body.direction === 0 || body.direction === '0'
     
     // Also check if there's a message - "message-in" or "message_in_raw"
-    const messageText = body['message-in'] || body.message_in_raw || body.message || ''
+    // Decode URL-encoded messages (Picky Assist sometimes sends them encoded)
+    let messageText = body['message-in'] || body.message_in_raw || body.message || ''
+    try {
+      // Decode URL encoding (+ becomes space, %XX becomes character)
+      messageText = decodeURIComponent(messageText.replace(/\+/g, ' '))
+    } catch {
+      // If decoding fails, use original text
+    }
     
     if (!isIncoming && !messageText) {
       console.log(`⏭️ Ignoring: direction=${body.direction}, no message content`)

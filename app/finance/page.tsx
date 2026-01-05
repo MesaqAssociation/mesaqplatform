@@ -33,7 +33,7 @@ export default async function FinancePage() {
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
   }) as Pool
 
-  // Get all accounts
+  // Get all accounts including main membership and donation flags
   const { rows: accounts } = await pool.query(`
     SELECT 
       id,
@@ -42,6 +42,8 @@ export default async function FinancePage() {
       bsb,
       current_balance,
       currency,
+      COALESCE(is_donation_account, false) as is_donation_account,
+      COALESCE(is_main_membership_account, false) as is_main_membership_account,
       created_at
     FROM financial_accounts 
     ORDER BY created_at ASC

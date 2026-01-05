@@ -7,7 +7,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { IconSend, IconUsers, IconSearch, IconMessage, IconRefresh } from '@tabler/icons-react'
-import { Progress } from '@/components/ui/progress'
 import { showToast } from '@/lib/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -39,8 +38,6 @@ export default function MessagingClient() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sendProgress, setSendProgress] = useState(0)
-  const [sendStatus, setSendStatus] = useState<string>('')
   const [incomingMessages, setIncomingMessages] = useState<IncomingMessage[]>([])
   const [loadingIncoming, setLoadingIncoming] = useState(false)
 
@@ -110,12 +107,11 @@ export default function MessagingClient() {
     }
 
     setSending(true)
-    setSendStatus('Sending messages...')
 
     try {
       const memberIds = Array.from(selectedMembers)
       
-      // Queue all messages in the backend (with 5-second delays)
+      // Send all messages in bulk (no delays)
       const res = await fetch('/api/messaging/send-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +131,7 @@ export default function MessagingClient() {
         
         // Show success toast
         showToast(
-          `${data.queued} messages are being sent! You can close this page.`,
+          `${data.sent || data.queued} messages sent successfully!`,
           'success'
         )
       } else {
@@ -147,7 +143,6 @@ export default function MessagingClient() {
       showToast('Failed to send messages', 'error')
     } finally {
       setSending(false)
-      setSendStatus('')
     }
   }
 
@@ -266,36 +261,34 @@ export default function MessagingClient() {
           <CardHeader>
             <CardTitle>Compose Message</CardTitle>
             <CardDescription>
-              Write your message (sent individually to each member)
+              Write your message (sent individually to each member via WhatsApp)
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Pre-written greeting */}
+              <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
+                <p className="font-semibold text-primary">Salam (Member Name),</p>
+              </div>
+              
+              {/* Message input */}
               <Textarea
-                placeholder="Type your message here...
-
-You can use these variables:
-- {{name}} - Member's name
-- {{phone}} - Member's phone
-- {{email}} - Member's email"
+                placeholder="Type your message content here..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                rows={12}
-                className="resize-none"
+                rows={8}
+                className="resize-none border-2 focus:border-primary"
               />
-
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-1">Example:</p>
-                <p className="bg-muted p-2 rounded text-xs">
-                  Hi {`{{name}}`}, this is a message from Mesaq Association. 
-                  Your membership status is updated.
-                </p>
+              
+              {/* Pre-written sign-off */}
+              <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
+                <p className="font-semibold text-primary">Thank you - Mesaq Association</p>
               </div>
 
               {sending && (
-                <div className="space-y-2">
-                  <Progress value={sendProgress} />
-                  <p className="text-sm text-center text-muted-foreground">{sendStatus}</p>
+                <div className="flex items-center justify-center gap-3 py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <p className="text-sm text-muted-foreground">Sending messages...</p>
                 </div>
               )}
 

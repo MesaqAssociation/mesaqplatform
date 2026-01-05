@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendAdminMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendBulkAdminMessages, AdminMessageData } from '@/lib/picky-assist'
 
 export const runtime = 'nodejs'
 
@@ -60,10 +60,6 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check if we're in test mode
-    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
-
     // Get member details
     const placeholders = memberIds.map((_: any, i: number) => `$${i + 1}`).join(',')
     const { rows: members } = await pool.query(`
@@ -72,74 +68,42 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    // Create a readable stream for Server-Sent Events
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        let sent = 0
-        let failed = 0
+    console.log(`📤 Sending messages to ${members.length} members in bulk...`)
 
-        for (let i = 0; i < members.length; i++) {
-          const member = members[i]
-          const progress = Math.round(((i + 1) / members.length) * 100)
+    // Prepare admin message data for all members
+    const adminMessages: AdminMessageData[] = members
+      .filter(member => member.phone)
+      .map(member => ({
+        memberName: member.name,
+        message: message.trim(),
+        phone: member.phone
+      }))
 
-          try {
-            // Send status update
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ 
-                progress, 
-                status: `Sending to ${member.name}...`,
-                testMode: isTestMode
-              })}\n\n`)
-            )
+    if (adminMessages.length === 0) {
+      return NextResponse.json({ 
+        error: 'No members with valid phone numbers found' 
+      }, { status: 400 })
+    }
 
-            // Send using admin message template
-            // Template format: "Salam {{1}}, {{2}} Thank you - Mesaq"
-            const success = await sendAdminMessage(
-              {
-                memberName: member.name,
-                message: message.trim(),
-                phone: member.phone
-              },
-              isTestMode ? testNumber : undefined
-            )
+    // Check if we're in test mode
+    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+    const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
-            if (success) {
-              sent++
-            } else {
-              failed++
-            }
+    // Send all messages in bulk (single API call)
+    const result = await sendBulkAdminMessages(
+      adminMessages,
+      isTestMode,
+      testNumber
+    )
 
-            // Small delay between messages to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 500))
-          } catch (err) {
-            console.error(`Failed to send to ${member.name}:`, err)
-            failed++
-          }
-        }
+    console.log(`✅ Bulk send complete: ${result.sent} sent, ${result.failed} failed`)
 
-        // Send completion
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ 
-            complete: true,
-            progress: 100,
-            status: 'Complete',
-            sent,
-            failed,
-            testMode: isTestMode
-          })}\n\n`)
-        )
-
-        controller.close()
-      }
-    })
-
-    return new NextResponse(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+    return NextResponse.json({ 
+      success: result.success,
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      testMode: isTestMode
     })
   } catch (err: any) {
     console.error('Send messages error:', err)

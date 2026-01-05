@@ -65,19 +65,29 @@ export async function GET(req: NextRequest) {
 
     const { rows: messages } = await pool.query(query, [limit])
 
-    // Format messages for display
-    const formattedMessages = messages.map((msg: any) => ({
-      id: msg.id,
-      phone: msg.phone,
-      message: msg.message,
-      contactName: msg.contact_name,
-      timestamp: msg.timestamp,
-      type: msg.type,
-      read: msg.read,
-      memberId: msg.member_id,
-      memberName: msg.member_name,
-      memberCode: msg.member_code
-    }))
+    // Format messages for display and decode any URL-encoded content
+    const formattedMessages = messages.map((msg: any) => {
+      // Decode URL-encoded messages (+ becomes space, %XX becomes character)
+      let decodedMessage = msg.message || ''
+      try {
+        decodedMessage = decodeURIComponent(decodedMessage.replace(/\+/g, ' '))
+      } catch {
+        // If decoding fails, use original text
+      }
+      
+      return {
+        id: msg.id,
+        phone: msg.phone,
+        message: decodedMessage,
+        contactName: msg.contact_name,
+        timestamp: msg.timestamp,
+        type: msg.type,
+        read: msg.read,
+        memberId: msg.member_id,
+        memberName: msg.member_name,
+        memberCode: msg.member_code
+      }
+    })
 
     return NextResponse.json({ 
       messages: formattedMessages,
