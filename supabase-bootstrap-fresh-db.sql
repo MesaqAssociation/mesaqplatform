@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
   is_group_leader BOOLEAN DEFAULT FALSE,
   household_members INTEGER DEFAULT 1,
   date_joined DATE,
+  current_balance DECIMAL(10,2) DEFAULT 0.00,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
