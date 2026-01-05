@@ -22,6 +22,7 @@ type IncomingMessage = {
   id: string
   phone: string
   message: string
+  mediaUrl: string | null
   contactName: string | null
   timestamp: string
   type: string
@@ -129,14 +130,14 @@ export default function MessagingClient() {
         setSelectedMembers(new Set())
         setSearchQuery('')
         
-        // Show success toast
+        // Show success toast with checkmark
         showToast(
-          `${data.sent || data.queued} messages sent successfully!`,
+          `✅ ${data.sent || data.queued} message${(data.sent || data.queued) === 1 ? '' : 's'} sent successfully!`,
           'success'
         )
       } else {
         const error = await res.json()
-        showToast(`Failed to send messages: ${error.error || 'Unknown error'}`, 'error')
+        showToast(`❌ Failed to send messages: ${error.error || 'Unknown error'}`, 'error')
       }
     } catch (err) {
       console.error('Send error:', err)
@@ -378,6 +379,33 @@ export default function MessagingClient() {
                           <p className="text-sm whitespace-pre-wrap break-words">
                             {msg.message}
                           </p>
+                          {msg.mediaUrl && (
+                            <div className="mt-2">
+                              {msg.type === 'image' ? (
+                                <a 
+                                  href={msg.mediaUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-block"
+                                >
+                                  <img 
+                                    src={msg.mediaUrl} 
+                                    alt="Attached image" 
+                                    className="max-w-[200px] max-h-[200px] rounded-lg border hover:opacity-90 transition-opacity cursor-pointer"
+                                  />
+                                </a>
+                              ) : (
+                                <a 
+                                  href={msg.mediaUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm"
+                                >
+                                  📎 Download {msg.type === 'audio' ? 'Audio' : msg.type === 'video' ? 'Video' : msg.type === 'document' ? 'Document' : 'File'}
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

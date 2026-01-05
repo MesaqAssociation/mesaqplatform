@@ -61,7 +61,20 @@ export async function POST(req: NextRequest) {
     const uniqueId = body['unique-id'] || body.unique_id || null
     const applicationId = body.application || null
     const projectId = body['project-id'] || body.project_id || null
-    const messageType = body.type === 1 ? 'text' : (body.type === 2 ? 'image' : 'other')
+    const mediaUrl = body['media-url'] || body.media_url || null
+    
+    // Determine message type: 1 = text, 2 = image, 3 = audio, 4 = video, 5 = document
+    let messageType = 'text'
+    if (body.type === 2) messageType = 'image'
+    else if (body.type === 3) messageType = 'audio'
+    else if (body.type === 4) messageType = 'video'
+    else if (body.type === 5) messageType = 'document'
+    else if (mediaUrl) messageType = 'media' // Fallback if has media URL
+
+    // For media messages without text, set a descriptive message
+    if (!messageText && mediaUrl) {
+      messageText = `[${messageType.charAt(0).toUpperCase() + messageType.slice(1)} attachment]`
+    }
 
     // Store in database
     const { rows } = await pool.query(`
@@ -71,11 +84,12 @@ export async function POST(req: NextRequest) {
         to_phone,
         message_type,
         message_text,
+        media_url,
         contact_name,
         contact_phone,
         timestamp,
         raw_payload
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id
     `, [
       uniqueId,  // Use unique-id as channel_id
@@ -83,6 +97,7 @@ export async function POST(req: NextRequest) {
       null,  // to_phone not provided in this format
       messageType,
       messageText,
+      mediaUrl,  // Store media URL
       contactName,
       fromPhone,  // contact_phone same as from
       new Date().toISOString(),  // Current timestamp
