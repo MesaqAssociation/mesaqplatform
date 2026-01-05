@@ -118,11 +118,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, action: 'deleted' })
     } else {
       // Default: cancel the notification (mark as cancelled)
-      await pool.query(`
-        UPDATE scheduled_notifications 
-        SET status = 'cancelled' 
-        WHERE id = $1 AND status = 'pending'
-      `, [id])
+    await pool.query(`
+      UPDATE scheduled_notifications 
+      SET status = 'cancelled' 
+      WHERE id = $1 AND status = 'pending'
+    `, [id])
       return NextResponse.json({ success: true, action: 'cancelled' })
     }
   } catch (err: any) {

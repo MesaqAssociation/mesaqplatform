@@ -389,11 +389,11 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                         {isAdmin && (
                           <div className="flex gap-1">
                             {notification.status === 'pending' && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleCancel(notification.id)}
-                                title="Cancel notification"
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleCancel(notification.id)}
+                            title="Cancel notification"
                               >
                                 <IconX className="size-4 text-muted-foreground hover:text-orange-500" />
                               </Button>
@@ -403,9 +403,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                               size="icon"
                               onClick={() => handleDelete(notification.id)}
                               title="Delete notification permanently"
-                            >
-                              <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
-                            </Button>
+                          >
+                            <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
+                          </Button>
                           </div>
                         )}
                       </div>

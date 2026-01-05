@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         error: 'No members with valid phone numbers found' 
       }, { status: 400 })
-    }
+          }
 
     // Check if we're in test mode
     const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
