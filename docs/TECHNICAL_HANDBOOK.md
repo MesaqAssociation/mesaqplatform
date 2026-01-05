@@ -1,0 +1,619 @@
+## Mesaq Technical Handbook (Developer / Ops)
+
+This document explains **how Mesaq is built**, what external services it uses, how the major subsystems work, and how to debug/operate it safely in production.
+
+If you are looking for *end-user* instructions (how to use the dashboard), see `MESAQ_USER_MANUAL.txt`.
+
+### Quick Start (New Developer)
+
+- **Stack**: Next.js 14 (App Router) + React 18 + TypeScript + Tailwind/Shadcn UI, Postgres (Supabase) via `pg`, JWT auth in HttpOnly cookie.
+- **Run locally**:
+  - Configure `.env.local` (see `ENV_VARIABLES.md`, `ENV_SETUP.md`)
+  - `npm install`
+  - `npm run dev`
+- **Production**: Vercel deployment (env vars in Vercel Project Settings).
+
+### High-Level Architecture
+
+Mesaq is a single Next.js app:
+- **UI pages** live under `app/**` (mostly client components for interactive dashboards).
+- **Backend API** lives under `app/api/**/route.ts` (serverless API routes running in Node.js runtime).
+- **Shared business logic** lives under `lib/**`.
+
+```mermaid
+flowchart TD
+  Browser[BrowserUI] --> NextApp[NextJsAppRouter]
+  NextApp --> ApiRoutes[ApiRoutes_app_api]
+  ApiRoutes --> Postgres[(SupabasePostgres)]
+  ApiRoutes --> PickyAssist[PickyAssistApi]
+  ApiRoutes --> Telegram[TelegramBotApi]
+  ApiRoutes --> R2[CloudflareR2_S3]
+  NextApp --> StaticAssets[PublicAssets]
+```
+
+### Key External Services
+
+- **Supabase Postgres**: primary database (connected via `DATABASE_URL` using the Supabase *transaction pooler* in serverless).
+- **Picky Assist**: WhatsApp template messaging + incoming webhooks.
+- **Cloudflare R2**: object storage (bank statements, documents, profile images).
+- **Telegram Bot**: bank statement upload + conversational create flows.
+- **Google Maps Places API**: address autocomplete (client-side key).
+- **Wasender API** (legacy): `lib/whatsapp.ts` supports non-template WhatsApp sending; much of production messaging is now through Picky Assist templates.
+
+## System Layout
+
+### Important Directories
+
+- **`app/`**: pages + layouts + API routes
+  - `app/api/**/route.ts`: backend endpoints (JWT auth + Postgres queries)
+- **`components/`**: UI components (Shadcn-style)
+- **`lib/`**: shared logic
+  - `lib/picky-assist.ts`: Picky Assist template messaging (bulk send, test mode override)
+  - `lib/parseBankStatement.ts`: PDF parsing (pdf-parse)
+  - `lib/matchTransactionToMember.ts`: matching logic (member_id/phone/banking_name)
+  - `lib/cloudflare-r2.ts`: R2 upload helper (bank statements + documents)
+  - `lib/getUserFromToken.ts`: JWT cookie → user lookup
+- **`scripts/`**: operational scripts (e.g., Telegram webhook setup)
+
+### Notable Runtime/Config Details
+
+- `next.config.mjs`:
+  - `typescript.ignoreBuildErrors = true` (production builds may succeed even with TS errors; rely on CI/lint discipline)
+  - `images.unoptimized = true`
+- Many API routes declare `export const runtime = 'nodejs'` to ensure Node APIs (Buffer, pg, crypto) work on Vercel.
+
+## Authentication & Authorization
+
+### JWT Cookie
+
+Login (`POST /api/login`) signs a JWT and sets it as `auth_token`:
+- HttpOnly cookie
+- `Secure`
+- `SameSite=Lax`
+- 7 day expiry
+
+Auth checks vary by route:
+- Some accept **`Authorization: Bearer <token>`** or cookie (common in CORS/mobile endpoints).
+- Most use cookie-only.
+
+References:
+- `app/api/login/route.ts`
+- `app/api/auth/check/route.ts`
+- `lib/getUserFromToken.ts`
+- `lib/cors.ts` (CORS headers for mobile support)
+
+### Roles
+
+Routes commonly gate sensitive actions to roles like:
+- `admin`, `board`, `manager`
+- sometimes also `head`, `finance officer`, `public officer`, `logistics officer`
+
+Role checks are done by querying `users.role` inside API routes.
+
+## Database (Supabase Postgres)
+
+### Connection Pattern
+
+Most API routes do:
+- `new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })`
+
+Use the **Supabase transaction pooler** URL for serverless deployments (Vercel), as referenced in `ENV_VARIABLES.md`.
+
+### Core Tables (Conceptual)
+
+The system is centered around:
+- **`users`**: members + admins (auth, role, contact, banking_name, group assignment)
+- **`events`**: calendar events / meetings
+- **`member_events`**: attendance/junction
+- **`financial_accounts`**: bank accounts (supports donation vs membership accounts)
+  - `is_main_membership_account` marks the account used in payment reminders (only one should be true)
+- **`transactions`**: imported or manual transactions
+  - can be matched to a member via `matched_member_id`
+  - often linked to `bank_statements` via `statement_id`
+- **`bank_statements`**: uploaded statement metadata + optional `file_url` (R2)
+- **`membership_payments`**: payment records by month (can reference transactions)
+- **`system_settings`**: key/value config (monthly fee, fines settings, last organizing group, etc.)
+- **`payment_keywords`**: finance categorization keywords
+- **`scheduled_notifications`**: scheduled outbound messages to members (sent via Picky Assist admin template)
+- **`incoming_messages`**: inbound WhatsApp messages (text + media URL)
+- **`community_documents`**: uploaded docs to share with community
+- **`member_groups`**: group metadata (some code supports legacy `users.group_name` mode)
+
+### Migrations / Schema Changes
+
+SQL migration files live in repo root as `supabase-*.sql`.
+
+Common “schema mismatch” debugging pattern:
+- Some endpoints explicitly check for expected columns and return a helpful error mentioning which migration to run.
+  - Example: `app/api/finance/transactions/route.ts` references `supabase-add-matched-member.sql`.
+
+## Messaging System
+
+Mesaq has two outbound messaging paths:
+
+```mermaid
+flowchart TD
+  AdminUI[AdminUI] --> SendApi[ApiMessagingSend]
+  AdminUI --> SendBatchApi[ApiMessagingSendBatch]
+  SendApi --> PickyAssistPush[PickyAssistPushApi]
+  SendBatchApi --> PickyAssistPush
+  PickyAssistPush --> WhatsAppUsers[WhatsAppRecipients]
+
+  WhatsAppUsers --> PickyAssistWebhook[PickyAssistWebhook]
+  PickyAssistWebhook --> IncomingWebhook[ApiMessagingWebhook]
+  IncomingWebhook --> PostgresIncoming[(incoming_messages)]
+  AdminUI --> IncomingFetch[ApiMessagingIncoming]
+  IncomingFetch --> PostgresIncoming
+```
+
+### 1) Picky Assist Template Messaging (Primary)
+
+File: `lib/picky-assist.ts`
+
+Key points:
+- Uses Picky Assist “push” API to send template messages.
+- Supports **bulk sending** (single API call with `data: [...]`).
+- Supports **global test mode override**: if `PICKY_ASSIST_TEST_MODE` is enabled and `WHATSAPP_TEST_NUMBER` is set, **all messages** are redirected to the test number.
+
+Important env vars:
+- `PICKY_ASSIST_API_KEY`
+- `PICKY_ASSIST_APPLICATION_ID`
+- `PICKY_ASSIST_PAYMENT_TEMPLATE_ID`
+- `PICKY_ASSIST_EVENT_TEMPLATE_ID`
+- `PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID`
+- `PICKY_ASSIST_TEST_MODE` (`true`/`1`/`yes`)
+- `WHATSAPP_TEST_NUMBER`
+
+Template placeholder mapping is documented at the top of `lib/picky-assist.ts`.
+
+### 2) Legacy WhatsApp Sending via Wasender (Secondary/Legacy)
+
+File: `lib/whatsapp.ts`
+
+Env vars:
+- `WASENDER_API_KEY`
+- `WHATSAPP_TEST_NUMBER`
+- `WHATSAPP_BOARD_GROUP_ID` (optional)
+
+This path is not template-based and may not work for all WhatsApp scenarios outside the 24h window.
+
+### Incoming WhatsApp Messages (Text + Media Attachments)
+
+- **Webhook endpoint**: `POST /api/messaging/webhook`
+  - Accepts Picky Assist webhook payloads including `media-url`
+  - Decodes URL-encoded text (`+` and `%xx`) before storing
+  - Stores attachments in `incoming_messages.media_url`
+- **UI fetch endpoint**: `GET /api/messaging/incoming`
+  - Returns `mediaUrl` for display in the dashboard
+
+Database requirement:
+- Run `supabase-incoming-messages.sql` (base table)
+- Run `supabase-incoming-messages-media.sql` (adds `media_url`)
+
+## Finance System (Statements → Transactions → Membership)
+
+### Bank Statement Upload (Web)
+
+Endpoint: `POST /api/finance/upload-statement` (`app/api/finance/upload-statement/route.ts`)
+
+Flow:
+1. Verify JWT cookie
+2. Parse uploaded PDF (`lib/parseBankStatement.ts`)
+3. Detect duplicates by date range / existing transactions
+4. Optionally upload statement PDF to R2 (`lib/cloudflare-r2.ts`) and store `file_url`
+5. Insert `bank_statements` record
+6. Match transactions to members (`lib/matchTransactionToMember.ts`) — **credit-only**
+7. Insert transactions, categorize, update balances, and attempt membership payment detection
+
+### Categorization Logic (High Level)
+
+During import, categorization considers (in priority order):
+- payment keywords (description-based)
+- member match + “multiple of monthly fee” heuristics
+- donation account special-case (skip matching and balance updates)
+
+### Manual Transactions and Matching
+
+Endpoint: `app/api/finance/transactions/route.ts`
+- Create manual transactions and update account balance.
+- Match/unmatch a transaction to a member.
+- If category becomes “Membership Payment” and a member is matched, it creates/updates `membership_payments`.
+
+### Main Membership Payment Account
+
+Used for payment reminder details (BSB + account number).
+
+Endpoints:
+- `GET /api/finance/accounts` returns `is_main_membership_account`
+- `PATCH /api/finance/accounts` sets a single account as main (unsets others first)
+
+Migration:
+- `supabase-main-membership-account.sql`
+
+## Cloudflare
+
+### Cloudflare R2 (Object Storage)
+
+There are two env var naming conventions present in repo docs:
+
+- **Used by code** (recommended to follow):
+  - `R2_ENDPOINT`
+  - `R2_ACCESS_KEY_ID`
+  - `R2_SECRET_ACCESS_KEY`
+  - `R2_BUCKET_NAME`
+  - `R2_PUBLIC_URL` (recommended for public links)
+  - References: `lib/cloudflare-r2.ts`, `app/api/upload/route.ts`
+
+- **Mentioned in setup doc** (older naming):
+  - `CLOUDFLARE_R2_*` variables in `CLOUDFLARE_R2_SETUP.md`
+
+For production consistency, align Vercel env vars to the ones actually consumed by code.
+
+### Cloudflare DNS/SSL (“Not Secure” Troubleshooting)
+
+Common checklist:
+- Cloudflare SSL/TLS mode: **Full (strict)**
+- Enable: **Always Use HTTPS**
+- Enable: **Automatic HTTPS Rewrites**
+- Ensure origin (Vercel) is serving HTTPS correctly
+- Check for mixed content in browser devtools (HTTP assets inside HTTPS pages)
+
+## Telegram Bot
+
+Docs:
+- `TELEGRAM_BOT_SETUP.md` (setup + operations)
+
+Key pieces:
+- Webhook endpoint: `POST /api/telegram/webhook`
+- Setup script: `scripts/setup-telegram-bot.ts` (run after deploy)
+
+Env var:
+- `TELEGRAM_BOT_TOKEN`
+
+The Telegram webhook implements:
+- PDF upload → parse → import transactions (similar pipeline to web upload)
+- `/create` guided flows for creating events or members (in-memory state machine; consider Redis/DB if scaling)
+
+## Deployment (Vercel)
+
+### Environment Variables
+
+Set in Vercel:
+- Project → Settings → Environment Variables
+- Add variables from `ENV_VARIABLES.md` and integration docs
+- Redeploy after changes
+
+Notes:
+- `ENV_SETUP.md` references `OPENAI_API_KEY` for AI matching; however, **current code has AI matching disabled** in `app/api/membership/detect-payments/route.ts` (Step 5 logs “AI matching disabled”).
+- R2 env var naming is inconsistent across docs (`R2_*` vs `CLOUDFLARE_R2_*`). The runtime code paths primarily read `R2_*` (see `lib/cloudflare-r2.ts` and `app/api/upload/route.ts`).
+
+### Logs and Debugging
+
+- Vercel → Project → Logs
+- Watch for common prefixes used in code (`✅`, `⚠️`, `❌`, `📤`, etc.)
+
+### Scheduled Jobs / Cron
+
+Mesaq includes an endpoint designed for cron:
+- `POST /api/notifications/send-due`
+  - Optional auth: set `CRON_SECRET` and call with `Authorization: Bearer <CRON_SECRET>`
+  - Sends due scheduled notifications using the Picky Assist admin template
+
+Payment reminder automation endpoint is currently disabled:
+- `POST /api/payment-reminders/run` returns a “disabled” response by design
+
+## API Routes Catalog (Authoritative)
+
+Below is the inventory of API route files and the HTTP methods they export. In Next.js, the public URL is the directory path without `route.ts`.
+
+### Full Inventory Table
+
+| Endpoint | Methods | Auth | Notes / Source |
+| --- | --- | --- | --- |
+| `/api/auth/check` | GET | Cookie JWT | `app/api/auth/check/route.ts` |
+| `/api/auth/logout` | POST | Cookie JWT | `app/api/auth/logout/route.ts` |
+| `/api/backup` | GET, POST | Cookie JWT + role-gated | Full backup export/restore. `app/api/backup/route.ts` |
+| `/api/documents` | GET, POST | Cookie JWT (POST is role-gated) | Community docs. `app/api/documents/route.ts` |
+| `/api/documents/[id]` | DELETE | Cookie JWT + role-gated | Delete doc. `app/api/documents/[id]/route.ts` |
+| `/api/events` | GET, OPTIONS | Cookie JWT | List events. `app/api/events/route.ts` |
+| `/api/events/list` | GET, OPTIONS | Cookie JWT | Alternate list endpoint. `app/api/events/list/route.ts` |
+| `/api/events/create` | POST | Cookie JWT | Creates event; may send bulk event template. `app/api/events/create/route.ts` |
+| `/api/events/last-organizing-group` | GET | Cookie JWT | Reads `system_settings`. `app/api/events/last-organizing-group/route.ts` |
+| `/api/events/[event_id]` | DELETE | Cookie JWT | Delete event. `app/api/events/[event_id]/route.ts` |
+| `/api/events/[event_id]/complete` | POST | Cookie JWT | Mark completed. `app/api/events/[event_id]/complete/route.ts` |
+| `/api/export` | GET | Cookie JWT + role-gated | CSV export. `app/api/export/route.ts` |
+| `/api/finance/accounts` | GET, POST, PATCH, DELETE, OPTIONS | Cookie JWT | Accounts + main membership account. `app/api/finance/accounts/route.ts` |
+| `/api/finance/upload-statement` | POST | Cookie JWT | Parse/import PDF; optional R2 upload. `app/api/finance/upload-statement/route.ts` |
+| `/api/finance/statements` | GET | Cookie JWT | List bank statements. `app/api/finance/statements/route.ts` |
+| `/api/finance/transactions` | GET, POST, PATCH, DELETE, OPTIONS | Cookie JWT | List/create/match/categorize. `app/api/finance/transactions/route.ts` |
+| `/api/finance/transactions/search` | GET | Cookie JWT | Transaction search. `app/api/finance/transactions/search/route.ts` |
+| `/api/finance/keywords` | GET, POST, DELETE | Cookie JWT | Payment keywords. `app/api/finance/keywords/route.ts` |
+| `/api/finance/review-payments` | GET | Cookie JWT | Review flow. `app/api/finance/review-payments/route.ts` |
+| `/api/finance/adjust-balance` | POST | Cookie JWT | Member balance adjustment. `app/api/finance/adjust-balance/route.ts` |
+| `/api/finance/advance-payment` | POST | Cookie JWT | Advance payment flow. `app/api/finance/advance-payment/route.ts` |
+| `/api/finance/convert-to-membership` | POST | Cookie JWT | Convert transaction. `app/api/finance/convert-to-membership/route.ts` |
+| `/api/finance/clear-all` | POST | Cookie JWT | Destructive clear. `app/api/finance/clear-all/route.ts` |
+| `/api/groups` | GET, POST, DELETE | Cookie JWT (POST/DELETE role-gated) | Group management. `app/api/groups/route.ts` |
+| `/api/groups/members` | GET | Cookie JWT | Members by group. `app/api/groups/members/route.ts` |
+| `/api/login` | POST, OPTIONS | None | Login; sets cookie. `app/api/login/route.ts` |
+| `/api/logout` | POST | Cookie JWT | Logout. `app/api/logout/route.ts` |
+| `/api/members` | GET, OPTIONS | Cookie JWT | List members + computed balance. `app/api/members/route.ts` |
+| `/api/members/create` | POST | Cookie JWT | Create member (admin UI). `app/api/members/create/route.ts` |
+| `/api/members/bulk-create` | POST | Cookie JWT | Bulk create from text. `app/api/members/bulk-create/route.ts` |
+| `/api/members/[member_id]` | PATCH, DELETE | Cookie JWT + role-gated | Edit/delete member. `app/api/members/[member_id]/route.ts` |
+| `/api/members/[member_id]/password` | PATCH | Cookie JWT + role-gated | Set password. `app/api/members/[member_id]/password/route.ts` |
+| `/api/members/[member_id]/role` | PATCH | Cookie JWT + role-gated | Set role. `app/api/members/[member_id]/role/route.ts` |
+| `/api/members/[member_id]/set-leader` | POST | Cookie JWT + role-gated | Set leader. `app/api/members/[member_id]/set-leader/route.ts` |
+| `/api/members/events` | POST, DELETE | Cookie JWT | Attendance. `app/api/members/events/route.ts` |
+| `/api/membership/status/[member_id]` | GET, OPTIONS | Cookie JWT | Membership status. `app/api/membership/status/[member_id]/route.ts` |
+| `/api/membership/balance/[member_id]` | GET, OPTIONS | Cookie JWT | Balance details. `app/api/membership/balance/[member_id]/route.ts` |
+| `/api/membership/detect-payments` | POST | Cookie JWT | Heuristic detection; AI step disabled. `app/api/membership/detect-payments/route.ts` |
+| `/api/messaging/send` | POST | Cookie JWT + role-gated | Bulk admin template send. `app/api/messaging/send/route.ts` |
+| `/api/messaging/send-batch` | POST | Cookie JWT + role-gated | Batch send to IDs. `app/api/messaging/send-batch/route.ts` |
+| `/api/messaging/send-single` | POST | Cookie JWT + role-gated | Send to one. `app/api/messaging/send-single/route.ts` |
+| `/api/messaging/incoming` | GET, PATCH, OPTIONS | Cookie JWT | Incoming message list/mark-read. `app/api/messaging/incoming/route.ts` |
+| `/api/messaging/webhook` | POST, GET | None | Picky Assist inbound webhook (no signature validation implemented). `app/api/messaging/webhook/route.ts` |
+| `/api/notifications` | GET, POST, DELETE | Cookie JWT | Scheduled notifications CRUD. `app/api/notifications/route.ts` |
+| `/api/notifications/send-due` | POST | `CRON_SECRET` bearer (optional) | Cron target. `app/api/notifications/send-due/route.ts` |
+| `/api/payment-reminders/send` | GET, POST, OPTIONS | Cookie JWT + role-gated | Payment reminder send/preview. `app/api/payment-reminders/send/route.ts` |
+| `/api/payment-reminders/test-send` | POST | Cookie JWT | Status report test sender. `app/api/payment-reminders/test-send/route.ts` |
+| `/api/payment-reminders/run` | POST | None (disabled) | Intentionally disabled auto-run. `app/api/payment-reminders/run/route.ts` |
+| `/api/reports/board-members` | GET | Cookie JWT | Report endpoint. `app/api/reports/board-members/route.ts` |
+| `/api/search` | GET | Cookie JWT | Search across entities. `app/api/search/route.ts` |
+| `/api/settings/fines` | POST | Cookie JWT + board-only | Fine settings. `app/api/settings/fines/route.ts` |
+| `/api/settings/monthly-fee` | GET, POST | Cookie JWT | Monthly fee settings. `app/api/settings/monthly-fee/route.ts` |
+| `/api/signup` | POST | None | Signup (legacy bootstrap). `app/api/signup/route.ts` |
+| `/api/telegram/webhook` | POST | None | Telegram webhook (no signature validation implemented). `app/api/telegram/webhook/route.ts` |
+| `/api/upload` | POST | Cookie JWT | Upload to R2 (members/*). `app/api/upload/route.ts` |
+| `/api/user/profile` | GET, OPTIONS | Cookie JWT | Profile. `app/api/user/profile/route.ts` |
+| `/api/user/update` | PATCH, OPTIONS | Cookie JWT | Update profile. `app/api/user/update/route.ts` |
+| `/api/user/change-password` | POST, OPTIONS | Cookie JWT | Change password. `app/api/user/change-password/route.ts` |
+| `/api/whatsapp/check` | GET | Cookie JWT | WhatsApp health check. `app/api/whatsapp/check/route.ts` |
+
+### Auth / Session
+
+- **`/api/login`**: OPTIONS, POST — login, sets `auth_token` cookie (`app/api/login/route.ts`)
+- **`/api/logout`**: POST — logout (`app/api/logout/route.ts`)
+- **`/api/auth/check`**: GET — validate cookie token (`app/api/auth/check/route.ts`)
+- **`/api/auth/logout`**: POST — logout variant (`app/api/auth/logout/route.ts`)
+
+### Users / Profile
+
+- **`/api/user/profile`**: GET, OPTIONS — fetch current user profile (`app/api/user/profile/route.ts`)
+- **`/api/user/update`**: OPTIONS, PATCH — update current user profile (`app/api/user/update/route.ts`)
+- **`/api/user/change-password`**: OPTIONS, POST — change password (`app/api/user/change-password/route.ts`)
+
+### Members
+
+- **`/api/members`**: GET, OPTIONS — list members with computed balances (`app/api/members/route.ts`)
+- **`/api/members/create`**: POST — create member (bcrypt password hash) (`app/api/members/create/route.ts`)
+- **`/api/members/bulk-create`**: POST — bulk create members from lines (default password = phone) (`app/api/members/bulk-create/route.ts`)
+- **`/api/members/[member_id]`**: DELETE, PATCH — delete/update member (role-gated) (`app/api/members/[member_id]/route.ts`)
+- **`/api/members/[member_id]/password`**: PATCH — set member password (`app/api/members/[member_id]/password/route.ts`)
+- **`/api/members/[member_id]/role`**: PATCH — set member role (`app/api/members/[member_id]/role/route.ts`)
+- **`/api/members/[member_id]/set-leader`**: POST — mark member as group leader (`app/api/members/[member_id]/set-leader/route.ts`)
+- **`/api/members/events`**: POST, DELETE — manage member event attendance (`app/api/members/events/route.ts`)
+
+### Groups
+
+- **`/api/groups`**: GET, POST, DELETE — list/create/delete groups (supports legacy `group_name`) (`app/api/groups/route.ts`)
+- **`/api/groups/members`**: GET — list members of a group by id/name (`app/api/groups/members/route.ts`)
+
+### Events
+
+- **`/api/events`**: GET, OPTIONS — list events (`app/api/events/route.ts`)
+- **`/api/events/list`**: GET, OPTIONS — list events (alt endpoint) (`app/api/events/list/route.ts`)
+- **`/api/events/create`**: POST — create event; may bulk notify group via Picky Assist (`app/api/events/create/route.ts`)
+- **`/api/events/last-organizing-group`**: GET — last group from `system_settings` (`app/api/events/last-organizing-group/route.ts`)
+- **`/api/events/[event_id]`**: DELETE — delete event (`app/api/events/[event_id]/route.ts`)
+- **`/api/events/[event_id]/complete`**: POST — mark event completed (`app/api/events/[event_id]/complete/route.ts`)
+
+### Finance
+
+- **`/api/finance/accounts`**: DELETE, GET, OPTIONS, PATCH, POST — manage accounts; set main membership account (`app/api/finance/accounts/route.ts`)
+- **`/api/finance/upload-statement`**: POST — parse + import bank statement PDF (`app/api/finance/upload-statement/route.ts`)
+- **`/api/finance/transactions`**: DELETE, GET, OPTIONS, PATCH, POST — list/create/match/update/delete transactions (`app/api/finance/transactions/route.ts`)
+- **`/api/finance/transactions/search`**: GET — search transactions (`app/api/finance/transactions/search/route.ts`)
+- **`/api/finance/statements`**: GET — list bank statements (`app/api/finance/statements/route.ts`)
+- **`/api/finance/keywords`**: DELETE, GET, POST — manage payment keywords (`app/api/finance/keywords/route.ts`)
+- **`/api/finance/adjust-balance`**: POST — adjust a member balance (`app/api/finance/adjust-balance/route.ts`)
+- **`/api/finance/advance-payment`**: POST — record advance payment (`app/api/finance/advance-payment/route.ts`)
+- **`/api/finance/convert-to-membership`**: POST — convert transaction to membership (`app/api/finance/convert-to-membership/route.ts`)
+- **`/api/finance/review-payments`**: GET — review membership payment matches (`app/api/finance/review-payments/route.ts`)
+- **`/api/finance/clear-all`**: POST — clear finance data (dangerous) (`app/api/finance/clear-all/route.ts`)
+
+### Membership
+
+- **`/api/membership/status/[member_id]`**: GET, OPTIONS — membership status (`app/api/membership/status/[member_id]/route.ts`)
+- **`/api/membership/balance/[member_id]`**: GET, OPTIONS — membership balance (`app/api/membership/balance/[member_id]/route.ts`)
+- **`/api/membership/detect-payments`**: POST — run payment detection (AI step currently disabled) (`app/api/membership/detect-payments/route.ts`)
+
+### Messaging (Admin + Incoming)
+
+- **`/api/messaging/send`**: POST — bulk send admin messages via Picky Assist (`app/api/messaging/send/route.ts`)
+- **`/api/messaging/send-batch`**: POST — send admin messages to selected members (`app/api/messaging/send-batch/route.ts`)
+- **`/api/messaging/send-single`**: POST — send to one member (`app/api/messaging/send-single/route.ts`)
+- **`/api/messaging/incoming`**: GET, OPTIONS, PATCH — list incoming messages and mark read (`app/api/messaging/incoming/route.ts`)
+- **`/api/messaging/webhook`**: GET, POST — receive incoming messages from Picky Assist; includes media URL (`app/api/messaging/webhook/route.ts`)
+
+### Notifications (Scheduled)
+
+- **`/api/notifications`**: DELETE, GET, POST — create/cancel/delete scheduled notifications (`app/api/notifications/route.ts`)
+- **`/api/notifications/send-due`**: POST — cron target; sends due notifications via Picky Assist admin template (`app/api/notifications/send-due/route.ts`)
+
+### Payment Reminders
+
+- **`/api/payment-reminders/send`**: GET, OPTIONS, POST — preview and send reminders using main membership account details (`app/api/payment-reminders/send/route.ts`)
+- **`/api/payment-reminders/test-send`**: POST — testing endpoint (`app/api/payment-reminders/test-send/route.ts`)
+- **`/api/payment-reminders/run`**: POST — intentionally disabled auto-send (`app/api/payment-reminders/run/route.ts`)
+
+### Documents / Uploads
+
+- **`/api/documents`**: GET, POST — list/upload community docs (`app/api/documents/route.ts`)
+- **`/api/documents/[id]`**: DELETE — delete a document (`app/api/documents/[id]/route.ts`)
+- **`/api/upload`**: POST — upload member image/file to R2 (uses `R2_*` env vars) (`app/api/upload/route.ts`)
+
+### Reporting / Export / Backup
+
+- **`/api/export`**: GET — export members/events/finance as CSV or JSON-for-xlsx (role-gated) (`app/api/export/route.ts`)
+- **`/api/backup`**: GET, POST — download/restore full backup (dangerous; role-gated) (`app/api/backup/route.ts`)
+- **`/api/reports/board-members`**: GET — report endpoint (`app/api/reports/board-members/route.ts`)
+
+### Search / Health Checks
+
+- **`/api/search`**: GET — search members/events/meetings (`app/api/search/route.ts`)
+- **`/api/whatsapp/check`**: GET — WhatsApp integration check (`app/api/whatsapp/check/route.ts`)
+
+### Signup
+
+- **`/api/signup`**: POST — signup endpoint (`app/api/signup/route.ts`)
+
+### Telegram
+
+- **`/api/telegram/webhook`**: POST — Telegram bot webhook (`app/api/telegram/webhook/route.ts`)
+
+## Debugging & Runbooks
+
+### 1) “Unauthorized” (401/403)
+
+Checklist:
+- Confirm `AUTH_SECRET` is set in the environment you’re testing.
+- Confirm the browser has `auth_token` cookie set (HttpOnly; check Application → Cookies).
+- For CORS/mobile flows, confirm `Authorization: Bearer <token>` is being sent where supported.
+- For 403: confirm `users.role` is in the allowed list for that endpoint.
+
+### 2) Database connection issues
+
+Common symptoms:
+- timeouts / `ECONNRESET`
+- “Server not configured”
+
+Checklist:
+- Use Supabase **transaction pooler** URL in `DATABASE_URL` for Vercel.
+- Ensure IP allowlisting / SSL settings are correct (Supabase typically requires SSL).
+
+### 3) Picky Assist message sending failures
+
+Checklist:
+- `PICKY_ASSIST_API_KEY` set
+- `PICKY_ASSIST_APPLICATION_ID` set
+- Correct template id env var set for the message type
+- If `PICKY_ASSIST_TEST_MODE` is enabled, verify `WHATSAPP_TEST_NUMBER` is set (otherwise messages may attempt real sends depending on call path)
+- Check Vercel logs for Picky Assist response payloads
+
+### 4) Incoming messages show “+” / “%0A” etc
+
+The webhook and fetch endpoints now decode URL-encoded text.
+If you still see encoded strings, confirm the stored DB rows were inserted after the decode fix, or reprocess existing rows.
+
+### 5) Attachments not visible in UI
+
+Checklist:
+- Ensure the `incoming_messages.media_url` column exists (run `supabase-incoming-messages-media.sql`)
+- Confirm webhook payload includes `media-url` and it’s being stored
+- Confirm UI is rendering `mediaUrl` field returned by `/api/messaging/incoming`
+
+### 6) PDF parsing problems (bank statements)
+
+Checklist:
+- Confirm the PDF is text-based (not a scanned image-only PDF)
+- Check logs from `lib/parseBankStatement.ts` (it logs parsed transactions)
+- If bank format changes, update parsing heuristics in `lib/parseBankStatement.ts`
+
+### 7) R2 upload issues
+
+Checklist:
+- Ensure code-consumed env vars are set: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
+- Verify bucket permissions and public access configuration
+- If R2 fails, some endpoints fallback (e.g., documents store a data URL), while others may return 500.
+
+### 8) “Duplicate statement” / statement upload blocked
+
+You may see errors like:
+- HTTP 409 (duplicate transactions detected by overlap)
+- HTTP 400 (duplicate date range in `bank_statements`)
+
+What to check:
+- Confirm you selected the correct `financial_accounts` account (or the PDF account number matched an existing account automatically).
+- Check existing transactions for that date range: `GET /api/finance/transactions?accountId=...&year=...&month=...`
+- Check `bank_statements` entries for overlapping ranges: `GET /api/finance/statements?accountId=...`
+
+Operational options:
+- If it’s a real duplicate: do nothing.
+- If it’s a false positive: remove the conflicting statement/transactions (admin-only) or use the finance “clear” tools carefully (`/api/finance/clear-all` is destructive).
+
+### 9) Payment reminders fail with “No main account found”
+
+Payment reminders (`/api/payment-reminders/send`) require **BSB + account number** from the main membership account.
+
+Fix:
+- Set a main membership account via finance UI, or call:
+  - `PATCH /api/finance/accounts` with `{ "accountId": "...", "isMainMembershipAccount": true }`
+
+Notes:
+- If no main is set, the backend falls back to “first non-donation account”, but will still fail if no usable account exists or BSB/account fields are missing.
+
+### 10) Scheduled notifications not sending (cron)
+
+Check:
+- `scheduled_notifications.status` is `pending`
+- `scheduled_date` is <= today (ISO date)
+- You’re calling `POST /api/notifications/send-due`
+- If `CRON_SECRET` is set, you must send: `Authorization: Bearer <CRON_SECRET>`
+- Messaging env vars are configured (`PICKY_ASSIST_API_KEY`, `PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID`)
+
+Test mode:
+- If `PICKY_ASSIST_TEST_MODE=true`, all messages will redirect to `WHATSAPP_TEST_NUMBER` (if set).
+
+### 11) Backup restore safety (high risk)
+
+Restore endpoint: `POST /api/backup`
+- Requires `{ backup, confirmText: "confirm" }`
+- Deletes most tables before restoring (intentionally destructive)
+
+Best practice:
+- Take a fresh backup first (`GET /api/backup`)
+- Restore in staging before production
+- Confirm schema compatibility (newer columns may not exist in older backups)
+
+### 12) Webhook security hardening (recommended follow-up)
+
+Current state:
+- `POST /api/messaging/webhook` (Picky Assist) and `POST /api/telegram/webhook` are **not authenticated** via signatures/allowlists in code.
+
+Recommended hardening:
+- Add a shared secret header and validate it (similar to `CRON_SECRET` pattern), or
+- IP allowlist if provider supports it, or
+- Verify provider-signed webhook requests if available.
+
+## Developer Workflows
+
+### Add a New API Route
+
+1. Create a folder under `app/api/<your-route>/route.ts`
+2. Export handler(s): `export async function GET/POST/...`
+3. Use `export const runtime = 'nodejs'` if you need Node APIs or `pg`
+4. Add auth checks consistent with neighboring endpoints (cookie JWT + optional CORS headers)
+
+### Add a Database Migration
+
+1. Create a new `supabase-<feature>.sql` in repo root
+2. Apply in Supabase SQL editor
+3. If the migration is required for runtime correctness, add defensive checks and clear error messages in the relevant API route
+
+### Update Picky Assist Templates
+
+1. Update template in Picky Assist dashboard
+2. Update env vars in Vercel:
+   - `PICKY_ASSIST_*_TEMPLATE_ID`
+3. Verify placeholder ordering matches `lib/picky-assist.ts`
+4. Test using `PICKY_ASSIST_TEST_MODE=true` + `WHATSAPP_TEST_NUMBER`
+
+### Cloudflare / Domain Changes
+
+- If DNS or SSL settings change, validate:
+  - Cloudflare SSL mode = Full (strict)
+  - Vercel domain is configured and serving HTTPS
+  - No mixed-content warnings on key pages (login/dashboard/finance)
+
+
