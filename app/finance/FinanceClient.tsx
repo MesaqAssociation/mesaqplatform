@@ -1014,15 +1014,6 @@ export default function FinanceClient({
         </div>
       </div>
       
-      {/* Main account info */}
-      {currentAccount.is_main_membership_account && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
-            <IconStarFilled className="size-4 text-yellow-500" />
-            <span><strong>Main Membership Payment Account</strong> - This account's BSB and account number are used in payment reminder messages to members.</span>
-          </p>
-        </div>
-      )}
 
       {/* Bank Balance */}
       <Card>
