@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,24 +8,6 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
-// Load Google Maps script
-function useGoogleMaps() {
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if ((window as any).google?.maps?.places) {
-      setLoaded(true)
-      return
-    }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
-    script.async = true
-    script.onload = () => setLoaded(true)
-    document.head.appendChild(script)
-  }, [])
-  return loaded
-}
 
 type Group = {
   id: string | null
@@ -41,8 +23,6 @@ export default function CreateMemberForm() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const addressInputRef = useRef<HTMLInputElement>(null)
-  const mapsLoaded = useGoogleMaps()
   const [groups, setGroups] = useState<Group[]>([])
 
   // Load groups on mount
@@ -80,27 +60,6 @@ export default function CreateMemberForm() {
     return new Date(year, month, 0).getDate()
   }
 
-  // Setup Google Maps autocomplete
-  useEffect(() => {
-    if (!mapsLoaded || !addressInputRef.current) return
-    const autocomplete = new (window as any).google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: 'au' },
-      bounds: {
-        north: -37.5,
-        south: -38.5,
-        east: 145.5,
-        west: 144.5,
-      },
-      strictBounds: false,
-    })
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace()
-      if (place.formatted_address) {
-        setFormData(prev => ({ ...prev, address: place.formatted_address }))
-      }
-    })
-  }, [mapsLoaded])
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -433,7 +392,6 @@ export default function CreateMemberForm() {
       <div>
         <Label htmlFor="address">Address</Label>
         <Input
-          ref={addressInputRef}
           id="address"
           value={formData.address}
           onChange={(e) => setFormData({ ...formData, address: e.target.value })}

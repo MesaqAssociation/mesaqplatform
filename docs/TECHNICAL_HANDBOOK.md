@@ -37,7 +37,6 @@ flowchart TD
 - **Picky Assist**: WhatsApp template messaging + incoming webhooks.
 - **Cloudflare R2**: object storage (bank statements, documents, profile images).
 - **Telegram Bot**: bank statement upload + conversational create flows.
-- **Google Maps Places API**: address autocomplete (client-side key).
 - **Wasender API** (legacy): `lib/whatsapp.ts` supports non-template WhatsApp sending; much of production messaging is now through Picky Assist templates.
 
 ## System Layout

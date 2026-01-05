@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,24 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { IconTrash } from '@tabler/icons-react'
-
-// Load Google Maps script
-function useGoogleMaps() {
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if ((window as any).google?.maps?.places) {
-      setLoaded(true)
-      return
-    }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
-    script.async = true
-    script.onload = () => setLoaded(true)
-    document.head.appendChild(script)
-  }, [])
-  return loaded
-}
 
 type AgendaItem = {
   id: string
@@ -39,8 +21,6 @@ export default function CreateEventForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isMeeting = searchParams.get('type') === 'meeting'
-  const addressInputRef = useRef<HTMLInputElement>(null)
-  const mapsLoaded = useGoogleMaps()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -89,27 +69,6 @@ export default function CreateEventForm() {
     loadGroups()
   }, [])
 
-  // Setup Google Maps autocomplete
-  useEffect(() => {
-    if (!mapsLoaded || !addressInputRef.current) return
-    const autocomplete = new (window as any).google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: 'au' },
-      bounds: {
-        north: -37.5,
-        south: -38.5,
-        east: 145.5,
-        west: 144.5,
-      },
-      strictBounds: false,
-    })
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace()
-      if (place.formatted_address) {
-        setFormData(prev => ({ ...prev, address: place.formatted_address }))
-      }
-    })
-  }, [mapsLoaded])
 
   // Generate time options in 15-minute increments (12-hour format)
   const generateTimeOptions = () => {
@@ -217,7 +176,6 @@ export default function CreateEventForm() {
       <div>
         <Label htmlFor="address">Address</Label>
         <Input
-          ref={addressInputRef}
           id="address"
           value={formData.address}
           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
