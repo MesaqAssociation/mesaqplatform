@@ -14,7 +14,20 @@ import {
   IconBuilding, IconMapPin, IconUsers, IconCalendar
 } from '@tabler/icons-react'
 import { useToast } from '@/hooks/use-toast'
-import { Sidebar } from '@/components/Sidebar'
+
+// Decode HTML entities from scraped content
+function decodeHtmlEntities(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 interface GrantSource {
   id: string
@@ -197,64 +210,52 @@ export function GrantsClient() {
   }
 
   function getScoreColor(score?: number) {
-    if (!score) return 'bg-gray-100 text-gray-600'
-    if (score >= 80) return 'bg-green-100 text-green-700'
-    if (score >= 60) return 'bg-yellow-100 text-yellow-700'
-    return 'bg-red-100 text-red-700'
+    if (!score) return 'bg-muted text-muted-foreground'
+    if (score >= 80) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+    if (score >= 60) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
   }
 
   function getSourceTypeBadge(type: string) {
     const colors: Record<string, string> = {
-      federal: 'bg-blue-100 text-blue-700',
-      state: 'bg-purple-100 text-purple-700',
-      local: 'bg-green-100 text-green-700',
-      smartygrants: 'bg-orange-100 text-orange-700',
+      federal: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      state: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      local: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      smartygrants: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
     }
-    return colors[type] || 'bg-gray-100 text-gray-600'
+    return colors[type] || 'bg-muted text-muted-foreground'
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 p-6 bg-gray-50">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-          </div>
-        </main>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 p-6 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Grant Monitoring</h1>
-              <p className="text-gray-600">Monitor and discover grant opportunities for the community</p>
-            </div>
-            <Button
-              onClick={checkForGrants}
-              disabled={checking}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {checking ? (
-                <>
-                  <IconRefresh className="mr-2 h-4 w-4 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <IconSearch className="mr-2 h-4 w-4" />
-                  Check Now
-                </>
-              )}
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Grant Monitoring</h1>
+          <p className="text-muted-foreground">Monitor and discover grant opportunities for the community</p>
+        </div>
+        <Button onClick={checkForGrants} disabled={checking}>
+          {checking ? (
+            <>
+              <IconRefresh className="mr-2 h-4 w-4 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            <>
+              <IconSearch className="mr-2 h-4 w-4" />
+              Check Now
+            </>
+          )}
+        </Button>
+      </div>
 
           <Tabs defaultValue="discovered" className="space-y-4">
             <TabsList>
@@ -268,9 +269,9 @@ export function GrantsClient() {
               {grants.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <IconSparkles className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Grants Discovered Yet</h3>
-                    <p className="text-gray-600 mb-4">
+                    <IconSparkles className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Grants Discovered Yet</h3>
+                    <p className="text-muted-foreground mb-4">
                       Click "Check Now" to scan all configured sources for grant opportunities.
                     </p>
                     <Button onClick={checkForGrants} disabled={checking}>
@@ -282,14 +283,14 @@ export function GrantsClient() {
               ) : (
                 <div className="grid gap-4">
                   {grants.map(grant => (
-                    <Card key={grant.id} className={grant.is_eligible ? 'border-l-4 border-l-emerald-500' : ''}>
+                    <Card key={grant.id} className={grant.is_eligible ? 'border-l-4 border-l-primary' : ''}>
                       <CardContent className="py-4">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-gray-900">{grant.title}</h3>
+                              <h3 className="font-semibold">{decodeHtmlEntities(grant.title)}</h3>
                               {grant.is_eligible && (
-                                <Badge className="bg-emerald-100 text-emerald-700">
+                                <Badge variant="outline">
                                   <IconCheck className="h-3 w-3 mr-1" />
                                   Eligible
                                 </Badge>
@@ -298,13 +299,13 @@ export function GrantsClient() {
                                 <Badge variant="outline" className="text-xs">Notified</Badge>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">
-                              {grant.source_name} {grant.source_entity && `• ${grant.source_entity}`}
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {decodeHtmlEntities(grant.source_name)} {grant.source_entity && `• ${decodeHtmlEntities(grant.source_entity)}`}
                             </p>
                             {grant.description && (
-                              <p className="text-sm text-gray-700 mb-2 line-clamp-2">{grant.description}</p>
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{decodeHtmlEntities(grant.description)}</p>
                             )}
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <IconCalendar className="h-3 w-3" />
                                 Seen: {new Date(grant.first_seen_at).toLocaleDateString()}
@@ -335,7 +336,7 @@ export function GrantsClient() {
                           </div>
                         </div>
                         {grant.ai_eligibility_reason && (
-                          <p className="text-xs text-gray-500 mt-2 italic">
+                          <p className="text-xs text-muted-foreground mt-2 italic">
                             AI: {grant.ai_eligibility_reason}
                           </p>
                         )}
@@ -356,7 +357,7 @@ export function GrantsClient() {
               </div>
 
               {showAddSource && (
-                <Card className="border-emerald-200">
+                <Card>
                   <CardHeader>
                     <CardTitle>Add New Grant Source</CardTitle>
                   </CardHeader>
@@ -410,13 +411,13 @@ export function GrantsClient() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-900">{source.name}</h3>
+                            <h3 className="font-semibold">{source.name}</h3>
                             <Badge className={getSourceTypeBadge(source.source_type)}>
                               {source.source_type}
                             </Badge>
                           </div>
                           {source.entity && (
-                            <p className="text-sm text-gray-600 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <IconBuilding className="h-3 w-3" />
                               {source.entity}
                             </p>
@@ -438,7 +439,7 @@ export function GrantsClient() {
                             </div>
                           )}
                           {source.last_checked_at && (
-                            <p className="text-xs text-gray-400 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                               Last checked: {new Date(source.last_checked_at).toLocaleString()}
                             </p>
                           )}
@@ -538,15 +539,13 @@ export function GrantsClient() {
                       />
                     </div>
                   </div>
-                  <Button onClick={updateProfile} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button onClick={updateProfile}>
                     Save Profile
                   </Button>
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
-        </div>
-      </main>
+      </Tabs>
     </div>
   )
 }
