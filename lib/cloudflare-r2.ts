@@ -44,12 +44,14 @@ function getR2Client() {
  * @param file - File buffer to upload
  * @param fileName - Name for the file in R2
  * @param contentType - MIME type of the file
+ * @param folder - Folder within mesaq-association (e.g., 'bank-statements', 'documents')
  * @returns Public URL of the uploaded file
  */
 export async function uploadToR2(
   file: Buffer | Uint8Array,
   fileName: string,
-  contentType: string = 'application/pdf'
+  contentType: string = 'application/pdf',
+  folder: string = 'bank-statements'
 ): Promise<string> {
   if (!isR2Configured()) {
     console.warn('⚠️ R2 not configured, skipping upload')
@@ -60,9 +62,10 @@ export async function uploadToR2(
   const bucketName = process.env.R2_BUCKET_NAME!
   
   // Generate a unique key with timestamp to avoid conflicts
+  // Include mesaq-association prefix to match R2 bucket structure
   const timestamp = Date.now()
   const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const key = `bank-statements/${timestamp}-${sanitizedFileName}`
+  const key = `mesaq-association/${folder}/${timestamp}-${sanitizedFileName}`
 
   console.log(`📤 Uploading to R2: ${key}`)
 

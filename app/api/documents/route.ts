@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     let fileUrl: string
     if (isR2Configured()) {
       try {
-        fileUrl = await uploadToR2(buffer, file.name, file.type || 'application/octet-stream')
+        fileUrl = await uploadToR2(buffer, file.name, file.type || 'application/octet-stream', 'documents')
       } catch (r2Error) {
         console.error('R2 upload failed:', r2Error)
         return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })

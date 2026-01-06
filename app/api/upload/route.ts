@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const key = `members/${randomUUID()}-${file.name}`
+    // Include mesaq-association prefix to match R2 bucket structure
+    const key = `mesaq-association/members/${randomUUID()}-${file.name}`
 
     await s3.send(
       new PutObjectCommand({
