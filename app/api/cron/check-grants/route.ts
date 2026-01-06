@@ -32,13 +32,13 @@ interface DiscoveredGrant extends ScrapedGrant {
 }
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret or allow in development
+  // Verify cron secret if configured
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Allow without auth in development or if no secret set
-    if (process.env.NODE_ENV === 'production' && cronSecret) {
+  // Only require auth if CRON_SECRET is explicitly set
+  if (cronSecret) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
