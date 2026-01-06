@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX, IconLogout, IconBell } from '@tabler/icons-react'
+import { IconDashboard, IconUsers, IconCash, IconCalendarEvent, IconSettings, IconFileText, IconSend, IconMenu2, IconX, IconLogout, IconBell, IconGift } from '@tabler/icons-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/components/I18nProvider'
@@ -56,6 +56,7 @@ export function Sidebar({ user }: SidebarProps) {
     { title: t("events"), url: "/events", icon: IconCalendarEvent },
     { title: "Documents", url: "/documents", icon: IconFileText },
     { title: "Messaging", url: "/messaging", icon: IconSend },
+    { title: "Grants", url: "/grants", icon: IconGift },
   ] : [
     // Regular members only see limited items
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
