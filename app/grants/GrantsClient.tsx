@@ -14,7 +14,7 @@ import {
   IconBuilding, IconMapPin, IconUsers, IconCalendar
 } from '@tabler/icons-react'
 import { useToast } from '@/hooks/use-toast'
-import Sidebar from '@/components/Sidebar'
+import { Sidebar } from '@/components/Sidebar'
 
 interface GrantSource {
   id: string
