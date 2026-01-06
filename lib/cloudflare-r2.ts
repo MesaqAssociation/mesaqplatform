@@ -44,7 +44,7 @@ function getR2Client() {
  * @param file - File buffer to upload
  * @param fileName - Name for the file in R2
  * @param contentType - MIME type of the file
- * @param folder - Folder within mesaq-association (e.g., 'bank-statements', 'documents')
+ * @param folder - Folder path (e.g., 'bank-statements', 'documents')
  * @returns Public URL of the uploaded file
  */
 export async function uploadToR2(
@@ -62,10 +62,9 @@ export async function uploadToR2(
   const bucketName = process.env.R2_BUCKET_NAME!
   
   // Generate a unique key with timestamp to avoid conflicts
-  // Include mesaq-association prefix to match R2 bucket structure
   const timestamp = Date.now()
   const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const key = `mesaq-association/${folder}/${timestamp}-${sanitizedFileName}`
+  const key = `${folder}/${timestamp}-${sanitizedFileName}`
 
   console.log(`📤 Uploading to R2: ${key}`)
 
@@ -96,14 +95,15 @@ export async function uploadToR2(
 
 /**
  * Get public URL for an R2 object
+ * R2 public URLs include bucket name in path
  */
 function getPublicUrl(key: string): string {
-  // Use public URL from env
-  if (process.env.R2_PUBLIC_URL) {
-    return `${process.env.R2_PUBLIC_URL}/${key}`
+  // Use public URL from env - include bucket name in path
+  if (process.env.R2_PUBLIC_URL && process.env.R2_BUCKET_NAME) {
+    return `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET_NAME}/${key}`
   }
   
-  // Fallback - this shouldn't happen if R2_PUBLIC_URL is set
+  // Fallback - this shouldn't happen if R2 is configured
   return key
 }
 

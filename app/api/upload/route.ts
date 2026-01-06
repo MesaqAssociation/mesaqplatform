@@ -35,8 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    // Include mesaq-association prefix to match R2 bucket structure
-    const key = `mesaq-association/members/${randomUUID()}-${file.name}`
+    const key = `members/${randomUUID()}-${file.name}`
 
     await s3.send(
       new PutObjectCommand({
@@ -47,7 +46,8 @@ export async function POST(req: NextRequest) {
       })
     )
 
-    const url = `${process.env.R2_PUBLIC_URL}/${key}`
+    // R2 public URLs include bucket name in path
+    const url = `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET_NAME}/${key}`
     return NextResponse.json({ url })
   } catch (err: any) {
     console.error('Upload error:', err)
