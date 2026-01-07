@@ -278,7 +278,11 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
   const getNotificationsForDate = (date: Date) => {
     const dateKey = formatDateKey(date)
-    return notifications.filter(n => n.scheduled_date === dateKey && n.status === 'pending')
+    return notifications.filter(n => {
+      // Handle both full ISO timestamps and YYYY-MM-DD formats
+      const notifDate = n.scheduled_date.split('T')[0]
+      return notifDate === dateKey && n.status === 'pending'
+    })
   }
 
   const hasEvents = (date: Date) => getEventsForDate(date).length > 0
@@ -746,7 +750,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 <span className="font-medium">Status:</span>{' '}
                 {viewNotification && getStatusBadge(viewNotification.status)}
               </div>
-              {viewNotification?.recipients_count && (
+              {viewNotification?.recipients_count != null && viewNotification.recipients_count > 0 && (
                 <div>
                   <span className="font-medium">Recipients:</span> {viewNotification.recipients_count}
                 </div>
