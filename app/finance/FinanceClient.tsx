@@ -162,8 +162,6 @@ export default function FinanceClient({
     }
   }, [advanceMemberQuery, allMembers])
   
-  // Test send messages
-  const [sendingTestMessages, setSendingTestMessages] = useState(false)
   
   // Transaction Search
   const [showSearchBar, setShowSearchBar] = useState(false)
@@ -534,6 +532,7 @@ export default function FinanceClient({
 
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
+    setDialogCategory(txn.category || '')
     setShowTransactionDialog(true)
   }
 
@@ -838,57 +837,6 @@ export default function FinanceClient({
     }
   }
 
-  const handleTestSendMessages = async () => {
-    const confirm = window.confirm(
-      `🧪 TEST MODE: Send Payment Reminder\n\n` +
-      `This will send a personalized payment reminder to YOUR test number.\n\n` +
-      `What happens:\n` +
-      `• Finds members who are behind on payments\n` +
-      `• Sends message for 1 member (test) with amount owed\n` +
-      `• Includes bank account details for payment\n` +
-      `• Message goes to WHATSAPP_TEST_NUMBER (not actual member)\n` +
-      `• NO real members messaged\n` +
-      `• NO DATA stored\n\n` +
-      `Continue?`
-    )
-
-    if (!confirm) return
-
-    setSendingTestMessages(true)
-    try {
-      const res = await fetch('/api/payment-reminders/test-send', {
-        method: 'POST',
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        const failedMsg = data.messagesFailed > 0 ? ` (${data.messagesFailed} failed)` : ''
-        showToast(
-          `🧪 Test: Sent ${data.messagesSent} message(s) to your test number${failedMsg}`,
-          'success'
-        )
-        console.log('📊 Test results:', data)
-        
-        // Show detailed results in console
-        if (data.results && data.results.length > 0) {
-          console.table(data.results)
-        }
-      } else {
-        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error
-        showToast(errorMsg || 'Failed to send test messages', 'error')
-        console.error('❌ Test error:', data)
-        if (data.stack) {
-          console.error('Stack trace:', data.stack)
-        }
-      }
-    } catch (err) {
-      console.error('Test send error:', err)
-      showToast('Failed to send test messages. Check console for details.', 'error')
-    } finally {
-      setSendingTestMessages(false)
-    }
-  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AU', {
@@ -1148,10 +1096,7 @@ export default function FinanceClient({
                   <button
                     key={txn.id}
                     className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors"
-                    onClick={() => {
-                      setSelectedTransaction(txn)
-                      setShowTransactionDialog(true)
-                    }}
+                    onClick={() => handleTransactionClick(txn)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -1186,23 +1131,6 @@ export default function FinanceClient({
             <IconTrash className="mr-2 size-4" />
             Clear All Transactions
           </Button>
-        <Button
-          variant="outline"
-          onClick={handleTestSendMessages}
-          disabled={sendingTestMessages}
-          className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
-        >
-          {sendingTestMessages ? (
-            <>
-              <IconUpload className="mr-2 size-4 animate-pulse" />
-              Sending...
-            </>
-          ) : (
-            <>
-              🧪 Test Payment Reminders
-            </>
-          )}
-        </Button>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>

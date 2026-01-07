@@ -10,6 +10,10 @@ import { Toaster } from '@/components/ui/toaster'
 export const metadata: Metadata = {
   title: 'Mesaq Association',
   description: 'Association Management System',
+  icons: {
+    icon: '/cropped-logo.webp',
+    apple: '/cropped-logo.webp',
+  },
 }
 
 export default function RootLayout({

@@ -98,12 +98,9 @@ async function getMemberBalance(userId: string): Promise<number> {
     }
 }
 
-// Helper function to get total membership payments for a member in the current year
-async function getMembershipPaymentsThisYear(userId: string): Promise<number> {
+// Helper function to get total membership payments for a member in date range
+async function getMembershipPaymentsInRange(userId: string, startDate: string, endDate: string): Promise<number> {
     try {
-        const currentYear = getCurrentYear()
-        const startDate = `${currentYear}-01-01`
-        
         const { rows } = await pool.query(`
             SELECT COALESCE(SUM(t.amount), 0) as total
             FROM transactions t
@@ -111,7 +108,8 @@ async function getMembershipPaymentsThisYear(userId: string): Promise<number> {
               AND t.category = 'Membership Payment'
               AND t.transaction_type = 'credit'
               AND t.transaction_date >= $2::date
-        `, [userId, startDate])
+              AND t.transaction_date <= $3::date
+        `, [userId, startDate, endDate])
 
         return parseFloat(rows[0]?.total || '0')
     } catch (err) {
@@ -120,12 +118,9 @@ async function getMembershipPaymentsThisYear(userId: string): Promise<number> {
     }
 }
 
-// Helper function to get total event payments (NOT donations) for a member in the current year
-async function getEventPaymentsThisYear(userId: string): Promise<number> {
+// Helper function to get total event payments (NOT donations) for a member in date range
+async function getEventPaymentsInRange(userId: string, startDate: string, endDate: string): Promise<number> {
     try {
-        const currentYear = getCurrentYear()
-        const startDate = `${currentYear}-01-01`
-        
         // Get event payments - this is the "Special" category that excludes donations
         // It includes 'Event Payment' and also legacy 'Special Payment' that aren't donations
         const { rows } = await pool.query(`
@@ -136,7 +131,8 @@ async function getEventPaymentsThisYear(userId: string): Promise<number> {
               AND t.category != 'Donation'
               AND t.transaction_type = 'credit'
               AND t.transaction_date >= $2::date
-        `, [userId, startDate])
+              AND t.transaction_date <= $3::date
+        `, [userId, startDate, endDate])
 
         return parseFloat(rows[0]?.total || '0')
     } catch (err) {
@@ -152,7 +148,17 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+        // Parse date range from query params
+        const { searchParams } = new URL(req.url)
         const currentYear = getCurrentYear()
+        
+        // Default to current year if no dates provided
+        const startDate = searchParams.get('startDate') || `${currentYear}-01-01`
+        const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0]
+        
+        // Format dates for display
+        const startDateFormatted = new Date(startDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+        const endDateFormatted = new Date(endDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
         
         // Get all members with their details including member_id
         const { rows: members } = await pool.query(`
@@ -162,13 +168,13 @@ export async function GET(req: NextRequest) {
       ORDER BY name ASC
     `)
 
-        console.log(`📊 Found ${members.length} members for annual report (${currentYear})`)
+        console.log(`📊 Found ${members.length} members for report (${startDate} to ${endDate})`)
 
         // Calculate all payment data for each member
         const memberData = await Promise.all(
             members.map(async (member: any, index: number) => {
-                const membershipPayments = await getMembershipPaymentsThisYear(member.id)
-                const eventPayments = await getEventPaymentsThisYear(member.id)
+                const membershipPayments = await getMembershipPaymentsInRange(member.id, startDate, endDate)
+                const eventPayments = await getEventPaymentsInRange(member.id, startDate, endDate)
                 const currentBalance = await getMemberBalance(member.id)
                 const sum = membershipPayments + eventPayments
                 
@@ -184,7 +190,7 @@ export async function GET(req: NextRequest) {
             })
         )
 
-        console.log(`💰 Calculated annual payments for ${memberData.length} members`)
+        console.log(`💰 Calculated payments for ${memberData.length} members (${startDate} to ${endDate})`)
 
         // Calculate totals
         const totalMembershipPayments = memberData.reduce((sum, m) => sum + parseFloat(m.membershipPayments), 0)
@@ -418,7 +424,7 @@ export async function GET(req: NextRequest) {
                     // Title
                     new Paragraph({
                         children: [
-                            new TextRun({ text: `Annual Report ${currentYear}`, bold: true, size: 48, color: '1E3A5F' })
+                            new TextRun({ text: `Financial Report`, bold: true, size: 48, color: '1E3A5F' })
                         ],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 100 },
@@ -426,7 +432,7 @@ export async function GET(req: NextRequest) {
                     // Subtitle
                     new Paragraph({
                         children: [
-                            new TextRun({ text: `Period: January 1, ${currentYear} to Present`, italics: true, size: 24, color: '64748B' })
+                            new TextRun({ text: `Period: ${startDateFormatted} to ${endDateFormatted}`, italics: true, size: 24, color: '64748B' })
                         ],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 50 },
@@ -521,7 +527,7 @@ export async function GET(req: NextRequest) {
         return new NextResponse(buffer, {
             headers: {
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'Content-Disposition': `attachment; filename="Annual-Report-${currentYear}-${getMelbourneDate().replace(/\//g, '-')}.docx"`,
+                'Content-Disposition': `attachment; filename="Financial-Report-${startDate}-to-${endDate}.docx"`,
             },
         })
     } catch (err: any) {
