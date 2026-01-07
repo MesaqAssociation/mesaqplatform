@@ -1,9 +1,9 @@
 import { Pool } from 'pg'
 
 /**
- * Automatically detect and record membership payment when a transaction is categorized to a member
+ * Automatically detect and record membership payment when a transaction is categorized
  * 
- * This function is called after a transaction is inserted with a category (member name).
+ * This function is called after a transaction is inserted.
  * It checks if the transaction should be recorded as a membership payment.
  */
 export async function autoDetectMembershipPayment(
@@ -14,23 +14,23 @@ export async function autoDetectMembershipPayment(
   transactionDate: string
 ): Promise<boolean> {
   try {
-    // Skip if category is "Misc" (not a member payment)
-    if (category === 'Misc') {
+    // Only process Membership Payment category
+    if (category !== 'Membership Payment') {
       return false
     }
 
-    // Find the member by name (category is the member's name)
-    const { rows: members } = await pool.query(
-      `SELECT id FROM users WHERE name = $1 LIMIT 1`,
-      [category]
+    // Get the transaction to find the matched member
+    const { rows: txns } = await pool.query(
+      `SELECT matched_member_id FROM transactions WHERE id = $1`,
+      [transactionId]
     )
 
-    if (members.length === 0) {
-      console.log(`⚠️ No member found with name: ${category}`)
+    if (txns.length === 0 || !txns[0].matched_member_id) {
+      console.log(`⚠️ Transaction ${transactionId} has no matched member`)
       return false
     }
 
-    const memberId = members[0].id
+    const memberId = txns[0].matched_member_id
 
     // Determine the payment month from transaction date
     const txnDate = new Date(transactionDate + 'T00:00:00')
@@ -48,7 +48,7 @@ export async function autoDetectMembershipPayment(
       return false
     }
 
-    // Insert membership payment (allow multiple payments per month)
+    // Insert membership payment
     const { rowCount } = await pool.query(
       `INSERT INTO membership_payments (user_id, payment_month, amount, transaction_id, payment_date, status)
        VALUES ($1, $2, $3, $4, $5, 'paid')`,
@@ -56,7 +56,7 @@ export async function autoDetectMembershipPayment(
     )
 
     if (rowCount && rowCount > 0) {
-      console.log(`✅ Recorded membership payment: ${category} - $${Math.abs(amount)} for ${paymentMonthStr}`)
+      console.log(`✅ Recorded membership payment: member ${memberId} - $${Math.abs(amount)} for ${paymentMonthStr}`)
       return true
     }
 
@@ -66,4 +66,3 @@ export async function autoDetectMembershipPayment(
     return false
   }
 }
-
