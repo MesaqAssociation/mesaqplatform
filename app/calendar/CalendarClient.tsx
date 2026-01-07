@@ -22,6 +22,8 @@ type Notification = {
   sent_at: string | null
   recipients_count: number
   created_by_name: string | null
+  recipient_type: 'everyone' | 'specific' | null
+  recipient_ids: string[] | null
 }
 
 type Event = {
@@ -843,14 +845,20 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
               <div>
                 <span className="font-medium">Status:</span>{' '}
                 {viewNotification && getStatusBadge(viewNotification.status)}
               </div>
+              <div>
+                <span className="font-medium">Sending to:</span>{' '}
+                {viewNotification?.recipient_type === 'specific' 
+                  ? `${viewNotification?.recipient_ids?.length || 0} specific people` 
+                  : 'Everyone'}
+              </div>
               {viewNotification?.recipients_count != null && viewNotification.recipients_count > 0 && (
                 <div>
-                  <span className="font-medium">Recipients:</span> {viewNotification.recipients_count}
+                  <span className="font-medium">Sent to:</span> {viewNotification.recipients_count}
                 </div>
               )}
             </div>

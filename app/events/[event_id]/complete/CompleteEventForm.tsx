@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { useRouter } from 'next/navigation'
 import { IconX, IconUpload, IconCheck } from '@tabler/icons-react'
+import { showToast } from '@/lib/toast'
 
 type Props = {
   eventId: string
@@ -128,14 +129,15 @@ export default function CompleteEventForm({ eventId, eventType }: Props) {
       })
 
       if (response.ok) {
+        showToast('Event marked as completed!', 'success')
         const backUrl = eventType === 'Meeting' ? '/meetings' : '/events'
-        router.push(`${backUrl}?success=Event marked as completed`)
+        router.push(backUrl)
       } else {
-        alert('Failed to mark event as completed')
+        showToast('Failed to mark event as completed', 'error')
       }
     } catch (error) {
       console.error('Error:', error)
-      alert('An error occurred')
+      showToast('An error occurred', 'error')
     } finally {
       setSubmitting(false)
     }

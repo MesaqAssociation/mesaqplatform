@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { showToast } from '@/lib/toast'
 
 type Props = {
   eventId: string
@@ -37,16 +38,17 @@ export default function EventActions({ eventId, eventTitle, backUrl }: Props) {
       })
 
       if (res.ok) {
-        router.push(`${backUrl}?success=Event deleted successfully`)
+        showToast('Event deleted successfully!', 'success')
+        router.push(backUrl)
         router.refresh()
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to delete event')
+        showToast(data.error || 'Failed to delete event', 'error')
         setDeleting(false)
       }
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete event')
+      showToast('Failed to delete event', 'error')
       setDeleting(false)
     }
   }

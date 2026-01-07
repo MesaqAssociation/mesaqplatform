@@ -27,24 +27,18 @@ export default async function SettingsPage() {
   }) as Pool
 
   let currentFee = '50.00'
-  let finesEnabled = false
-  let fineAmount = '10.00'
   let fullUserData: any = {}
   
   try {
     // Get system settings
     const { rows: settingsRows } = await pool.query(`
       SELECT key, value FROM system_settings 
-      WHERE key IN ('monthly_membership_fee', 'late_payment_fines_enabled', 'late_payment_fine_amount')
+      WHERE key = 'monthly_membership_fee'
     `)
     
     settingsRows.forEach(row => {
       if (row.key === 'monthly_membership_fee') {
         currentFee = row.value
-      } else if (row.key === 'late_payment_fines_enabled') {
-        finesEnabled = row.value === 'true'
-      } else if (row.key === 'late_payment_fine_amount') {
-        fineAmount = row.value
       }
     })
 
@@ -75,8 +69,6 @@ export default async function SettingsPage() {
         user={user} 
         fullUserData={fullUserData}
         currentFee={currentFee}
-        finesEnabled={finesEnabled}
-        fineAmount={fineAmount}
       />
     </MainLayout>
   )

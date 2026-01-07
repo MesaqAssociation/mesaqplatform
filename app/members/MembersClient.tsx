@@ -7,7 +7,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useI18n } from '@/components/I18nProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { getInitials } from '@/lib/utils'
+import { IconSearch } from '@tabler/icons-react'
 
 type Member = {
   id: string
@@ -33,6 +35,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
   const { t } = useI18n()
   const router = useRouter()
   const [sortBy, setSortBy] = useState<SortOption>('name-asc')
+  const [searchQuery, setSearchQuery] = useState('')
   
   const getRoleTranslation = (role: string | null) => {
     if (role === 'Manager') return t('manager')
@@ -58,30 +61,42 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
     )
   }
 
-  // Sort members based on selected option
+  // Filter and sort members based on search query and selected option
   const sortedMembers = useMemo(() => {
-    const sorted = [...initial]
+    // First filter by search query
+    let filtered = [...initial]
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(m => 
+        (m.name?.toLowerCase().includes(query)) ||
+        (m.phone?.includes(query)) ||
+        (m.email?.toLowerCase().includes(query)) ||
+        (m.group_name?.toLowerCase().includes(query)) ||
+        (m.member_id?.toLowerCase().includes(query))
+      )
+    }
     
+    // Then sort
     switch (sortBy) {
       case 'name-asc':
-        return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       
       case 'most-paid':
-        return sorted.sort((a, b) => {
+        return filtered.sort((a, b) => {
           const aTotal = a.total_paid || 0
           const bTotal = b.total_paid || 0
           return bTotal - aTotal // Highest first
         })
       
       case 'least-paid':
-        return sorted.sort((a, b) => {
+        return filtered.sort((a, b) => {
           const aTotal = a.total_paid || 0
           const bTotal = b.total_paid || 0
           return aTotal - bTotal // Lowest first
         })
       
       case 'unpaid-first':
-        return sorted.sort((a, b) => {
+        return filtered.sort((a, b) => {
           const aFee = a.monthly_fee || 0
           const aPaid = a.total_paid || 0
           const bFee = b.monthly_fee || 0
@@ -95,33 +110,54 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
         })
       
       default:
-        return sorted
+        return filtered
     }
-  }, [initial, sortBy])
+  }, [initial, sortBy, searchQuery])
   
   return (
     <div className="space-y-4">
-      {/* Filter Controls - Only show for admins */}
-      {isAdmin && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <label htmlFor="sort" className="text-sm font-medium">
-            Sort by:
-          </label>
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-              <SelectItem value="most-paid">Most Paid</SelectItem>
-              <SelectItem value="least-paid">Least Paid</SelectItem>
-              <SelectItem value="unpaid-first">Unpaid First</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
-            Refresh
-          </Button>
+      {/* Search and Filter Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        {/* Search Bar */}
+        <div className="relative flex-1 w-full sm:max-w-sm">
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search members..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        
+        {/* Sort Controls - Only show for admins */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <label htmlFor="sort" className="text-sm font-medium">
+              Sort:
+            </label>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                <SelectItem value="most-paid">Most Paid</SelectItem>
+                <SelectItem value="least-paid">Least Paid</SelectItem>
+                <SelectItem value="unpaid-first">Unpaid First</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => router.refresh()}>
+              Refresh
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Results count */}
+      {searchQuery && (
+        <p className="text-sm text-muted-foreground">
+          Found {sortedMembers.length} member{sortedMembers.length !== 1 ? 's' : ''}
+        </p>
       )}
 
     {/* Desktop: Table view */}

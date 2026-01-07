@@ -67,6 +67,7 @@ export default function CreateMemberForm() {
     role: 'Community Member',
     group_name: '',
     banking_name: '',
+    payment_identifiers: '',
     member_id: '',
     date_joined: new Date().toISOString().split('T')[0], // Default to today
     household_members: '1',
@@ -310,6 +311,23 @@ export default function CreateMemberForm() {
         />
         <p className="text-xs text-muted-foreground mt-1">
           💡 Separate multiple banking names with commas (e.g., "ALI, MAX")
+        </p>
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label htmlFor="payment_identifiers">Payment Identifiers</Label>
+        <Input
+          id="payment_identifiers"
+          value={formData.payment_identifiers}
+          onChange={(e) => setFormData({ ...formData, payment_identifiers: e.target.value })}
+          placeholder="e.g., ABC123, DEF456 (comma-separated for multiple)"
+          className="mt-1"
+          autoComplete="off"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          💡 Unique strings this member puts in their payment descriptions. Separate multiple with commas.
         </p>
       </div>
 

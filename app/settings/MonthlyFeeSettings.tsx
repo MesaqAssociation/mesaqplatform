@@ -100,6 +100,9 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            💡 Fee changes will apply from the next month onwards. Past months remain unchanged.
+          </p>
         </div>
 
         {isEditing && (

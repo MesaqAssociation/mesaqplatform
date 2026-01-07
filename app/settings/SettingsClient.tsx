@@ -2,7 +2,6 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import MonthlyFeeSettings from './MonthlyFeeSettings'
-import FineSettings from './FineSettings'
 import UserSettings from './UserSettings'
 import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
@@ -14,15 +13,11 @@ import CustomMemberFields from './CustomMemberFields'
 export default function SettingsClient({
   user,
   fullUserData,
-  currentFee,
-  finesEnabled,
-  fineAmount
+  currentFee
 }: {
   user: any
   fullUserData: any
   currentFee: string
-  finesEnabled: boolean
-  fineAmount: string
 }) {
   // Allow board members and admin roles to access settings
   const isAdmin = user?.role === 'board' || user?.role === 'admin' || user?.role === 'Manager'
@@ -65,17 +60,6 @@ export default function SettingsClient({
                 Set the monthly membership fee for all members
               </p>
               <MonthlyFeeSettings initialFee={currentFee} />
-            </div>
-
-            <div className="border rounded-lg p-6 shadow-md">
-              <h2 className="text-lg font-medium mb-4">Late Payment Fines</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Configure automatic fines for late payments
-              </p>
-              <FineSettings
-                initialEnabled={finesEnabled}
-                initialAmount={fineAmount}
-              />
             </div>
 
             <div className="border rounded-lg p-6 shadow-md">

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { IconTrash } from '@tabler/icons-react'
+import { showToast } from '@/lib/toast'
 
 type AgendaItem = {
   id: string
@@ -168,9 +169,11 @@ export default function CreateEventForm() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Failed to create event')
       }
-      router.push(isMeeting ? '/events/meetings?success=Meeting created successfully' : '/events?success=Event created successfully')
+      showToast(isMeeting ? 'Meeting created successfully!' : 'Event created successfully!', 'success')
+      router.push(isMeeting ? '/events/meetings' : '/events')
     } catch (err: any) {
       setError(err.message || 'Error creating event')
+      showToast(err.message || 'Error creating event', 'error')
       setLoading(false)
     }
   }
