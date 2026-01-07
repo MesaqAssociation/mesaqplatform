@@ -532,7 +532,9 @@ export default function FinanceClient({
 
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
-    setDialogCategory(txn.category || '')
+    // Set category, defaulting to 'Other' if empty/null
+    const category = txn.category?.trim() || 'Other'
+    setDialogCategory(category)
     setShowTransactionDialog(true)
   }
 
@@ -1430,16 +1432,19 @@ export default function FinanceClient({
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
                 <Select 
-                  value={dialogCategory || selectedTransaction.category} 
+                  value={dialogCategory} 
                   onValueChange={(v) => setDialogCategory(v)}
                 >
                   <SelectTrigger className="w-48 mt-1">
-                    <SelectValue />
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Membership Payment">Membership Payment</SelectItem>
                     <SelectItem value="Event Payment">Event Payment</SelectItem>
                     <SelectItem value="Donation">Donation</SelectItem>
+                    <SelectItem value="Special Payment">Special Payment</SelectItem>
+                    <SelectItem value="Late Payment Fine">Late Payment Fine</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1558,15 +1563,17 @@ export default function FinanceClient({
                 </div>
               )}
 
-              <div>
-                <Label className="text-muted-foreground text-xs">Created At</Label>
-                <p className="text-sm">
-                  {new Date(selectedTransaction.created_at).toLocaleString('en-AU', {
-                    dateStyle: 'long',
-                    timeStyle: 'short',
-                  })}
-                </p>
-              </div>
+              {selectedTransaction.created_at && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Created At</Label>
+                  <p className="text-sm">
+                    {new Date(selectedTransaction.created_at).toLocaleString('en-AU', {
+                      dateStyle: 'long',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                </div>
+              )}
 
               {selectedTransaction.statement_file_name && (
                 <div className="border-t pt-4">

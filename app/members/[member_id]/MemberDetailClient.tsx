@@ -762,7 +762,12 @@ export default function MemberDetailClient({
                                     <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
                                   )}
                                   <div className="min-w-0 flex-1">
-                                    <p className="font-medium truncate">{txn.transaction_name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium truncate">{txn.transaction_name}</p>
+                                      {txn.category === 'Late Payment Fine' && (
+                                        <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1.5 py-0.5 rounded">Fine</span>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-muted-foreground">{formatDate(txn.transaction_date)}</p>
                                     {txn.description && (
                                       <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
