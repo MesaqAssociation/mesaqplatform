@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       // 
       // {{2}}
       // 
-      // Thank you - Mesaq"
+      // Kind Regards - Mesaq"
       const adminMessages: AdminMessageData[] = members.map(member => ({
         memberName: member.name,
         message: `📢 ${notification.title}\n\n${notification.message}`,

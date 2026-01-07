@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Store the FULL message including template wrapper
-      fullMessageContent = `Salam ${recipientName},\n\n${userMessage}\n\nThank you - Mesaq Association`
+      fullMessageContent = `Salam ${recipientName},\n\n${userMessage}\n\nKind Regards - Mesaq Association`
 
       const payload = {
         token: apiKey,

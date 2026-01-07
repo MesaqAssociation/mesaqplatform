@@ -343,7 +343,7 @@ export default function MessagingClient() {
       if (res.ok) {
         const displayMessage = canSendFreeText 
           ? newMessage.trim()
-          : `Salam ${effectiveName},\n\n${newMessage.trim()}\n\nThank you - Mesaq Association`
+          : `Salam ${effectiveName},\n\n${newMessage.trim()}\n\nKind Regards - Mesaq Association`
         
         const optimisticMessage: Message = {
           id: `temp-${Date.now()}`,
@@ -861,7 +861,7 @@ export default function MessagingClient() {
                       {!canSendFreeText && (
                         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
                           <IconTemplate className="size-3 flex-shrink-0" />
-                          <span className="truncate">Using template: Salam [Name]... Thank you - Mesaq</span>
+                          <span className="truncate">Using template: Salam [Name]... Kind Regards - Mesaq</span>
                         </div>
                       )}
                       {canSendFreeText && (
@@ -997,7 +997,7 @@ export default function MessagingClient() {
                   />
 
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
-                    <p className="font-semibold text-primary text-sm">Thank you - Mesaq Association</p>
+                    <p className="font-semibold text-primary text-sm">Kind Regards - Mesaq Association</p>
               </div>
 
                   {sendingBulk && (

@@ -518,8 +518,8 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
     if (state?.type === 'event' && state.step === 'organizing_group') {
       const group = data.replace('org_group_', '')
       state.data.organizing_group = group === 'none' ? null : group
-      state.step = 'date'
-      await sendTelegramMessage(chatId, '📆 Enter the event date (DD-MM-YYYY):\n\nExample: 25-12-2024')
+      state.step = 'date_year'
+      await showDateSelection(chatId)
     } else if (state?.type === 'event' && state.step === 'confirm') {
       // Final group selection after confirmation
       const group = data.replace('org_group_', '')
@@ -554,7 +554,57 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
     if (state?.type === 'event') {
       state.data.notify_group = data === 'notify_yes'
       state.step = 'confirm'
+      // Show loading indicator
+      await sendTelegramMessage(chatId, '⏳ Loading summary...')
       await showEventConfirmation(chatId, state.data)
+    }
+  }
+  // Handle year selection for date
+  else if (data.startsWith('year_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event' && state.step === 'date_year') {
+      state.data.selected_year = data.replace('year_', '')
+      state.step = 'date_month'
+      await showMonthSelection(chatId)
+    }
+  }
+  // Handle month selection for date
+  else if (data.startsWith('month_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event' && state.step === 'date_month') {
+      state.data.selected_month = data.replace('month_', '')
+      state.step = 'date_day'
+      await showDaySelection(chatId, parseInt(state.data.selected_year), parseInt(state.data.selected_month))
+    }
+  }
+  // Handle day selection for date
+  else if (data.startsWith('day_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event' && state.step === 'date_day') {
+      const day = data.replace('day_', '').padStart(2, '0')
+      const month = state.data.selected_month.padStart(2, '0')
+      const year = state.data.selected_year
+      state.data.event_date = `${year}-${month}-${day}`
+      state.step = 'start_time'
+      await showTimeSelection(chatId, 'start')
+    }
+  }
+  // Handle start time selection
+  else if (data.startsWith('stime_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event' && state.step === 'start_time') {
+      state.data.start_time = data.replace('stime_', '')
+      state.step = 'end_time'
+      await showTimeSelection(chatId, 'end', state.data.start_time)
+    }
+  }
+  // Handle end time selection
+  else if (data.startsWith('etime_')) {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event' && state.step === 'end_time') {
+      state.data.end_time = data.replace('etime_', '')
+      state.step = 'cost'
+      await sendTelegramMessage(chatId, '💰 What is the total cost for this event? (Enter amount in dollars, or type "0" for free):')
     }
   }
   // Confirm creation
@@ -743,6 +793,94 @@ async function showNotifyOption(chatId: number): Promise<void> {
   await sendTelegramMessage(chatId, '📱 Send WhatsApp notifications to organizing group members?', { reply_markup: keyboard })
 }
 
+// Show date selection - year first
+async function showDateSelection(chatId: number): Promise<void> {
+  const currentYear = new Date().getFullYear()
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: `${currentYear}`, callback_data: `year_${currentYear}` },
+        { text: `${currentYear + 1}`, callback_data: `year_${currentYear + 1}` },
+      ],
+    ],
+  }
+  await sendTelegramMessage(chatId, '📆 Select year:', { reply_markup: keyboard })
+}
+
+// Show month selection
+async function showMonthSelection(chatId: number): Promise<void> {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ]
+  const buttons = []
+  for (let i = 0; i < 12; i += 3) {
+    const row = []
+    for (let j = i; j < i + 3 && j < 12; j++) {
+      row.push({ text: months[j], callback_data: `month_${j + 1}` })
+    }
+    buttons.push(row)
+  }
+  const keyboard = { inline_keyboard: buttons }
+  await sendTelegramMessage(chatId, '📆 Select month:', { reply_markup: keyboard })
+}
+
+// Show day selection
+async function showDaySelection(chatId: number, year: number, month: number): Promise<void> {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const buttons = []
+  for (let i = 1; i <= daysInMonth; i += 7) {
+    const row = []
+    for (let j = i; j < i + 7 && j <= daysInMonth; j++) {
+      row.push({ text: `${j}`, callback_data: `day_${j}` })
+    }
+    buttons.push(row)
+  }
+  const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December']
+  const keyboard = { inline_keyboard: buttons }
+  await sendTelegramMessage(chatId, `📆 Select day (${monthNames[month]} ${year}):`, { reply_markup: keyboard })
+}
+
+// Show time selection
+async function showTimeSelection(chatId: number, type: 'start' | 'end', startTime?: string): Promise<void> {
+  const times = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+    '20:00', '20:30', '21:00', '21:30', '22:00'
+  ]
+  
+  // Filter times for end time selection (only show times after start time)
+  let availableTimes = times
+  if (type === 'end' && startTime) {
+    availableTimes = times.filter(t => t > startTime)
+  }
+  
+  // Convert to 12-hour format for display
+  const formatTime = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    const period = h >= 12 ? 'PM' : 'AM'
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+    return `${hour12}:${m.toString().padStart(2, '0')}${period}`
+  }
+  
+  const prefix = type === 'start' ? 'stime' : 'etime'
+  const buttons = []
+  for (let i = 0; i < availableTimes.length; i += 4) {
+    const row = []
+    for (let j = i; j < i + 4 && j < availableTimes.length; j++) {
+      row.push({ text: formatTime(availableTimes[j]), callback_data: `${prefix}_${availableTimes[j]}` })
+    }
+    buttons.push(row)
+  }
+  
+  const keyboard = { inline_keyboard: buttons }
+  const label = type === 'start' ? '🕐 Select start time:' : '🕐 Select end time:'
+  await sendTelegramMessage(chatId, label, { reply_markup: keyboard })
+}
+
 // Show event type selection
 async function showEventTypeSelection(chatId: number): Promise<void> {
   const keyboard = {
@@ -830,26 +968,45 @@ async function showGroupSelection(chatId: number): Promise<void> {
 // Show organizing group selection
 async function showOrgGroupSelection(chatId: number): Promise<void> {
   try {
-    // Try member_groups table first, fall back to users.group_name
-    let groups: any[] = []
+    // Get ALL groups from both member_groups table AND users.group_name
+    const groupNames = new Set<string>()
+    
+    // Try to get from member_groups table
     try {
-      const { rows } = await pool.query(`
-        SELECT id, name FROM member_groups ORDER BY name ASC
-      `)
-      groups = rows
+      const { rows } = await pool.query(`SELECT name FROM member_groups ORDER BY name ASC`)
+      rows.forEach((r: any) => groupNames.add(r.name))
     } catch {
-      // Fall back to unique group_name values from users
+      // Table might not exist, that's OK
+    }
+    
+    // Also get unique group_name values from users table
+    try {
       const { rows } = await pool.query(`
         SELECT DISTINCT group_name as name FROM users 
         WHERE group_name IS NOT NULL AND group_name != ''
         ORDER BY group_name ASC
       `)
-      groups = rows.map((r: any) => ({ id: null, name: r.name }))
+      rows.forEach((r: any) => groupNames.add(r.name))
+    } catch {
+      // Ignore errors
     }
     
-    const buttons = groups.map((g: any) => [{
-      text: g.name,
-      callback_data: `org_group_${g.name}`,
+    const groups = Array.from(groupNames).sort()
+    
+    if (groups.length === 0) {
+      // No groups found, skip to date
+      const state = userStates.get(chatId)
+      if (state?.type === 'event') {
+        state.data.organizing_group = null
+        state.step = 'date'
+        await showDateSelection(chatId)
+      }
+      return
+    }
+    
+    const buttons = groups.map((name: string) => [{
+      text: name,
+      callback_data: `org_group_${name}`,
     }])
     buttons.push([{ text: '❌ No Group', callback_data: 'org_group_none' }])
 
@@ -862,7 +1019,7 @@ async function showOrgGroupSelection(chatId: number): Promise<void> {
     if (state?.type === 'event') {
       state.data.organizing_group = null
       state.step = 'date'
-      await sendTelegramMessage(chatId, '📆 Enter the event date (DD-MM-YYYY):\n\nExample: 25-12-2024')
+      await showDateSelection(chatId)
     }
   }
 }
@@ -949,14 +1106,26 @@ async function createEvent(chatId: number, data: any): Promise<void> {
           `, [data.organizing_group])
 
           if (groupMembers.length > 0) {
-            // Format the event date for display
+            // Format the event date for display with time
             const eventDate = new Date(data.event_date)
-            const formattedDate = eventDate.toLocaleDateString('en-AU', { 
+            const formattedDateOnly = eventDate.toLocaleDateString('en-AU', { 
               weekday: 'long', 
               day: 'numeric', 
               month: 'long', 
               year: 'numeric' 
             })
+            
+            // Format times to 12-hour format
+            const formatTo12Hour = (time24: string) => {
+              const [h, m] = time24.split(':').map(Number)
+              const period = h >= 12 ? 'PM' : 'AM'
+              const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+              return `${hour12}:${m.toString().padStart(2, '0')}${period}`
+            }
+            
+            const startTime12 = formatTo12Hour(data.start_time)
+            const endTime12 = formatTo12Hour(data.end_time)
+            const formattedDate = `${formattedDateOnly} ${startTime12} - ${endTime12}`
 
             const allMemberNames = groupMembers.map((m: any) => m.name)
             const eventNotifications: EventNotificationData[] = groupMembers
@@ -990,7 +1159,8 @@ async function createEvent(chatId: number, data: any): Promise<void> {
                   return {
                     messageType: 'event_notification' as const,
                     templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                    messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${data.title} - ${formattedDate}\n\nYour group: ${data.organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
+                    // Store FULL template message content matching the actual WhatsApp template
+                    messageContent: `Salam ${m.name},\nA new event has been created: ${data.title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${data.organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association`,
                     recipientPhone: formatPhoneNumber(m.phone),
                     recipientName: m.name,
                     recipientMemberId: m.id,

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
     // Send using the admin message template
-    // Template format: "Salam {{1}}, {{2}} Thank you - Mesaq"
+    // Template format: "Salam {{1}}, {{2}} Kind Regards - Mesaq"
     const success = await sendAdminMessage(
       {
         memberName: member.name,

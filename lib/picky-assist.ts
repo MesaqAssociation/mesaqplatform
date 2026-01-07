@@ -11,7 +11,7 @@
  * 
  * 3. Admin Messages (PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID)
  *    Placeholders: {{1}} Name, {{2}} Admin message
- *    Note: Messages come prefilled with "Salam {{name}}" and end with "Thank you - Mesaq"
+ *    Note: Messages come prefilled with "Salam {{name}}" and end with "Kind Regards - Mesaq"
  */
 
 export type PickyAssistTemplateMessage = {
@@ -416,7 +416,7 @@ export async function sendBulkEventNotifications(
  * {{1}} - Name of member
  * {{2}} - Admin message
  * 
- * Note: The message comes prefilled with "Salam {{name}}" and ends with "Thank you - Mesaq"
+ * Note: The message comes prefilled with "Salam {{name}}" and ends with "Kind Regards - Mesaq"
  */
 export async function sendAdminMessage(
   data: AdminMessageData,

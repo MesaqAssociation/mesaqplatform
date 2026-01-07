@@ -177,14 +177,14 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
     false // Not test mode for cron
   )
 
-  // Store sent messages in database with FULL template content
+  // Store sent messages in database with FULL template content matching actual WhatsApp template
   const batchId = generateBatchId()
   const sentMessageData: SentMessageData[] = members
     .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
     .map((m: any) => ({
       messageType: 'payment_reminder' as const,
       templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-      messageContent: `Salam ${m.name},\n\nThis is a friendly reminder that your membership balance is $${Math.abs(parseFloat(m.balance)).toFixed(0)}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
+      messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association`,
       recipientPhone: formatPhoneNumber(m.phone),
       recipientName: m.name,
       recipientMemberId: m.id,
@@ -248,7 +248,7 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
     const sentMessageData: SentMessageData[] = members.map((member: any) => ({
       messageType: 'scheduled' as const,
       templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-      messageContent: `Salam ${member.name},\n\n📢 ${notification.title}\n\n${notification.message}\n\nThank you - Mesaq Association`,
+      messageContent: `Salam ${member.name},\n\n📢 ${notification.title}\n\n${notification.message}\n\nKind Regards - Mesaq Association`,
       recipientPhone: formatPhoneNumber(member.phone),
       recipientName: member.name,
       recipientMemberId: member.id,

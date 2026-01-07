@@ -150,12 +150,12 @@ export async function POST(req: NextRequest) {
         account_number
       )
 
-      // Store the sent message with FULL template content
+      // Store the sent message with FULL template content matching actual WhatsApp template
       const balanceOwed = Math.abs(member.balance).toFixed(0)
       await storeSentMessage(pool, {
         messageType: 'payment_reminder',
         templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        messageContent: `Salam ${member.name},\n\nThis is a friendly reminder that your membership balance is $${balanceOwed}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
+        messageContent: `Salam ${member.name},\n\nYou are currently $${balanceOwed} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association`,
         recipientPhone: formatPhoneNumber(targetPhone),
         recipientName: member.name,
         recipientMemberId: member.id,
@@ -226,8 +226,8 @@ export async function POST(req: NextRequest) {
       .map((m: any) => ({
         messageType: 'payment_reminder' as const,
         templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        // Store FULL template message content
-        messageContent: `Salam ${m.name},\n\nThis is a friendly reminder that your membership balance is $${Math.abs(parseFloat(m.balance)).toFixed(0)}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
+        // Store FULL template message content matching actual WhatsApp template
+        messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association`,
         recipientPhone: formatPhoneNumber(m.phone),
         recipientName: m.name,
         recipientMemberId: m.id,

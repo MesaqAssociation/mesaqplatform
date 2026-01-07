@@ -181,7 +181,6 @@ export default function CreateEventForm() {
           id="address"
           value={formData.address}
           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          placeholder="Start typing address..."
           className="mt-1"
           autoComplete="off"
         />

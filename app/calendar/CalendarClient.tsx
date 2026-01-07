@@ -463,6 +463,12 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 rows={4}
                 className="mt-1"
               />
+              <div className="mt-2 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
+                <p className="font-medium mb-1">Message will be sent as:</p>
+                <p className="italic">Salam [Member Name],</p>
+                <p className="italic my-1">[Your message here]</p>
+                <p className="italic">Kind Regards - Mesaq Association</p>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">

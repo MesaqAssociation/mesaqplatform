@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     // 
     // {{2}}
     // 
-    // Thank you - Mesaq"
+    // Kind Regards - Mesaq"
     const adminMessages: AdminMessageData[] = members
       .filter(member => member.phone)
       .map(member => ({
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         messageType: 'admin_message' as const,
         templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
         // Store the FULL message including template wrapper
-        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nThank you - Mesaq Association`,
+        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nKind Regards - Mesaq Association`,
         recipientPhone: formatPhoneNumber(member.phone),
         recipientName: member.name,
         recipientMemberId: member.id,

@@ -107,14 +107,26 @@ export async function POST(req: NextRequest) {
           `, [organizing_group])
 
           if (groupMembers.length > 0) {
-            // Format the event date for display
+            // Format the event date for display with time
             const eventDate = new Date(event_date)
-            const formattedDate = eventDate.toLocaleDateString('en-AU', { 
+            const formattedDateOnly = eventDate.toLocaleDateString('en-AU', { 
               weekday: 'long', 
               day: 'numeric', 
               month: 'long', 
               year: 'numeric' 
             })
+            
+            // Format times to 12-hour format
+            const formatTo12Hour = (time24: string) => {
+              const [h, m] = time24.split(':').map(Number)
+              const period = h >= 12 ? 'PM' : 'AM'
+              const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+              return `${hour12}:${m.toString().padStart(2, '0')}${period}`
+            }
+            
+            const startTime12 = formatTo12Hour(start_time)
+            const endTime12 = formatTo12Hour(end_time)
+            const formattedDate = `${formattedDateOnly} ${startTime12} - ${endTime12}`
 
             // Get all member names for the "other members" field
             const allMemberNames = groupMembers.map(m => m.name)
@@ -160,8 +172,8 @@ export async function POST(req: NextRequest) {
                   return {
                     messageType: 'event_notification' as const,
                     templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                    // Store FULL template message content
-                    messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${title} - ${formattedDate}\n\nYour group: ${organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
+                    // Store FULL template message content matching the actual WhatsApp template
+                    messageContent: `Salam ${m.name},\nA new event has been created: ${title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association`,
                     recipientPhone: formatPhoneNumber(m.phone),
                     recipientName: m.name,
                     recipientMemberId: m.id,
