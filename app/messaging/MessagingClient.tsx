@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { IconSend, IconUsers, IconSearch, IconMessage, IconRefresh } from '@tabler/icons-react'
+import { IconSend, IconUsers, IconSearch, IconMessage, IconRefresh, IconChevronLeft, IconChevronRight, IconMailForward } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 
 type Member = {
   id: string
@@ -32,6 +33,32 @@ type IncomingMessage = {
   memberCode: string | null
 }
 
+type SentMessage = {
+  id: string
+  messageType: 'payment_reminder' | 'event_notification' | 'scheduled' | 'admin_message'
+  content: string
+  recipientPhone: string
+  recipientName: string | null
+  memberCode: string | null
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+  senderName: string | null
+  createdAt: string
+  sentAt: string | null
+  deliveredAt: string | null
+  readAt: string | null
+  failedAt: string | null
+  errorMessage: string | null
+}
+
+type Pagination = {
+  page: number
+  limit: number
+  totalCount: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
 export default function MessagingClient() {
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
@@ -41,10 +68,21 @@ export default function MessagingClient() {
   const [searchQuery, setSearchQuery] = useState('')
   const [incomingMessages, setIncomingMessages] = useState<IncomingMessage[]>([])
   const [loadingIncoming, setLoadingIncoming] = useState(false)
+  const [sentMessages, setSentMessages] = useState<SentMessage[]>([])
+  const [loadingSent, setLoadingSent] = useState(false)
+  const [sentPagination, setSentPagination] = useState<Pagination>({
+    page: 1,
+    limit: 30,
+    totalCount: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  })
 
   useEffect(() => {
     loadMembers()
     loadIncomingMessages()
+    loadSentMessages(1)
   }, [])
 
   const loadIncomingMessages = async () => {
@@ -59,6 +97,22 @@ export default function MessagingClient() {
       console.error('Failed to load incoming messages:', err)
     } finally {
       setLoadingIncoming(false)
+    }
+  }
+
+  const loadSentMessages = async (page: number) => {
+    setLoadingSent(true)
+    try {
+      const res = await fetch(`/api/messaging/sent?page=${page}&limit=30`)
+      if (res.ok) {
+        const data = await res.json()
+        setSentMessages(data.messages || [])
+        setSentPagination(data.pagination)
+      }
+    } catch (err) {
+      console.error('Failed to load sent messages:', err)
+    } finally {
+      setLoadingSent(false)
     }
   }
 
@@ -171,6 +225,22 @@ export default function MessagingClient() {
     }
   }
 
+  const StatusBadge = ({ status }: { status: string }) => {
+    const variants: Record<string, { className: string; label: string }> = {
+      pending: { className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500', label: '⏳ Pending' },
+      sent: { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', label: '✓ Sent' },
+      delivered: { className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', label: '✓✓ Delivered' },
+      read: { className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', label: '👁 Read' },
+      failed: { className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', label: '✗ Failed' },
+    }
+    const variant = variants[status] || variants.pending
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${variant.className}`}>
+        {variant.label}
+      </span>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -183,6 +253,7 @@ export default function MessagingClient() {
       <Tabs defaultValue="send" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="send">Send Messages</TabsTrigger>
+          <TabsTrigger value="sent">Sent Messages</TabsTrigger>
           <TabsTrigger value="incoming">Incoming Messages</TabsTrigger>
         </TabsList>
 
@@ -306,6 +377,133 @@ export default function MessagingClient() {
           </CardContent>
         </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="sent">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconMailForward className="size-5" />
+                    Sent Messages
+                  </CardTitle>
+                  <CardDescription>
+                    All outgoing messages (payment reminders, events, scheduled, custom)
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => loadSentMessages(sentPagination.page)}
+                  disabled={loadingSent}
+                >
+                  <IconRefresh className={`size-4 mr-2 ${loadingSent ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingSent ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading sent messages...
+                </div>
+              ) : sentMessages.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <IconMailForward className="size-12 mx-auto mb-3 opacity-30" />
+                  <p>No sent messages yet</p>
+                  <p className="text-sm mt-1">Messages you send will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {sentMessages.map((msg) => (
+                      <div 
+                        key={msg.id} 
+                        className="p-4 border rounded-lg hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <Badge variant={
+                                msg.messageType === 'payment_reminder' ? 'destructive' :
+                                msg.messageType === 'event_notification' ? 'default' :
+                                msg.messageType === 'scheduled' ? 'secondary' :
+                                'outline'
+                              }>
+                                {msg.messageType === 'payment_reminder' && '💰 Payment Reminder'}
+                                {msg.messageType === 'event_notification' && '📅 Event'}
+                                {msg.messageType === 'scheduled' && '📆 Scheduled'}
+                                {msg.messageType === 'admin_message' && '✉️ Admin Message'}
+                              </Badge>
+                              <StatusBadge status={msg.status} />
+                            </div>
+                            <div className="flex items-center gap-2 mb-1 text-sm">
+                              <span className="font-medium">
+                                To: {msg.recipientName || msg.recipientPhone}
+                              </span>
+                              {msg.memberCode && (
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  {msg.memberCode}
+                                </span>
+                              )}
+                              {msg.recipientName && (
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {msg.recipientPhone}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {msg.content}
+                            </p>
+                            {msg.errorMessage && (
+                              <p className="text-xs text-red-500 mt-1">
+                                Error: {msg.errorMessage}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                              <span>Sent: {formatTimestamp(msg.sentAt || msg.createdAt)}</span>
+                              {msg.deliveredAt && <span>• Delivered: {formatTimestamp(msg.deliveredAt)}</span>}
+                              {msg.readAt && <span>• Read: {formatTimestamp(msg.readAt)}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Pagination */}
+                  {sentPagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        Page {sentPagination.page} of {sentPagination.totalPages} ({sentPagination.totalCount} total)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadSentMessages(sentPagination.page - 1)}
+                          disabled={!sentPagination.hasPrev || loadingSent}
+                        >
+                          <IconChevronLeft className="size-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadSentMessages(sentPagination.page + 1)}
+                          disabled={!sentPagination.hasNext || loadingSent}
+                        >
+                          Next
+                          <IconChevronRight className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="incoming">

@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { sendBulkEventNotifications, formatPhoneNumber, EventNotificationData } from '@/lib/picky-assist'
+import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
 
@@ -146,6 +147,23 @@ export async function POST(req: NextRequest) {
             )
 
             console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+
+            // Store sent messages in database
+            const batchId = generateBatchId()
+            const sentMessageData: SentMessageData[] = groupMembers
+              .filter((m: any) => m.phone)
+              .map((m: any) => ({
+                messageType: 'event_notification' as const,
+                templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
+                messageContent: `Event: ${title} - ${formattedDate}`,
+                recipientPhone: formatPhoneNumber(m.phone),
+                recipientName: m.name,
+                recipientMemberId: m.id,
+                status: result.success ? 'sent' : 'failed',
+                batchId
+              }))
+
+            await storeSentMessagesBatch(pool, sentMessageData, batchId)
           }
         }
       } catch (whatsappErr) {

@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { sendBulkAdminMessages, formatPhoneNumber, AdminMessageData } from '@/lib/picky-assist'
+import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes max
@@ -111,6 +112,24 @@ export async function POST(req: NextRequest) {
     )
 
     console.log(`✅ Admin messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+
+    // Store sent messages in database
+    const batchId = generateBatchId()
+    const sentMessageData: SentMessageData[] = members
+      .filter(member => member.phone)
+      .map(member => ({
+        messageType: 'admin_message' as const,
+        templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
+        messageContent: message.trim().substring(0, 500),
+        recipientPhone: formatPhoneNumber(member.phone),
+        recipientName: member.name,
+        recipientMemberId: member.id,
+        status: result.success ? 'sent' : 'failed',
+        sentBy: userId,
+        batchId
+      }))
+
+    await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
     return NextResponse.json({ 
       success: result.success,

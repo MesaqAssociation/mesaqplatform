@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { sendBulkPaymentReminders, sendBulkAdminMessages, AdminMessageData, PaymentReminderData } from '@/lib/picky-assist'
+import { sendBulkPaymentReminders, sendBulkAdminMessages, AdminMessageData, PaymentReminderData, formatPhoneNumber } from '@/lib/picky-assist'
+import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -176,6 +177,23 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
     false // Not test mode for cron
   )
 
+  // Store sent messages in database
+  const batchId = generateBatchId()
+  const sentMessageData: SentMessageData[] = members
+    .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
+    .map((m: any) => ({
+      messageType: 'payment_reminder' as const,
+      templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
+      messageContent: `Payment reminder: Balance $${Math.abs(parseFloat(m.balance)).toFixed(0)}`,
+      recipientPhone: formatPhoneNumber(m.phone),
+      recipientName: m.name,
+      recipientMemberId: m.id,
+      status: result.success ? 'sent' : 'failed',
+      batchId
+    }))
+
+  await storeSentMessagesBatch(pool, sentMessageData, batchId)
+
   return { sent: result.sent, failed: result.failed, skipped: result.skipped }
 }
 
@@ -223,6 +241,21 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
       SET status = 'sent', sent_at = NOW(), recipients_count = $1
       WHERE id = $2
     `, [result.sent, notification.id])
+
+    // Store sent messages in database
+    const batchId = generateBatchId()
+    const sentMessageData: SentMessageData[] = members.map((member: any) => ({
+      messageType: 'scheduled' as const,
+      templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
+      messageContent: `📢 ${notification.title}: ${notification.message.substring(0, 100)}...`,
+      recipientPhone: formatPhoneNumber(member.phone),
+      recipientName: member.name,
+      recipientMemberId: member.id,
+      status: result.success ? 'sent' : 'failed',
+      batchId
+    }))
+
+    await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
     totalSent += result.sent
     totalFailed += result.failed

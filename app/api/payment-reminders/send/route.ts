@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { sendBulkPaymentReminders, sendPaymentReminder, formatPhoneNumber } from '@/lib/picky-assist'
 import { corsHeaders } from '@/lib/cors'
+import { storeSentMessagesBatch, storeSentMessage, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
 
@@ -149,6 +150,17 @@ export async function POST(req: NextRequest) {
         account_number
       )
 
+      // Store the sent message
+      await storeSentMessage(pool, {
+        messageType: 'payment_reminder',
+        templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
+        messageContent: `Payment reminder: Balance $${Math.abs(member.balance).toFixed(0)}`,
+        recipientPhone: formatPhoneNumber(targetPhone),
+        recipientName: member.name,
+        recipientMemberId: member.id,
+        status: success ? 'sent' : 'failed'
+      })
+
       if (success) {
         return NextResponse.json({ 
           success: true,
@@ -205,6 +217,23 @@ export async function POST(req: NextRequest) {
       testMode,
       testNumber
     )
+
+    // Store sent messages in database
+    const batchId = generateBatchId()
+    const sentMessageData: SentMessageData[] = members
+      .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
+      .map((m: any) => ({
+        messageType: 'payment_reminder' as const,
+        templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
+        messageContent: `Payment reminder: Balance $${Math.abs(parseFloat(m.balance)).toFixed(0)}`,
+        recipientPhone: formatPhoneNumber(m.phone),
+        recipientName: m.name,
+        recipientMemberId: m.id,
+        status: result.success ? 'sent' : 'failed',
+        batchId
+      }))
+
+    await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
     return NextResponse.json({
       success: result.success,
