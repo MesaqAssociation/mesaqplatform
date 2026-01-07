@@ -97,6 +97,9 @@ export default function MessagingClient() {
   // Mobile state
   const [showConversationList, setShowConversationList] = useState(true)
   
+  // Refresh state (for button animation)
+  const [refreshing, setRefreshing] = useState(false)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Detect mobile on mount
@@ -113,9 +116,17 @@ export default function MessagingClient() {
     loadBalance()
   }, [])
 
+  // Scroll to bottom helper
+  const scrollToBottom = (instant = false) => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'instant' : 'smooth' })
+    }, 50)
+  }
+
+  // Scroll to bottom when messages change (but not when loading older messages)
   useEffect(() => {
     if (!loadingMore && conversationMessages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      scrollToBottom()
     }
   }, [conversationMessages, loadingMore])
 
@@ -210,12 +221,15 @@ export default function MessagingClient() {
           if (silent) {
             const newMessages = data.messages || []
             // Check if messages changed
-            if (JSON.stringify(newMessages.map((m: Message) => m.id)) !== 
-                JSON.stringify(conversationMessages.map(m => m.id))) {
+            const oldIds = conversationMessages.map(m => m.id).join(',')
+            const newIds = newMessages.map((m: Message) => m.id).join(',')
+            if (newIds !== oldIds) {
               setConversationMessages(newMessages)
+              scrollToBottom() // Scroll to bottom on update
             }
           } else {
             setConversationMessages(data.messages || [])
+            scrollToBottom(true) // Instant scroll when opening chat
           }
           setContact(data.contact)
         }
@@ -235,11 +249,16 @@ export default function MessagingClient() {
     }
   }
 
-  // Refresh all - updates both list and current chat silently
+  // Refresh all - updates both list and current chat silently (button still spins)
   const refreshAll = async () => {
-    await loadConversations(false) // Silent refresh
-    if (selectedConversation) {
-      await loadConversationMessages(selectedConversation, false, true) // Silent refresh
+    setRefreshing(true)
+    try {
+      await loadConversations(false) // Silent refresh (no content loading state)
+      if (selectedConversation) {
+        await loadConversationMessages(selectedConversation, false, true) // Silent refresh
+      }
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -471,8 +490,8 @@ export default function MessagingClient() {
   const formatMessageTime = (timestamp: string) => {
     try {
       return new Date(timestamp).toLocaleTimeString('en-AU', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+        hour: '2-digit',
+        minute: '2-digit'
       })
     } catch {
       return ''
@@ -547,9 +566,10 @@ export default function MessagingClient() {
                     variant="ghost" 
                     size="icon"
                     onClick={refreshAll}
+                    disabled={refreshing}
                     title="Refresh conversations"
                   >
-                    <IconRefresh className="size-4" />
+                    <IconRefresh className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
               </div>
@@ -567,7 +587,7 @@ export default function MessagingClient() {
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
                     >
                       <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                        <AvatarFallback>
                           {getInitials(member.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -613,7 +633,7 @@ export default function MessagingClient() {
                         >
                           <Avatar className="h-11 w-11 md:h-12 md:w-12 flex-shrink-0">
                             <AvatarImage src={conv.memberImage || undefined} alt={displayName} />
-                            <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold text-sm md:text-base">
+                            <AvatarFallback>
                               {getInitials(displayName)}
                             </AvatarFallback>
                           </Avatar>
@@ -682,7 +702,7 @@ export default function MessagingClient() {
                     </Button>
                     <Avatar className="h-9 w-9 md:h-10 md:w-10">
                       <AvatarImage src={effectiveImage || undefined} alt={effectiveName || 'Contact'} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold text-sm">
+                      <AvatarFallback>
                         {getInitials(effectiveName)}
                       </AvatarFallback>
                     </Avatar>
@@ -709,10 +729,11 @@ export default function MessagingClient() {
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      onClick={() => loadConversationMessages(selectedConversation, false, true)}
+                      onClick={refreshAll}
+                      disabled={refreshing}
                       title="Refresh conversation"
                     >
-                      <IconRefresh className="size-4" />
+                      <IconRefresh className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
 
@@ -887,40 +908,40 @@ export default function MessagingClient() {
         {/* Bulk Message Tab */}
         <TabsContent value="bulk" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            {/* Member Selection */}
-            <Card>
+        {/* Member Selection */}
+        <Card>
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <IconUsers className="size-5" />
-                  Select Recipients
-                </CardTitle>
+              <IconUsers className="size-5" />
+              Select Recipients
+            </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Choose members to send messages to ({selectedMembers.size} selected)
-                </CardDescription>
-              </CardHeader>
+              Choose members to send messages to ({selectedMembers.size} selected)
+            </CardDescription>
+          </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
-                <div className="space-y-4">
-                  <div className="relative">
-                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
+            <div className="space-y-4">
+              <div className="relative">
+                <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search members..."
                       value={bulkSearchQuery}
                       onChange={(e) => setBulkSearchQuery(e.target.value)}
                       className="pl-9 text-sm"
-                    />
-                  </div>
+                />
+              </div>
 
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Checkbox
-                      id="select-all"
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Checkbox
+                  id="select-all"
                       checked={selectedMembers.size === filteredMembersForBulk.length && filteredMembersForBulk.length > 0}
-                      onCheckedChange={toggleAll}
-                    />
-                    <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                  onCheckedChange={toggleAll}
+                />
+                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
                       Select All ({filteredMembersForBulk.length})
-                    </label>
-                  </div>
+                </label>
+              </div>
 
                   <div className="space-y-2 max-h-[300px] md:max-h-[400px] overflow-y-auto">
                     {loadingMembers ? (
@@ -929,45 +950,45 @@ export default function MessagingClient() {
                       <p className="text-center text-muted-foreground py-4 text-sm">No members found</p>
                     ) : (
                       filteredMembersForBulk.map((member) => (
-                        <div
-                          key={member.id}
-                          className="flex items-start gap-2 p-2 rounded hover:bg-accent cursor-pointer"
-                          onClick={() => toggleMember(member.id)}
-                        >
-                          <Checkbox
-                            checked={selectedMembers.has(member.id)}
-                            onCheckedChange={() => toggleMember(member.id)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1 min-w-0">
+                    <div
+                      key={member.id}
+                      className="flex items-start gap-2 p-2 rounded hover:bg-accent cursor-pointer"
+                      onClick={() => toggleMember(member.id)}
+                    >
+                      <Checkbox
+                        checked={selectedMembers.has(member.id)}
+                        onCheckedChange={() => toggleMember(member.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">{member.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {member.phone} • {member.email}
-                            </div>
-                          </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {member.phone} • {member.email}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Message Composition */}
-            <Card>
+        {/* Message Composition */}
+        <Card>
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg">Compose Message</CardTitle>
                 <CardDescription className="text-xs md:text-sm">
                   Write your message (sent individually to each member via WhatsApp)
-                </CardDescription>
-              </CardHeader>
+            </CardDescription>
+          </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
-                <div className="space-y-4">
+            <div className="space-y-4">
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
                     <p className="font-semibold text-primary text-sm">Salam (Member Name),</p>
                   </div>
                   
-                  <Textarea
+              <Textarea
                     placeholder="Type your message content here..."
                     value={bulkMessage}
                     onChange={(e) => setBulkMessage(e.target.value)}
@@ -977,27 +998,27 @@ export default function MessagingClient() {
 
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
                     <p className="font-semibold text-primary text-sm">Thank you - Mesaq Association</p>
-                  </div>
+              </div>
 
                   {sendingBulk && (
                     <div className="flex items-center justify-center gap-3 py-4">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                       <p className="text-sm text-muted-foreground">Sending messages...</p>
-                    </div>
-                  )}
+                </div>
+              )}
 
-                  <Button 
+              <Button 
                     onClick={handleBulkSend} 
                     disabled={selectedMembers.size === 0 || !bulkMessage.trim() || sendingBulk}
-                    className="w-full"
-                    size="lg"
-                  >
-                    <IconSend className="mr-2 size-4" />
+                className="w-full"
+                size="lg"
+              >
+                <IconSend className="mr-2 size-4" />
                     {sendingBulk ? 'Sending...' : `Send to ${selectedMembers.size} Member(s)`}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
           </div>
         </TabsContent>
 
@@ -1005,15 +1026,15 @@ export default function MessagingClient() {
         <TabsContent value="balance" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             {/* Current Balance */}
-            <Card>
+          <Card>
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                   <IconWallet className="size-5" />
                   Picky Assist Balance
-                </CardTitle>
+                  </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
                   Your current WhatsApp messaging credit balance
-                </CardDescription>
+                  </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
                 <div className="space-y-4">
@@ -1030,25 +1051,25 @@ export default function MessagingClient() {
                     ) : (
                       <p className="text-muted-foreground">Unable to fetch balance</p>
                     )}
-                  </div>
+                </div>
                   
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                <Button 
+                  variant="outline" 
                       onClick={loadBalance}
                       disabled={loadingBalance}
                       className="flex-1"
                     >
                       <IconRefresh className={`size-4 mr-2 ${loadingBalance ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </Button>
+                  Refresh
+                </Button>
                     <Button asChild className="flex-1">
                       <a href="https://app.pickyassist.com/" target="_blank" rel="noopener noreferrer">
                         <IconExternalLink className="size-4 mr-2" />
                         Topup
                       </a>
-                    </Button>
-                  </div>
+                </Button>
+              </div>
                 </div>
               </CardContent>
             </Card>
@@ -1067,7 +1088,7 @@ export default function MessagingClient() {
                       <CardDescription className="text-xs md:text-sm">
                         Step-by-step guide to add credit
                       </CardDescription>
-                    </div>
+                </div>
                     {showTopupGuide ? (
                       <IconChevronDown className="size-5 text-muted-foreground" />
                     ) : (
@@ -1093,7 +1114,7 @@ export default function MessagingClient() {
                         <p className="text-sm font-medium">
                           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs mr-2">
                             {index + 1}
-                          </span>
+                              </span>
                           {step.text}
                         </p>
                         <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
@@ -1103,13 +1124,13 @@ export default function MessagingClient() {
                             fill
                             className="object-contain"
                           />
-                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
+                </div>
                 </CardContent>
               )}
-            </Card>
+          </Card>
           </div>
         </TabsContent>
       </Tabs>
