@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { parseBankStatementPDF } from '@/lib/parseBankStatement'
+import { parseBankStatementPDF, validateTransactionDates } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
@@ -108,6 +108,13 @@ export async function POST(req: NextRequest) {
 
         if (parsed.transactions.length === 0) {
           await sendTelegramMessage(chatId, '❌ No transactions found.')
+          return NextResponse.json({ ok: true })
+        }
+
+        // Validate transaction dates are not too far in the future (max 30 days)
+        const futureDates = validateTransactionDates(parsed.transactions)
+        if (futureDates.length > 0) {
+          await sendTelegramMessage(chatId, `❌ Statement contains transactions with dates too far in the future: ${futureDates.join(', ')}. Please check the statement year.`)
           return NextResponse.json({ ok: true })
         }
 

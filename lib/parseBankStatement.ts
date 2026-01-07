@@ -19,6 +19,35 @@ export type ParsedStatement = {
 }
 
 /**
+ * Validate that a date is not more than 30 days in the future
+ */
+export function isDateTooFarInFuture(dateStr: string): boolean {
+  const date = new Date(dateStr)
+  const maxFutureDate = new Date()
+  maxFutureDate.setDate(maxFutureDate.getDate() + 30)
+  return date > maxFutureDate
+}
+
+/**
+ * Check if statement has transactions too far in the future
+ * Returns list of invalid transaction dates if any
+ */
+export function validateTransactionDates(transactions: ParsedTransaction[]): string[] {
+  const invalidDates: string[] = []
+  const maxFutureDate = new Date()
+  maxFutureDate.setDate(maxFutureDate.getDate() + 30)
+  
+  for (const txn of transactions) {
+    const txnDate = new Date(txn.date)
+    if (txnDate > maxFutureDate) {
+      invalidDates.push(txn.date)
+    }
+  }
+  
+  return [...new Set(invalidDates)] // Return unique dates
+}
+
+/**
  * Parse bank statement PDF
  * Handles common Australian bank formats including:
  * - CommBank, NAB, Westpac, ANZ formats
@@ -101,7 +130,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     
     // Check if this line starts with a date (DD Mon or DD Mon YYYY)
     // Note: There may be no space between month and transaction name
-    const dateMatch = line.match(/^(\d{1,2}\s+\w{3})(?:\s+\d{4})?\s*(.+)/)
+    // Capture the full date including year if present
+    const dateMatch = line.match(/^(\d{1,2}\s+\w{3}(?:\s+\d{2,4})?)\s*(.+)/)
     
     if (dateMatch) {
       const dateStr = dateMatch[1]
@@ -251,7 +281,6 @@ function parseAUDate(dateStr: string, statementPeriod?: { from: string; to: stri
   // Handle formats: DD/MM/YYYY, DD/MM/YY, DD MMM YYYY, DD-MM-YYYY, etc.
   const cleaned = dateStr.trim().replace(/\s+/g, ' ')
   
-  // Try DD MMM YYYY (01 Jan 2025, 01 Oct 2025)
   const monthNames: { [key: string]: string } = {
     jan: '01', january: '01',
     feb: '02', february: '02',
@@ -267,29 +296,62 @@ function parseAUDate(dateStr: string, statementPeriod?: { from: string; to: stri
     dec: '12', december: '12',
   }
 
+  // Try DD MMM YYYY (01 Jan 2025, 01 Oct 2025) - with optional year
   const monthMatch = cleaned.match(/(\d{1,2})[\s\/-](\w{3,9})(?:[\s\/-](\d{2,4}))?/i)
   if (monthMatch) {
     const day = monthMatch[1].padStart(2, '0')
     const monthStr = monthMatch[2].toLowerCase()
     let year = monthMatch[3]
     
-    // If no year provided, infer from statement period
-    if (!year && statementPeriod) {
-      const toYear = statementPeriod.to.split('-')[0]
-      year = toYear
-    } else if (!year) {
-      // Fallback to current year
-      year = new Date().getFullYear().toString()
+    const month = monthNames[monthStr]
+    if (!month) {
+      // Invalid month name
+      console.warn(`Invalid month name: "${monthStr}"`)
+      return new Date().toISOString().split('T')[0]
+    }
+    
+    // If no year provided, infer intelligently
+    if (!year) {
+      if (statementPeriod) {
+        // Use statement period year, but check if month makes sense
+        const periodEndYear = parseInt(statementPeriod.to.split('-')[0])
+        const periodEndMonth = parseInt(statementPeriod.to.split('-')[1])
+        const periodStartYear = parseInt(statementPeriod.from.split('-')[0])
+        const periodStartMonth = parseInt(statementPeriod.from.split('-')[1])
+        const txnMonth = parseInt(month)
+        
+        // If transaction month is within period, use appropriate year
+        if (periodStartYear === periodEndYear) {
+          year = periodEndYear.toString()
+        } else {
+          // Statement spans years (e.g., Dec 2024 to Jan 2025)
+          // Use end year if month <= end month, else use start year
+          if (txnMonth <= periodEndMonth) {
+            year = periodEndYear.toString()
+          } else {
+            year = periodStartYear.toString()
+          }
+        }
+      } else {
+        // No statement period - use current year but check if date would be in future
+        const currentYear = new Date().getFullYear()
+        const currentMonth = new Date().getMonth() + 1
+        const txnMonth = parseInt(month)
+        
+        // If the month is more than 1 month ahead, assume previous year
+        if (txnMonth > currentMonth + 1) {
+          year = (currentYear - 1).toString()
+        } else {
+          year = currentYear.toString()
+        }
+      }
     } else if (year.length === 2) {
       // Convert 2-digit year to 4-digit
       const yearNum = parseInt(year)
       year = yearNum <= 50 ? `20${year}` : `19${year}`
     }
     
-    const month = monthNames[monthStr]
-    if (month) {
-      return `${year}-${month}-${day}`
-    }
+    return `${year}-${month}-${day}`
   }
 
   // Try DD/MM/YYYY or DD/MM/YY
@@ -301,7 +363,6 @@ function parseAUDate(dateStr: string, statementPeriod?: { from: string; to: stri
     // Convert 2-digit year to 4-digit
     if (year.length === 2) {
       const yearNum = parseInt(year)
-      // If year is 00-50, assume 2000-2050, if 51-99, assume 1951-1999
       year = yearNum <= 50 ? `20${year}` : `19${year}`
     }
     return `${year}-${month}-${day}`

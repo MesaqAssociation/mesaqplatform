@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { parseBankStatementPDF } from '@/lib/parseBankStatement'
+import { parseBankStatementPDF, validateTransactionDates } from '@/lib/parseBankStatement'
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
@@ -54,6 +54,14 @@ export async function POST(req: NextRequest) {
     if (parsed.transactions.length === 0) {
       return NextResponse.json({
         error: 'No transactions found in the statement. Please ensure the PDF is a valid bank statement.'
+      }, { status: 400 })
+    }
+
+    // Validate transaction dates are not too far in the future (max 30 days)
+    const futureDates = validateTransactionDates(parsed.transactions)
+    if (futureDates.length > 0) {
+      return NextResponse.json({
+        error: `Statement contains transactions with dates too far in the future: ${futureDates.join(', ')}. Please check the statement year.`
       }, { status: 400 })
     }
 
