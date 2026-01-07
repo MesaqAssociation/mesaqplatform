@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
       .map(member => ({
         messageType: 'admin_message' as const,
         templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-        // Store the FULL message including template wrapper
-        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nKind Regards - Mesaq Association`,
+        // Store the FULL message including template wrapper (English + Persian)
+        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nKind Regards - Mesaq Association\n----------\nسلام ${member.name}،\n\n${message.trim()}\n\nتشکر – انجمن میثاق`,
         recipientPhone: formatPhoneNumber(member.phone),
         recipientName: member.name,
         recipientMemberId: member.id,

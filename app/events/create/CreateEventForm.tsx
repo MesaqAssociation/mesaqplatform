@@ -72,32 +72,61 @@ export default function CreateEventForm() {
 
 
   // Generate time options in 15-minute increments (12-hour format)
-  const generateTimeOptions = () => {
+  // Start times: 00:15 to 23:45 (no midnight start)
+  // End times: Include midnight at the END of the list
+  const generateTimeOptions = (forEndTime: boolean = false, startTime?: string) => {
     const times: { value: string; label: string }[] = []
+    
+    // Generate times from 00:00 to 23:45
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
         const h24 = hour.toString().padStart(2, '0')
         const m = minute.toString().padStart(2, '0')
         const value = `${h24}:${m}`
         
+        // Skip midnight for start time
+        if (!forEndTime && value === '00:00') continue
+        
         // Convert to 12-hour format for display
         const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
         const period = hour < 12 ? 'AM' : 'PM'
-        const label = `${h12}:${m} ${period}`
+        const label = value === '00:00' ? '12:00 AM (Midnight)' : `${h12}:${m.toString().padStart(2, '0')} ${period}`
         
         times.push({ value, label })
       }
     }
+    
+    // For end time, filter and reorder
+    if (forEndTime && startTime) {
+      // Filter times after start time, treating 00:00 as 24:00 for comparison
+      const filtered = times.filter(t => {
+        const tValue = t.value === '00:00' ? '24:00' : t.value
+        return tValue > startTime
+      })
+      
+      // Move midnight to the end if it exists
+      const midnightIndex = filtered.findIndex(t => t.value === '00:00')
+      if (midnightIndex > -1) {
+        const [midnight] = filtered.splice(midnightIndex, 1)
+        filtered.push(midnight)
+      }
+      
+      return filtered
+    }
+    
     return times
   }
 
-  const timeOptions = generateTimeOptions()
+  const startTimeOptions = generateTimeOptions(false)
+  const endTimeOptions = generateTimeOptions(true, formData.start_time)
 
   // Get valid times for agenda items (between start and end time)
   const getValidAgendaTimes = () => {
     const start = formData.start_time
     const end = formData.end_time
-    return timeOptions.filter(time => time.value >= start && time.value <= end)
+    // Treat 00:00 as 24:00 for comparison
+    const endCompare = end === '00:00' ? '24:00' : end
+    return startTimeOptions.filter(time => time.value >= start && time.value <= endCompare)
   }
 
   function addAgendaItem() {
@@ -333,7 +362,7 @@ export default function CreateEventForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {timeOptions.map(time => (
+              {startTimeOptions.map(time => (
                 <SelectItem key={time.value} value={time.value}>
                   {time.label}
                 </SelectItem>
@@ -351,7 +380,7 @@ export default function CreateEventForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {timeOptions.map(time => (
+              {endTimeOptions.map(time => (
                 <SelectItem key={time.value} value={time.value}>
                   {time.label}
                 </SelectItem>

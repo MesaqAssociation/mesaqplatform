@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { IconPlus, IconBell, IconTrash, IconSend, IconCheck, IconX, IconClock, IconCalendarEvent, IconMapPin } from '@tabler/icons-react'
+import { IconPlus, IconBell, IconTrash, IconSend, IconCheck, IconX, IconClock, IconCalendarEvent, IconMapPin, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Notification = {
@@ -30,7 +29,8 @@ type Event = {
   title: string
   description: string | null
   event_date: string
-  event_time: string | null
+  start_time: string | null
+  end_time: string | null
   address: string | null
   organizing_group: string | null
 }
@@ -44,6 +44,14 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [creating, setCreating] = useState(false)
   
+  // Calendar navigation state
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  
+  // Popover state for day click
+  const [popoverDate, setPopoverDate] = useState<Date | null>(null)
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
+  const popoverRef = useRef<HTMLDivElement>(null)
+  
   // Form state
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
@@ -52,9 +60,19 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     loadData()
   }, [])
 
+  // Close popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setPopoverDate(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const loadData = async () => {
     try {
-      // Load notifications and events in parallel
       const [notifRes, eventsRes] = await Promise.all([
         fetch('/api/notifications'),
         fetch('/api/events')
@@ -67,10 +85,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       
       if (eventsRes.ok) {
         const data = await eventsRes.json()
-        // Only show future events
-        const today = new Date().toISOString().split('T')[0]
-        const futureEvents = (data.events || []).filter((e: Event) => e.event_date >= today)
-        setEvents(futureEvents)
+        setEvents(data.events || [])
       }
     } catch (err) {
       console.error('Failed to load data:', err)
@@ -111,6 +126,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         setTitle('')
         setMessage('')
         setSelectedDate(undefined)
+        setPopoverDate(null)
         loadData()
       } else {
         const data = await res.json()
@@ -138,9 +154,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to permanently delete this notification? This cannot be undone.')) {
-      return
-    }
+    if (!confirm('Are you sure you want to permanently delete this notification?')) return
     try {
       const res = await fetch(`/api/notifications?id=${id}&action=delete`, { method: 'DELETE' })
       if (res.ok) {
@@ -153,13 +167,6 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       showToast('Failed to delete notification', 'error')
     }
   }
-
-  // Get dates that have notifications or events for highlighting
-  const notificationDates = notifications
-    .filter(n => n.status === 'pending')
-    .map(n => new Date(n.scheduled_date))
-  
-  const eventDates = events.map(e => new Date(e.event_date))
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-AU', {
@@ -186,22 +193,81 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200"><IconClock className="size-3 mr-1" />Pending</Badge>
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs"><IconClock className="size-3 mr-1" />Pending</Badge>
       case 'sent':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><IconCheck className="size-3 mr-1" />Sent</Badge>
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs"><IconCheck className="size-3 mr-1" />Sent</Badge>
       case 'failed':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><IconX className="size-3 mr-1" />Failed</Badge>
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs"><IconX className="size-3 mr-1" />Failed</Badge>
       case 'cancelled':
-        return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">Cancelled</Badge>
+        return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 text-xs">Cancelled</Badge>
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge variant="outline" className="text-xs">{status}</Badge>
     }
   }
 
-  // Sort upcoming items by date
-  const upcomingEvents = [...events].sort((a, b) => 
-    new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
-  ).slice(0, 5)
+  // Calendar helpers
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const days: (Date | null)[] = []
+    
+    // Add empty slots for days before the first day of the month
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push(null)
+    }
+    
+    // Add all days of the month
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      days.push(new Date(year, month, i))
+    }
+    
+    return days
+  }
+
+  const formatDateKey = (date: Date) => date.toISOString().split('T')[0]
+
+  const getEventsForDate = (date: Date) => {
+    const dateKey = formatDateKey(date)
+    return events.filter(e => e.event_date === dateKey)
+  }
+
+  const getNotificationsForDate = (date: Date) => {
+    const dateKey = formatDateKey(date)
+    return notifications.filter(n => n.scheduled_date === dateKey && n.status === 'pending')
+  }
+
+  const hasEvents = (date: Date) => getEventsForDate(date).length > 0
+  const hasNotifications = (date: Date) => getNotificationsForDate(date).length > 0
+
+  const handleDayClick = (date: Date, event: React.MouseEvent) => {
+    const rect = (event.target as HTMLElement).getBoundingClientRect()
+    setPopoverPosition({
+      top: rect.bottom + window.scrollY + 8,
+      left: Math.min(rect.left + window.scrollX, window.innerWidth - 320)
+    })
+    setPopoverDate(date)
+  }
+
+  const openScheduleDialog = () => {
+    if (popoverDate) {
+      setSelectedDate(popoverDate)
+      setPopoverDate(null)
+      setShowCreateDialog(true)
+    }
+  }
+
+  const days = getDaysInMonth(currentMonth)
+  const monthName = currentMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Get upcoming events for sidebar
+  const upcomingEvents = [...events]
+    .filter(e => new Date(e.event_date) >= today)
+    .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+    .slice(0, 5)
 
   return (
     <div className="p-4 md:p-6">
@@ -210,62 +276,95 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
           <h1 className="text-2xl font-semibold">Calendar & Notifications</h1>
           <p className="text-muted-foreground text-sm mt-1">Schedule messages and view upcoming events</p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <IconPlus className="mr-2 size-4" />
-            Schedule Notification
-          </Button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Section */}
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Calendar</CardTitle>
-            <CardDescription>Click a date to schedule a notification</CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Calendar</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                >
+                  <IconChevronLeft className="size-4" />
+                </Button>
+                <span className="font-medium min-w-[140px] text-center">{monthName}</span>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                >
+                  <IconChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => {
-                setSelectedDate(date)
-                if (date && isAdmin) {
-                  setShowCreateDialog(true)
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((date, i) => {
+                if (!date) {
+                  return <div key={`empty-${i}`} className="aspect-square" />
                 }
-              }}
-              modifiers={{
-                hasNotification: notificationDates,
-                hasEvent: eventDates
-              }}
-              modifiersStyles={{
-                hasNotification: {
-                  backgroundColor: 'hsl(var(--primary) / 0.15)',
-                  fontWeight: 'bold'
-                },
-                hasEvent: {
-                  border: '2px solid hsl(var(--primary))',
-                  borderRadius: '50%'
-                }
-              }}
-              className="rounded-md border w-full"
-            />
-            <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-primary/15"></div>
-                <span>Notification</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full border-2 border-primary"></div>
+                
+                const isToday = formatDateKey(date) === formatDateKey(today)
+                const hasEvt = hasEvents(date)
+                const hasNotif = hasNotifications(date)
+                const isSelected = popoverDate && formatDateKey(date) === formatDateKey(popoverDate)
+                
+                return (
+                  <button
+                    key={formatDateKey(date)}
+                    onClick={(e) => handleDayClick(date, e)}
+                    className={`
+                      aspect-square p-1 rounded-full flex flex-col items-center justify-center relative
+                      hover:bg-muted/80 transition-colors text-sm
+                      ${isToday ? 'bg-primary text-primary-foreground font-bold' : ''}
+                      ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}
+                    `}
+                  >
+                    <span>{date.getDate()}</span>
+                    {/* Dots indicator */}
+                    {(hasEvt || hasNotif) && (
+                      <div className="flex gap-0.5 absolute bottom-1">
+                        {hasEvt && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                        {hasNotif && <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            
+            {/* Legend */}
+            <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground border-t pt-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                 <span>Event</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <span>Scheduled Message</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Main Content Area */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Sidebar */}
+        <div className="space-y-6">
           {/* Upcoming Events */}
           <Card>
             <CardHeader className="pb-2">
@@ -273,58 +372,34 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 <IconCalendarEvent className="size-5" />
                 Upcoming Events
               </CardTitle>
-              <CardDescription>Events scheduled for the future</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {[1, 2].map(i => (
-                    <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                    <div key={i} className="h-16 bg-muted/50 rounded animate-pulse" />
                   ))}
                 </div>
               ) : upcomingEvents.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <IconCalendarEvent className="size-10 mx-auto mb-2 opacity-20" />
-                  <p>No upcoming events</p>
-                </div>
+                <p className="text-sm text-muted-foreground text-center py-4">No upcoming events</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {upcomingEvents.map((event) => (
                     <div 
                       key={event.id} 
-                      className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => router.push(`/events/${event.id}`)}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{event.title}</h3>
-                          {event.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{event.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>📅 {formatDate(event.event_date)}</span>
-                            {event.event_time && <span>🕐 {formatTime(event.event_time)}</span>}
-                            {event.organizing_group && (
-                              <Badge variant="outline" className="text-xs">{event.organizing_group}</Badge>
-                            )}
-                          </div>
-                          {event.address && (
-                            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                              <IconMapPin className="size-3" />
-                              <span className="truncate">{event.address}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <h4 className="font-medium text-sm truncate">{event.title}</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDate(event.event_date)}
+                        {event.start_time && ` • ${formatTime(event.start_time)}`}
+                      </p>
                     </div>
                   ))}
-                  {events.length > 5 && (
-                    <Button 
-                      variant="ghost" 
-                      className="w-full" 
-                      onClick={() => router.push('/events')}
-                    >
-                      View all {events.length} events
+                  {events.filter(e => new Date(e.event_date) >= today).length > 5 && (
+                    <Button variant="ghost" size="sm" className="w-full" onClick={() => router.push('/events')}>
+                      View all events
                     </Button>
                   )}
                 </div>
@@ -332,81 +407,36 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
             </CardContent>
           </Card>
 
-          {/* Scheduled Notifications */}
+          {/* Pending Notifications */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <IconBell className="size-5" />
-                Scheduled Notifications
+                Pending Messages
               </CardTitle>
-              <CardDescription>Messages scheduled to be sent to all members</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {[1, 2].map(i => (
-                    <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                    <div key={i} className="h-16 bg-muted/50 rounded animate-pulse" />
                   ))}
                 </div>
-              ) : notifications.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <IconBell className="size-10 mx-auto mb-2 opacity-20" />
-                  <p>No notifications scheduled</p>
-                  {isAdmin && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-3"
-                      onClick={() => setShowCreateDialog(true)}
-                    >
-                      Create your first notification
-                    </Button>
-                  )}
-                </div>
+              ) : notifications.filter(n => n.status === 'pending').length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No pending messages</p>
               ) : (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {notifications.map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={`p-4 border rounded-lg ${notification.status === 'cancelled' ? 'opacity-50' : ''}`}
-                    >
-                      <div className="flex justify-between items-start gap-4">
+                <div className="space-y-2">
+                  {notifications.filter(n => n.status === 'pending').slice(0, 5).map((notif) => (
+                    <div key={notif.id} className="p-3 border rounded-lg">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium truncate">{notification.title}</h3>
-                            {getStatusBadge(notification.status)}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>📅 {formatDate(notification.scheduled_date)}</span>
-                            {notification.sent_at && (
-                              <span>✉️ Sent to {notification.recipients_count} members</span>
-                            )}
-                          </div>
+                          <h4 className="font-medium text-sm truncate">{notif.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.scheduled_date)}</p>
                         </div>
                         {isAdmin && (
-                          <div className="flex gap-1">
-                            {notification.status === 'pending' && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => handleCancel(notification.id)}
-                            title="Cancel notification"
-                              >
-                                <IconX className="size-4 text-muted-foreground hover:text-orange-500" />
-                              </Button>
-                            )}
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleDelete(notification.id)}
-                              title="Delete notification permanently"
-                          >
-                            <IconTrash className="size-4 text-muted-foreground hover:text-destructive" />
+                          <Button variant="ghost" size="icon" className="size-7" onClick={() => handleCancel(notif.id)}>
+                            <IconX className="size-3" />
                           </Button>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -418,30 +448,94 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
 
+      {/* Day Popover */}
+      {popoverDate && (
+        <div 
+          ref={popoverRef}
+          className="fixed z-50 bg-popover border rounded-lg shadow-lg p-4 w-80"
+          style={{ top: popoverPosition.top, left: popoverPosition.left }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">
+              {popoverDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h3>
+            <Button variant="ghost" size="icon" className="size-6" onClick={() => setPopoverDate(null)}>
+              <IconX className="size-4" />
+            </Button>
+          </div>
+          
+          {/* Events for this day */}
+          {getEventsForDate(popoverDate).length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-blue-500" /> Events
+              </p>
+              <div className="space-y-2">
+                {getEventsForDate(popoverDate).map(event => (
+                  <div 
+                    key={event.id} 
+                    className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/50"
+                    onClick={() => router.push(`/events/${event.id}`)}
+                  >
+                    <p className="font-medium truncate">{event.title}</p>
+                    {event.start_time && (
+                      <p className="text-xs text-muted-foreground">{formatTime(event.start_time)} - {formatTime(event.end_time)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Notifications for this day */}
+          {getNotificationsForDate(popoverDate).length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-yellow-500" /> Scheduled Messages
+              </p>
+              <div className="space-y-2">
+                {getNotificationsForDate(popoverDate).map(notif => (
+                  <div key={notif.id} className="p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium truncate flex-1">{notif.title}</p>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" className="size-5" onClick={() => handleCancel(notif.id)}>
+                          <IconX className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* No items message */}
+          {getEventsForDate(popoverDate).length === 0 && getNotificationsForDate(popoverDate).length === 0 && (
+            <p className="text-sm text-muted-foreground mb-3">No events or messages scheduled</p>
+          )}
+          
+          {/* Schedule button */}
+          {isAdmin && (
+            <Button className="w-full" size="sm" onClick={openScheduleDialog}>
+              <IconPlus className="mr-2 size-4" />
+              Schedule Message
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Create Notification Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Schedule Notification</DialogTitle>
             <DialogDescription>
-              Create a message to be sent to all members on the selected date
+              Send a message to all members on {selectedDate?.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 pt-4">
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <div className="mt-1">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date()}
-                  className="rounded-md border"
-                />
-              </div>
-            </div>
-
+          <div className="space-y-4 pt-2">
             <div>
               <Label htmlFor="title">Title *</Label>
               <Input
@@ -478,7 +572,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 className="flex-1"
               >
                 <IconSend className="mr-2 size-4" />
-                {creating ? 'Scheduling...' : 'Schedule Notification'}
+                {creating ? 'Scheduling...' : 'Schedule'}
               </Button>
               <Button 
                 variant="outline" 

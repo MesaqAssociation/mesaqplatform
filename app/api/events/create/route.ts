@@ -172,8 +172,8 @@ export async function POST(req: NextRequest) {
                   return {
                     messageType: 'event_notification' as const,
                     templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                    // Store FULL template message content matching the actual WhatsApp template
-                    messageContent: `Salam ${m.name},\nA new event has been created: ${title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association`,
+                    // Store FULL template message content matching the actual WhatsApp template (English + Persian)
+                    messageContent: `Salam ${m.name},\nA new event has been created: ${title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nانجمن میثاق یک برنامه جدید را برگزار می کند: ${title} - ${formattedDate}.\n\nشما این پیام را دریافت کرده‌اید چون عضو ${organizing_group} هستید؛ گروه شما مسئول مدیریت این برنامه می‌باشد. لطفا با اعضای دیگر گروه در تماس شوید.\n\nاعضای دیگر گروه: ${otherMembers}\n\nتشکر – انجمن میثاق`,
                     recipientPhone: formatPhoneNumber(m.phone),
                     recipientName: m.name,
                     recipientMemberId: m.id,

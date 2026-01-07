@@ -607,6 +607,22 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       await sendTelegramMessage(chatId, '💰 What is the total cost for this event? (Enter amount in dollars, or type "0" for free):')
     }
   }
+  // Handle back to year selection
+  else if (data === 'back_to_year') {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      state.step = 'date_year'
+      await showDateSelection(chatId)
+    }
+  }
+  // Handle back to month selection
+  else if (data === 'back_to_month') {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      state.step = 'date_month'
+      await showMonthSelection(chatId)
+    }
+  }
   // Confirm creation
   else if (data === 'confirm_yes') {
     const state = userStates.get(chatId)
@@ -793,7 +809,7 @@ async function showNotifyOption(chatId: number): Promise<void> {
   await sendTelegramMessage(chatId, '📱 Send WhatsApp notifications to organizing group members?', { reply_markup: keyboard })
 }
 
-// Show date selection - year first
+// Show date selection - year first (dynamic, always shows current and next 2 years)
 async function showDateSelection(chatId: number): Promise<void> {
   const currentYear = new Date().getFullYear()
   const keyboard = {
@@ -801,31 +817,34 @@ async function showDateSelection(chatId: number): Promise<void> {
       [
         { text: `${currentYear}`, callback_data: `year_${currentYear}` },
         { text: `${currentYear + 1}`, callback_data: `year_${currentYear + 1}` },
+        { text: `${currentYear + 2}`, callback_data: `year_${currentYear + 2}` },
       ],
     ],
   }
   await sendTelegramMessage(chatId, '📆 Select year:', { reply_markup: keyboard })
 }
 
-// Show month selection
+// Show month selection with back button
 async function showMonthSelection(chatId: number): Promise<void> {
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ]
   const buttons = []
-  for (let i = 0; i < 12; i += 3) {
+  for (let i = 0; i < 12; i += 4) {
     const row = []
-    for (let j = i; j < i + 3 && j < 12; j++) {
+    for (let j = i; j < i + 4 && j < 12; j++) {
       row.push({ text: months[j], callback_data: `month_${j + 1}` })
     }
     buttons.push(row)
   }
+  // Add back button
+  buttons.push([{ text: '⬅️ Back to Year', callback_data: 'back_to_year' }])
   const keyboard = { inline_keyboard: buttons }
   await sendTelegramMessage(chatId, '📆 Select month:', { reply_markup: keyboard })
 }
 
-// Show day selection
+// Show day selection with back button
 async function showDaySelection(chatId: number, year: number, month: number): Promise<void> {
   const daysInMonth = new Date(year, month, 0).getDate()
   const buttons = []
@@ -836,6 +855,8 @@ async function showDaySelection(chatId: number, year: number, month: number): Pr
     }
     buttons.push(row)
   }
+  // Add back button
+  buttons.push([{ text: '⬅️ Back to Month', callback_data: 'back_to_month' }])
   const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
                       'July', 'August', 'September', 'October', 'November', 'December']
   const keyboard = { inline_keyboard: buttons }
@@ -844,23 +865,42 @@ async function showDaySelection(chatId: number, year: number, month: number): Pr
 
 // Show time selection
 async function showTimeSelection(chatId: number, type: 'start' | 'end', startTime?: string): Promise<void> {
-  const times = [
+  // Start times: 8:00 AM to 11:00 PM (no midnight)
+  const startTimes = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
     '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
     '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
-    '20:00', '20:30', '21:00', '21:30', '22:00'
+    '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00'
   ]
   
-  // Filter times for end time selection (only show times after start time)
-  let availableTimes = times
-  if (type === 'end' && startTime) {
-    availableTimes = times.filter(t => t > startTime)
+  // End times: Include midnight (00:00) which represents end of day
+  const endTimes = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+    '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', 
+    '23:00', '23:30', '00:00'  // Midnight at the end
+  ]
+  
+  let availableTimes: string[]
+  if (type === 'start') {
+    availableTimes = startTimes
+  } else {
+    // For end time, filter to show times after start time
+    // Treat 00:00 (midnight) as 24:00 for comparison purposes
+    availableTimes = endTimes.filter(t => {
+      if (!startTime) return true
+      const tValue = t === '00:00' ? '24:00' : t
+      return tValue > startTime
+    })
   }
   
   // Convert to 12-hour format for display
   const formatTime = (t: string) => {
     const [h, m] = t.split(':').map(Number)
+    if (t === '00:00') return '12:00AM (Midnight)'
     const period = h >= 12 ? 'PM' : 'AM'
     const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
     return `${hour12}:${m.toString().padStart(2, '0')}${period}`
@@ -1159,8 +1199,8 @@ async function createEvent(chatId: number, data: any): Promise<void> {
                   return {
                     messageType: 'event_notification' as const,
                     templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                    // Store FULL template message content matching the actual WhatsApp template
-                    messageContent: `Salam ${m.name},\nA new event has been created: ${data.title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${data.organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association`,
+                    // Store FULL template message content matching the actual WhatsApp template (English + Persian)
+                    messageContent: `Salam ${m.name},\nA new event has been created: ${data.title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${data.organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nانجمن میثاق یک برنامه جدید را برگزار می کند: ${data.title} - ${formattedDate}.\n\nشما این پیام را دریافت کرده‌اید چون عضو ${data.organizing_group} هستید؛ گروه شما مسئول مدیریت این برنامه می‌باشد. لطفا با اعضای دیگر گروه در تماس شوید.\n\nاعضای دیگر گروه: ${otherMembers}\n\nتشکر – انجمن میثاق`,
                     recipientPhone: formatPhoneNumber(m.phone),
                     recipientName: m.name,
                     recipientMemberId: m.id,

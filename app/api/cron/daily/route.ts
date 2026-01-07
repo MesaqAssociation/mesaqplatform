@@ -184,7 +184,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
     .map((m: any) => ({
       messageType: 'payment_reminder' as const,
       templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-      messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association`,
+      messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nشما فعلاً $${Math.abs(parseFloat(m.balance)).toFixed(0)} بابت حق العضویت انجمن میثاق عقب هستید.\n\nلطفاً هرچه زودتر پرداخت کنید و شماره تلفن خود را در توضیح بنویسید:\n\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nتشکر – انجمن میثاق`,
       recipientPhone: formatPhoneNumber(m.phone),
       recipientName: m.name,
       recipientMemberId: m.id,
