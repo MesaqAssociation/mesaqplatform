@@ -118,11 +118,18 @@ export async function GET(
     // Reverse to get chronological order (oldest first in the returned array)
     const chronologicalMessages = messages.reverse()
 
+    // Helper to clean attachment placeholder text
+    const cleanMessage = (msg: string | null) => {
+      if (!msg) return ''
+      // Remove [Image attachment], [Media attachment], etc.
+      return msg.replace(/\[(Image|Video|Audio|Document|Media) attachment\]/gi, '').trim()
+    }
+
     return NextResponse.json({
       contact,
       messages: chronologicalMessages.map(m => ({
         id: m.id,
-        message: m.message,
+        message: cleanMessage(m.message),
         messageType: m.message_type,
         mediaUrl: m.media_url,
         mediaType: m.media_type,

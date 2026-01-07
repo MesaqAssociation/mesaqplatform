@@ -71,10 +71,7 @@ export async function POST(req: NextRequest) {
     else if (body.type === 5) messageType = 'document'
     else if (mediaUrl) messageType = 'media' // Fallback if has media URL
 
-    // For media messages without text, set a descriptive message
-    if (!messageText && mediaUrl) {
-      messageText = `[${messageType.charAt(0).toUpperCase() + messageType.slice(1)} attachment]`
-    }
+    // For media messages without text, leave message empty (UI will handle display)
 
     // Store in database
     const { rows } = await pool.query(`

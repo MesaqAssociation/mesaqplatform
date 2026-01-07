@@ -97,16 +97,26 @@ export async function GET(req: NextRequest) {
       LIMIT 100
     `)
 
+    // Helper to clean attachment placeholder text
+    const cleanMessage = (msg: string | null) => {
+      if (!msg) return ''
+      // Remove [Image attachment], [Media attachment], etc.
+      let cleaned = msg.replace(/\[(Image|Video|Audio|Document|Media) attachment\]/gi, '').trim()
+      if (!cleaned) cleaned = '📎 Media'
+      return cleaned.substring(0, 100) + (cleaned.length > 100 ? '...' : '')
+    }
+
     return NextResponse.json({
       conversations: conversations.map(c => ({
         phoneKey: c.phone_key,
         displayPhone: c.display_phone,
-        contactName: c.contact_name || c.member_name,
+        // Priority: member_name (if matched) > contact_name from message
+        contactName: c.member_name || c.contact_name,
         memberId: c.member_id,
         memberName: c.member_name,
         memberCode: c.member_code,
         memberImage: c.member_image,
-        lastMessage: c.last_message?.substring(0, 100) + (c.last_message?.length > 100 ? '...' : ''),
+        lastMessage: cleanMessage(c.last_message),
         lastTimestamp: c.timestamp,
         lastDirection: c.last_direction,
         lastStatus: c.last_status,
