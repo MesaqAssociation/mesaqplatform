@@ -14,8 +14,9 @@ const pool = new Pool({
 
 /**
  * POST /api/messaging/send-direct
- * Send a direct WhatsApp message (session message, not template)
- * Only works within 24 hours of the last incoming message from the recipient
+ * Send a direct WhatsApp message to a member OR any phone number
+ * - If within 24h of last incoming message: sends free text
+ * - Otherwise: sends via admin message template
  */
 export async function POST(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
@@ -36,24 +37,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { memberId, message } = await req.json()
+    const { memberId, phoneNumber, contactName, message } = await req.json()
 
-    if (!memberId || !message?.trim()) {
-      return NextResponse.json({ error: 'Member ID and message required' }, { status: 400 })
+    if (!message?.trim()) {
+      return NextResponse.json({ error: 'Message required' }, { status: 400 })
     }
 
-    // Get member info
-    const { rows: memberRows } = await pool.query(
-      'SELECT id, name, phone FROM users WHERE id = $1',
-      [memberId]
-    )
-
-    if (memberRows.length === 0 || !memberRows[0].phone) {
-      return NextResponse.json({ error: 'Member not found or no phone number' }, { status: 404 })
+    if (!memberId && !phoneNumber) {
+      return NextResponse.json({ error: 'Member ID or phone number required' }, { status: 400 })
     }
 
-    const member = memberRows[0]
-    const phone = formatPhoneNumber(member.phone)
+    let phone: string
+    let recipientName: string
+    let recipientMemberId: string | null = null
+
+    if (memberId) {
+      // Get member info
+      const { rows: memberRows } = await pool.query(
+        'SELECT id, name, phone FROM users WHERE id = $1',
+        [memberId]
+      )
+
+      if (memberRows.length === 0 || !memberRows[0].phone) {
+        return NextResponse.json({ error: 'Member not found or no phone number' }, { status: 404 })
+      }
+
+      phone = formatPhoneNumber(memberRows[0].phone)
+      recipientName = memberRows[0].name
+      recipientMemberId = memberRows[0].id
+    } else {
+      // Use provided phone number directly
+      phone = formatPhoneNumber(phoneNumber)
+      recipientName = contactName || phoneNumber
+      
+      // Try to find matching member by phone
+      const phoneKey = phone.replace(/\D/g, '').slice(-9)
+      const { rows: matchedMember } = await pool.query(`
+        SELECT id, name FROM users 
+        WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = $1
+        LIMIT 1
+      `, [phoneKey])
+      
+      if (matchedMember.length > 0) {
+        recipientMemberId = matchedMember[0].id
+        recipientName = matchedMember[0].name
+      }
+    }
 
     // Check if within 24-hour window (last incoming message from this number)
     const phoneKey = phone.replace(/\D/g, '').slice(-9)
@@ -75,16 +104,19 @@ export async function POST(req: NextRequest) {
     }
 
     let success = false
-    let sentMessage = message.trim()
+    const userMessage = message.trim()
+    let fullMessageContent: string
 
     if (canSendFreeText) {
       // Send session message (free text)
+      fullMessageContent = userMessage
+      
       const payload = {
         token: apiKey,
         application: parseInt(applicationId),
         data: [{
           number: phone,
-          message: sentMessage
+          message: userMessage
         }]
       }
 
@@ -103,13 +135,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Admin message template not configured' }, { status: 400 })
       }
 
+      // Store the FULL message including template wrapper
+      fullMessageContent = `Salam ${recipientName},\n\n${userMessage}\n\nThank you - Mesaq Association`
+
       const payload = {
         token: apiKey,
         application: parseInt(applicationId),
         template_id: templateId,
         data: [{
           number: phone,
-          template_message: [member.name, sentMessage],
+          template_message: [recipientName, userMessage],
           language: 'en'
         }]
       }
@@ -124,14 +159,14 @@ export async function POST(req: NextRequest) {
       console.log(`📤 Sent template message to ${phone}:`, success ? 'OK' : 'FAILED')
     }
 
-    // Store sent message
+    // Store sent message with FULL content
     await storeSentMessage(pool, {
       messageType: 'admin_message',
       templateId: canSendFreeText ? undefined : process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-      messageContent: sentMessage.substring(0, 500),
+      messageContent: fullMessageContent,
       recipientPhone: phone,
-      recipientName: member.name,
-      recipientMemberId: member.id,
+      recipientName: recipientName,
+      recipientMemberId: recipientMemberId || undefined,
       status: success ? 'sent' : 'failed',
       sentBy: userId
     })
@@ -149,4 +184,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

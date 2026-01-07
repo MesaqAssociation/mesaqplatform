@@ -226,12 +226,15 @@ export default function MessagingClient() {
     setSearchQuery('')
   }
 
-  // Get effective member ID from contact or conversation
+  // Get effective member ID and phone from contact or conversation
   const selectedConv = conversations.find(c => c.phoneKey === selectedConversation)
   const effectiveMemberId = contact?.member_id || selectedConv?.memberId
+  const effectivePhone = contact?.phone || selectedConv?.displayPhone
+  const effectiveName = contact?.member_name || selectedConv?.contactName || selectedConv?.memberName
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !effectiveMemberId) return
+    if (!newMessage.trim()) return
+    if (!effectiveMemberId && !effectivePhone) return
     
     setSending(true)
     try {
@@ -239,15 +242,22 @@ export default function MessagingClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberId: effectiveMemberId,
+          memberId: effectiveMemberId || undefined,
+          phoneNumber: !effectiveMemberId ? effectivePhone : undefined,
+          contactName: !effectiveMemberId ? effectiveName : undefined,
           message: newMessage.trim(),
         }),
       })
 
       if (res.ok) {
+        // Show full message if template was used
+        const displayMessage = canSendFreeText 
+          ? newMessage.trim()
+          : `Salam ${effectiveName},\n\n${newMessage.trim()}\n\nThank you - Mesaq Association`
+        
         const optimisticMessage: Message = {
           id: `temp-${Date.now()}`,
-          message: newMessage.trim(),
+          message: displayMessage,
           messageType: 'admin_message',
           mediaUrl: null,
           mediaType: null,
@@ -728,12 +738,12 @@ export default function MessagingClient() {
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           onKeyPress={handleKeyPress}
-                          disabled={sending || !effectiveMemberId}
+                          disabled={sending || (!effectiveMemberId && !effectivePhone)}
                           className="flex-1"
                         />
                         <Button 
                           onClick={sendMessage}
-                          disabled={!newMessage.trim() || sending || !effectiveMemberId}
+                          disabled={!newMessage.trim() || sending || (!effectiveMemberId && !effectivePhone)}
                           size="icon"
                         >
                           {sending ? (
@@ -743,9 +753,9 @@ export default function MessagingClient() {
                           )}
                         </Button>
                       </div>
-                      {!effectiveMemberId && selectedConversation && (
-                        <p className="text-xs text-amber-500 mt-2">
-                          ⚠ This contact is not linked to a member. Cannot send messages.
+                      {!effectiveMemberId && effectivePhone && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          ℹ This contact is not linked to a member. Message will be sent to {effectivePhone}
                         </p>
                       )}
                     </div>

@@ -177,14 +177,14 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
     false // Not test mode for cron
   )
 
-  // Store sent messages in database
+  // Store sent messages in database with FULL template content
   const batchId = generateBatchId()
   const sentMessageData: SentMessageData[] = members
     .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
     .map((m: any) => ({
       messageType: 'payment_reminder' as const,
       templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-      messageContent: `Payment reminder: Balance $${Math.abs(parseFloat(m.balance)).toFixed(0)}`,
+      messageContent: `Salam ${m.name},\n\nThis is a friendly reminder that your membership balance is $${Math.abs(parseFloat(m.balance)).toFixed(0)}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
       recipientPhone: formatPhoneNumber(m.phone),
       recipientName: m.name,
       recipientMemberId: m.id,
@@ -244,10 +244,11 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
 
     // Store sent messages in database
     const batchId = generateBatchId()
+    // Store FULL template message content
     const sentMessageData: SentMessageData[] = members.map((member: any) => ({
       messageType: 'scheduled' as const,
       templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-      messageContent: `📢 ${notification.title}: ${notification.message.substring(0, 100)}...`,
+      messageContent: `Salam ${member.name},\n\n📢 ${notification.title}\n\n${notification.message}\n\nThank you - Mesaq Association`,
       recipientPhone: formatPhoneNumber(member.phone),
       recipientName: member.name,
       recipientMemberId: member.id,

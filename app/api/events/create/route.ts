@@ -148,20 +148,24 @@ export async function POST(req: NextRequest) {
 
             console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
 
-            // Store sent messages in database
+            // Store sent messages in database with FULL template content
             const batchId = generateBatchId()
             const sentMessageData: SentMessageData[] = groupMembers
               .filter((m: any) => m.phone)
-              .map((m: any) => ({
-                messageType: 'event_notification' as const,
-                templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                messageContent: `Event: ${title} - ${formattedDate}`,
-                recipientPhone: formatPhoneNumber(m.phone),
-                recipientName: m.name,
-                recipientMemberId: m.id,
-                status: result.success ? 'sent' : 'failed',
-                batchId
-              }))
+              .map((m: any) => {
+                const otherMembers = allMemberNames.filter(name => name !== m.name).join(', ') || 'None'
+                return {
+                  messageType: 'event_notification' as const,
+                  templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
+                  // Store FULL template message content
+                  messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${title} - ${formattedDate}\n\nYour group: ${organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
+                  recipientPhone: formatPhoneNumber(m.phone),
+                  recipientName: m.name,
+                  recipientMemberId: m.id,
+                  status: result.success ? 'sent' : 'failed',
+                  batchId
+                }
+              })
 
             await storeSentMessagesBatch(pool, sentMessageData, batchId)
           }

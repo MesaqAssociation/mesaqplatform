@@ -113,14 +113,15 @@ export async function POST(req: NextRequest) {
 
     console.log(`✅ Admin messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
 
-    // Store sent messages in database
+    // Store sent messages in database with FULL template content
     const batchId = generateBatchId()
     const sentMessageData: SentMessageData[] = members
       .filter(member => member.phone)
       .map(member => ({
         messageType: 'admin_message' as const,
         templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-        messageContent: message.trim().substring(0, 500),
+        // Store the FULL message including template wrapper
+        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nThank you - Mesaq Association`,
         recipientPhone: formatPhoneNumber(member.phone),
         recipientName: member.name,
         recipientMemberId: member.id,

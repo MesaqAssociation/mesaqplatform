@@ -150,11 +150,12 @@ export async function POST(req: NextRequest) {
         account_number
       )
 
-      // Store the sent message
+      // Store the sent message with FULL template content
+      const balanceOwed = Math.abs(member.balance).toFixed(0)
       await storeSentMessage(pool, {
         messageType: 'payment_reminder',
         templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        messageContent: `Payment reminder: Balance $${Math.abs(member.balance).toFixed(0)}`,
+        messageContent: `Salam ${member.name},\n\nThis is a friendly reminder that your membership balance is $${balanceOwed}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
         recipientPhone: formatPhoneNumber(targetPhone),
         recipientName: member.name,
         recipientMemberId: member.id,
@@ -225,7 +226,8 @@ export async function POST(req: NextRequest) {
       .map((m: any) => ({
         messageType: 'payment_reminder' as const,
         templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        messageContent: `Payment reminder: Balance $${Math.abs(parseFloat(m.balance)).toFixed(0)}`,
+        // Store FULL template message content
+        messageContent: `Salam ${m.name},\n\nThis is a friendly reminder that your membership balance is $${Math.abs(parseFloat(m.balance)).toFixed(0)}.\n\nPlease make payment to:\nBSB: ${bsb}\nAccount: ${account_number}\n\nThank you - Mesaq Association`,
         recipientPhone: formatPhoneNumber(m.phone),
         recipientName: m.name,
         recipientMemberId: m.id,
