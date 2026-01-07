@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -55,6 +55,15 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   // Form state
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
+  
+  // Confirm cancel dialog state
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancelNotificationId, setCancelNotificationId] = useState<string | null>(null)
+  const [confirmText, setConfirmText] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  
+  // View notification details dialog state
+  const [viewNotification, setViewNotification] = useState<Notification | null>(null)
 
   useEffect(() => {
     loadData()
@@ -94,6 +103,14 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // Format date to YYYY-MM-DD without timezone issues
+  const formatDateForApi = (date: Date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const handleCreate = async () => {
     if (!title.trim()) {
       showToast('Please enter a title', 'error')
@@ -116,7 +133,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         body: JSON.stringify({
           title: title.trim(),
           message: message.trim(),
-          scheduled_date: selectedDate.toISOString().split('T')[0]
+          scheduled_date: formatDateForApi(selectedDate)
         })
       })
 
@@ -127,7 +144,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         setMessage('')
         setSelectedDate(undefined)
         setPopoverDate(null)
-        loadData()
+        loadData() // Refresh data to show new notification
       } else {
         const data = await res.json()
         showToast(data.error || 'Failed to create notification', 'error')
@@ -139,25 +156,36 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  const handleCancel = async (id: string) => {
-    const confirmation = prompt('Type "confirm" to cancel this scheduled message:')
-    if (confirmation?.toLowerCase() !== 'confirm') {
-      if (confirmation !== null) {
-        showToast('Cancellation aborted - must type "confirm"', 'error')
-      }
+  const openCancelDialog = (id: string) => {
+    setCancelNotificationId(id)
+    setConfirmText('')
+    setShowCancelDialog(true)
+  }
+
+  const handleCancel = async () => {
+    if (!cancelNotificationId) return
+    if (confirmText.toLowerCase() !== 'confirm') {
+      showToast('Please type "confirm" to cancel', 'error')
       return
     }
     
+    setCancelling(true)
     try {
-      const res = await fetch(`/api/notifications?id=${id}&action=cancel`, { method: 'DELETE' })
+      const res = await fetch(`/api/notifications?id=${cancelNotificationId}&action=cancel`, { method: 'DELETE' })
       if (res.ok) {
         showToast('Notification cancelled', 'success')
-        loadData()
+        setShowCancelDialog(false)
+        setCancelNotificationId(null)
+        setConfirmText('')
+        setPopoverDate(null) // Close popover
+        loadData() // Refresh data to update yellow dots
       } else {
         showToast('Failed to cancel notification', 'error')
       }
     } catch (err) {
       showToast('Failed to cancel notification', 'error')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -442,14 +470,26 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               ) : (
                 <div className="space-y-2">
                   {notifications.filter(n => n.status === 'pending').slice(0, 5).map((notif) => (
-                    <div key={notif.id} className="p-3 border rounded-lg">
+                    <div 
+                      key={notif.id} 
+                      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => setViewNotification(notif)}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm truncate">{notif.title}</h4>
                           <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.scheduled_date)}</p>
                         </div>
                         {isAdmin && (
-                          <Button variant="ghost" size="icon" className="size-7" onClick={() => handleCancel(notif.id)}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="size-7" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openCancelDialog(notif.id)
+                            }}
+                          >
                             <IconX className="size-3" />
                           </Button>
                         )}
@@ -525,11 +565,23 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               </p>
               <div className="space-y-2">
                 {getNotificationsForDate(popoverDate).map(notif => (
-                  <div key={notif.id} className="p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded text-sm">
+                  <div 
+                    key={notif.id} 
+                    className="p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-950/50 border border-yellow-200 dark:border-yellow-800"
+                    onClick={() => setViewNotification(notif)}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium truncate flex-1">{notif.title}</p>
                       {isAdmin && (
-                        <Button variant="ghost" size="icon" className="size-5" onClick={() => handleCancel(notif.id)}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="size-5" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openCancelDialog(notif.id)
+                          }}
+                        >
                           <IconX className="size-3" />
                         </Button>
                       )}
@@ -616,6 +668,116 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Notification Confirmation Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowCancelDialog(false)
+          setCancelNotificationId(null)
+          setConfirmText('')
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Scheduled Message</DialogTitle>
+            <DialogDescription>
+              This will cancel the scheduled message. It will not be sent to members.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2">
+            <Label htmlFor="confirm-cancel">Type "confirm" to cancel this message</Label>
+            <Input
+              id="confirm-cancel"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="confirm"
+              autoComplete="off"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCancelDialog(false)
+                setCancelNotificationId(null)
+                setConfirmText('')
+              }}
+            >
+              Keep Message
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleCancel}
+              disabled={cancelling || confirmText.toLowerCase() !== 'confirm'}
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Message'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Notification Details Dialog */}
+      <Dialog open={!!viewNotification} onOpenChange={(open) => {
+        if (!open) setViewNotification(null)
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{viewNotification?.title}</DialogTitle>
+            <DialogDescription>
+              Scheduled for {viewNotification && formatDate(viewNotification.scheduled_date)}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-muted-foreground text-xs">Message</Label>
+              <div className="mt-1 p-3 bg-muted/50 rounded-md whitespace-pre-wrap text-sm">
+                {viewNotification?.message}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div>
+                <span className="font-medium">Status:</span>{' '}
+                {viewNotification && getStatusBadge(viewNotification.status)}
+              </div>
+              {viewNotification?.recipients_count && (
+                <div>
+                  <span className="font-medium">Recipients:</span> {viewNotification.recipients_count}
+                </div>
+              )}
+            </div>
+            
+            {viewNotification?.created_by_name && (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">Created by:</span> {viewNotification.created_by_name}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {isAdmin && viewNotification?.status === 'pending' && (
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  if (viewNotification) {
+                    setViewNotification(null)
+                    openCancelDialog(viewNotification.id)
+                  }
+                }}
+              >
+                Cancel Message
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setViewNotification(null)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
