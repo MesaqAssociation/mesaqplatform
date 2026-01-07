@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
                 await autoDetectMembershipPayment(
                   pool,
                   inserted[0].id,
-                  match.memberName,
+                  category,  // Pass 'Membership Payment' category, not member name
                   amount,
                   txn.date
                 )
