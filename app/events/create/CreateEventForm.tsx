@@ -37,6 +37,7 @@ export default function CreateEventForm() {
     start_time: '09:00',
     end_time: '10:00',
     organizing_group: '',
+    notify_group: true,
   })
 
   // Get days in month
@@ -131,6 +132,7 @@ export default function CreateEventForm() {
           ...formData,
           event_type: isMeeting ? 'Meeting' : 'Event',
           agenda: agendaItems,
+          notify_group: formData.notify_group,
         }),
       })
       if (!res.ok) {
@@ -204,9 +206,22 @@ export default function CreateEventForm() {
             💡 Last event was organized by: <strong>{lastOrganizingGroup}</strong>
           </p>
         )}
-        <p className="text-xs text-muted-foreground mt-1">
-          Members of this group will receive a WhatsApp notification about organizing this event
-        </p>
+        
+        {formData.organizing_group && (
+          <div className="flex items-center space-x-2 mt-3">
+            <Checkbox 
+              id="notify_group" 
+              checked={formData.notify_group}
+              onCheckedChange={(checked) => setFormData({ ...formData, notify_group: checked === true })}
+            />
+            <label 
+              htmlFor="notify_group" 
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Notify group members via WhatsApp
+            </label>
+          </div>
+        )}
       </div>
 
       <Separator />

@@ -78,7 +78,8 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: groupName.trim(),
-          memberIds: selectedMembers.length > 0 ? selectedMembers : undefined
+          leaderId: selectedLeader,
+          memberIds: selectedMembers.filter(id => id !== selectedLeader)
         })
       })
       

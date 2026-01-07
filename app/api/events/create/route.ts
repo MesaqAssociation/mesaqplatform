@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
       end_time, 
       event_type,
       agenda,
-      organizing_group 
+      organizing_group,
+      notify_group = true // Default to true for backwards compatibility
     } = body
 
     if (!title || !event_date || !start_time || !end_time) {
@@ -95,84 +96,87 @@ export async function POST(req: NextRequest) {
         SET value = EXCLUDED.value
       `, [organizing_group])
 
-      // Send WhatsApp notifications to group members using event template
-      try {
-        const { rows: groupMembers } = await pool.query(`
-          SELECT id, name, phone 
-          FROM users 
-          WHERE group_name = $1 AND phone IS NOT NULL
-        `, [organizing_group])
+      // Only send WhatsApp notifications if notify_group is true
+      if (notify_group) {
+        // Send WhatsApp notifications to group members using event template
+        try {
+          const { rows: groupMembers } = await pool.query(`
+            SELECT id, name, phone 
+            FROM users 
+            WHERE group_name = $1 AND phone IS NOT NULL
+          `, [organizing_group])
 
-        if (groupMembers.length > 0) {
-          // Format the event date for display
-          const eventDate = new Date(event_date)
-          const formattedDate = eventDate.toLocaleDateString('en-AU', { 
-            weekday: 'long', 
-            day: 'numeric', 
-            month: 'long', 
-            year: 'numeric' 
-          })
-
-          // Get all member names for the "other members" field
-          const allMemberNames = groupMembers.map(m => m.name)
-
-          // Prepare event notification data for each member
-          const eventNotifications: EventNotificationData[] = groupMembers
-            .filter(member => member.phone)
-            .map(member => {
-              // Get other members (exclude current member)
-              const otherMembers = allMemberNames
-                .filter(name => name !== member.name)
-                .join(', ')
-
-              return {
-                memberName: member.name,
-                eventName: title,
-                eventDate: formattedDate,
-                groupName: organizing_group,
-                otherGroupMembers: otherMembers || 'None',
-                phone: member.phone
-              }
+          if (groupMembers.length > 0) {
+            // Format the event date for display
+            const eventDate = new Date(event_date)
+            const formattedDate = eventDate.toLocaleDateString('en-AU', { 
+              weekday: 'long', 
+              day: 'numeric', 
+              month: 'long', 
+              year: 'numeric' 
             })
 
-          if (eventNotifications.length > 0) {
-            // Check if we're in test mode
-            const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-            const testNumber = process.env.WHATSAPP_TEST_NUMBER
+            // Get all member names for the "other members" field
+            const allMemberNames = groupMembers.map(m => m.name)
 
-            const result = await sendBulkEventNotifications(
-              eventNotifications,
-              isTestMode,
-              testNumber
-            )
+            // Prepare event notification data for each member
+            const eventNotifications: EventNotificationData[] = groupMembers
+              .filter(member => member.phone)
+              .map(member => {
+                // Get other members (exclude current member)
+                const otherMembers = allMemberNames
+                  .filter(name => name !== member.name)
+                  .join(', ')
 
-            console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
-
-            // Store sent messages in database with FULL template content
-            const batchId = generateBatchId()
-            const sentMessageData: SentMessageData[] = groupMembers
-              .filter((m: any) => m.phone)
-              .map((m: any) => {
-                const otherMembers = allMemberNames.filter(name => name !== m.name).join(', ') || 'None'
                 return {
-                  messageType: 'event_notification' as const,
-                  templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                  // Store FULL template message content
-                  messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${title} - ${formattedDate}\n\nYour group: ${organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
-                  recipientPhone: formatPhoneNumber(m.phone),
-                  recipientName: m.name,
-                  recipientMemberId: m.id,
-                  status: result.success ? 'sent' : 'failed',
-                  batchId
+                  memberName: member.name,
+                  eventName: title,
+                  eventDate: formattedDate,
+                  groupName: organizing_group,
+                  otherGroupMembers: otherMembers || 'None',
+                  phone: member.phone
                 }
               })
 
-            await storeSentMessagesBatch(pool, sentMessageData, batchId)
+            if (eventNotifications.length > 0) {
+              // Check if we're in test mode
+              const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+              const testNumber = process.env.WHATSAPP_TEST_NUMBER
+
+              const result = await sendBulkEventNotifications(
+                eventNotifications,
+                isTestMode,
+                testNumber
+              )
+
+              console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+
+              // Store sent messages in database with FULL template content
+              const batchId = generateBatchId()
+              const sentMessageData: SentMessageData[] = groupMembers
+                .filter((m: any) => m.phone)
+                .map((m: any) => {
+                  const otherMembers = allMemberNames.filter(name => name !== m.name).join(', ') || 'None'
+                  return {
+                    messageType: 'event_notification' as const,
+                    templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
+                    // Store FULL template message content
+                    messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${title} - ${formattedDate}\n\nYour group: ${organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
+                    recipientPhone: formatPhoneNumber(m.phone),
+                    recipientName: m.name,
+                    recipientMemberId: m.id,
+                    status: result.success ? 'sent' : 'failed',
+                    batchId
+                  }
+                })
+
+              await storeSentMessagesBatch(pool, sentMessageData, batchId)
+            }
           }
+        } catch (whatsappErr) {
+          console.error('Failed to send WhatsApp notifications:', whatsappErr)
+          // Don't fail the event creation if notifications fail
         }
-      } catch (whatsappErr) {
-        console.error('Failed to send WhatsApp notifications:', whatsappErr)
-        // Don't fail the event creation if notifications fail
       }
     }
     

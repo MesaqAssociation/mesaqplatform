@@ -4,6 +4,8 @@ import { parseBankStatementPDF, validateTransactionDates } from '@/lib/parseBank
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
+import { sendBulkEventNotifications, formatPhoneNumber, EventNotificationData } from '@/lib/picky-assist'
+import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 import bcrypt from 'bcryptjs'
 
 export const runtime = 'nodejs'
@@ -14,6 +16,7 @@ const pool = new Pool({
 })
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const TELEGRAM_ALLOWED_GROUP_ID = process.env.TELEGRAM_ALLOWED_GROUP_ID
 
 // In-memory state management for multi-step creation flows
 // In production, consider using Redis or database
@@ -30,6 +33,28 @@ export async function POST(req: NextRequest) {
   try {
     const update = await req.json()
     console.log('Telegram webhook received:', JSON.stringify(update, null, 2))
+
+    // Get chat ID from message or callback query
+    const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id
+    const chatType = update.message?.chat?.type || update.callback_query?.message?.chat?.type
+
+    // Check if TELEGRAM_ALLOWED_GROUP_ID is set and enforce group restriction
+    if (TELEGRAM_ALLOWED_GROUP_ID) {
+      const allowedGroupId = TELEGRAM_ALLOWED_GROUP_ID.toString()
+      const currentChatId = chatId?.toString()
+      
+      // Block private messages and messages from other groups
+      if (chatType === 'private' || (currentChatId && currentChatId !== allowedGroupId)) {
+        console.log(`🚫 Blocked message from chat ${currentChatId} (type: ${chatType}). Only allowed from group ${allowedGroupId}`)
+        
+        // Optionally send a message to inform the user (only for private chats)
+        if (chatType === 'private' && chatId) {
+          await sendTelegramMessage(chatId, '⚠️ This bot only works in the authorized group chat. Please use the bot there.')
+        }
+        
+        return NextResponse.json({ ok: true })
+      }
+    }
 
     // Handle callback queries (button clicks)
     if (update.callback_query) {
@@ -521,6 +546,15 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number, e.g., 1, 2, 3)')
     }
   }
+  // Handle notify option
+  else if (data === 'notify_yes' || data === 'notify_no') {
+    const state = userStates.get(chatId)
+    if (state?.type === 'event') {
+      state.data.notify_group = data === 'notify_yes'
+      state.step = 'confirm'
+      await showEventConfirmation(chatId, state.data)
+    }
+  }
   // Confirm creation
   else if (data === 'confirm_yes') {
     const state = userStates.get(chatId)
@@ -613,8 +647,14 @@ async function handleEventInput(chatId: number, text: string, state: CreationSta
         return
       }
       state.data.estimated_cost = cost
-      state.step = 'confirm'
-      await showEventConfirmation(chatId, state.data)
+      // Only ask about notifications if an organizing group was selected
+      if (state.data.organizing_group) {
+        state.step = 'notify'
+        await showNotifyOption(chatId)
+      } else {
+        state.step = 'confirm'
+        await showEventConfirmation(chatId, state.data)
+      }
       break
   }
 }
@@ -686,6 +726,19 @@ async function handleMemberInput(chatId: number, text: string, state: CreationSt
       userStates.delete(chatId)
       break
   }
+}
+
+// Show notify option for event
+async function showNotifyOption(chatId: number): Promise<void> {
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '✅ Yes, notify members', callback_data: 'notify_yes' },
+        { text: '❌ No notifications', callback_data: 'notify_no' },
+      ],
+    ],
+  }
+  await sendTelegramMessage(chatId, '📱 Send WhatsApp notifications to organizing group members?', { reply_markup: keyboard })
 }
 
 // Show event type selection
@@ -818,6 +871,10 @@ async function showEventConfirmation(chatId: number, data: any): Promise<void> {
   const [year, month, day] = data.event_date.split('-')
   const displayDate = `${day}-${month}-${year}`
   
+  const notifyStatus = data.organizing_group 
+    ? (data.notify_group ? '✅ Yes' : '❌ No')
+    : 'N/A'
+  
   const summary = `
 📅 <b>Event Summary</b>
 
@@ -827,6 +884,7 @@ async function showEventConfirmation(chatId: number, data: any): Promise<void> {
 ${data.address ? `<b>Location:</b> ${data.address}` : ''}
 ${data.description ? `<b>Description:</b> ${data.description}` : ''}
 ${data.organizing_group ? `<b>Organizing Group:</b> ${data.organizing_group}` : ''}
+${data.organizing_group ? `<b>Notify Members:</b> ${notifyStatus}` : ''}
 <b>Total Cost:</b> $${data.estimated_cost || 0}
 
 Ready to create this event?
@@ -869,9 +927,91 @@ async function createEvent(chatId: number, data: any): Promise<void> {
     )
 
     const event = result.rows[0]
+    
+    // Update last organizing group and send notifications if requested
+    if (data.organizing_group) {
+      await pool.query(`
+        INSERT INTO system_settings (key, value)
+        VALUES ('last_organizing_group', $1)
+        ON CONFLICT (key) DO UPDATE
+        SET value = EXCLUDED.value
+      `, [data.organizing_group])
+
+      // Send WhatsApp notifications if requested
+      if (data.notify_group) {
+        try {
+          const { rows: groupMembers } = await pool.query(`
+            SELECT id, name, phone 
+            FROM users 
+            WHERE group_name = $1 AND phone IS NOT NULL
+          `, [data.organizing_group])
+
+          if (groupMembers.length > 0) {
+            // Format the event date for display
+            const eventDate = new Date(data.event_date)
+            const formattedDate = eventDate.toLocaleDateString('en-AU', { 
+              weekday: 'long', 
+              day: 'numeric', 
+              month: 'long', 
+              year: 'numeric' 
+            })
+
+            const allMemberNames = groupMembers.map((m: any) => m.name)
+            const eventNotifications: EventNotificationData[] = groupMembers
+              .filter((member: any) => member.phone)
+              .map((member: any) => {
+                const otherMembers = allMemberNames
+                  .filter((name: string) => name !== member.name)
+                  .join(', ')
+                return {
+                  memberName: member.name,
+                  eventName: data.title,
+                  eventDate: formattedDate,
+                  groupName: data.organizing_group,
+                  otherGroupMembers: otherMembers || 'None',
+                  phone: member.phone
+                }
+              })
+
+            if (eventNotifications.length > 0) {
+              const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
+              const testNumber = process.env.WHATSAPP_TEST_NUMBER
+              const notifyResult = await sendBulkEventNotifications(eventNotifications, isTestMode, testNumber)
+              console.log(`✅ Event notifications from Telegram bot: ${notifyResult.sent} sent, ${notifyResult.failed} failed`)
+
+              // Store sent messages
+              const batchId = generateBatchId()
+              const sentMessageData: SentMessageData[] = groupMembers
+                .filter((m: any) => m.phone)
+                .map((m: any) => {
+                  const otherMembers = allMemberNames.filter((name: string) => name !== m.name).join(', ') || 'None'
+                  return {
+                    messageType: 'event_notification' as const,
+                    templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
+                    messageContent: `Salam ${m.name},\n\nYou have been assigned to: ${data.title} - ${formattedDate}\n\nYour group: ${data.organizing_group}\nOther members: ${otherMembers}\n\nThank you - Mesaq Association`,
+                    recipientPhone: formatPhoneNumber(m.phone),
+                    recipientName: m.name,
+                    recipientMemberId: m.id,
+                    status: notifyResult.success ? 'sent' : 'failed',
+                    batchId
+                  }
+                })
+              await storeSentMessagesBatch(pool, sentMessageData, batchId)
+            }
+          }
+        } catch (notifyErr) {
+          console.error('Failed to send WhatsApp notifications:', notifyErr)
+        }
+      }
+    }
+    
+    const notificationStatus = data.notify_group && data.organizing_group 
+      ? '\n📱 WhatsApp notifications sent to group members!'
+      : ''
+    
     await sendTelegramMessage(
       chatId,
-      `✅ Event created successfully! 🎉`
+      `✅ Event created successfully! 🎉${notificationStatus}`
     )
   } catch (err: any) {
     console.error('Error creating event:', err)
