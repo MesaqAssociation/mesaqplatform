@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconSend, IconSearch, IconChevronUp, IconTemplate, IconMessage, IconRefresh, IconUsers } from '@tabler/icons-react'
+import { IconSend, IconSearch, IconChevronUp, IconTemplate, IconMessage, IconRefresh, IconUsers, IconWallet, IconExternalLink, IconDownload, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getInitials } from '@/lib/utils'
+import Image from 'next/image'
 
 type Conversation = {
   phoneKey: string
@@ -87,11 +88,20 @@ export default function MessagingClient() {
   const [sendingBulk, setSendingBulk] = useState(false)
   const [loadingMembers, setLoadingMembers] = useState(true)
   
+  // Balance state
+  const [balance, setBalance] = useState<number | null>(null)
+  const [loadingBalance, setLoadingBalance] = useState(false)
+  const [showTopupGuide, setShowTopupGuide] = useState(false)
+  
+  // Mobile state
+  const [showConversationList, setShowConversationList] = useState(true)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadConversations()
     loadMembers()
+    loadBalance()
   }, [])
 
   useEffect(() => {
@@ -119,6 +129,21 @@ export default function MessagingClient() {
       setCanSendFreeText(false)
     }
   }, [conversationMessages])
+
+  const loadBalance = async () => {
+    setLoadingBalance(true)
+    try {
+      const res = await fetch('/api/messaging/balance')
+      if (res.ok) {
+        const data = await res.json()
+        setBalance(data.balance)
+      }
+    } catch (err) {
+      console.error('Failed to load balance:', err)
+    } finally {
+      setLoadingBalance(false)
+    }
+  }
 
   const loadMembers = async () => {
     setLoadingMembers(true)
@@ -191,7 +216,13 @@ export default function MessagingClient() {
   const selectConversation = (phoneKey: string) => {
     setSelectedConversation(phoneKey)
     setNewMessage('')
+    setShowConversationList(false) // Hide list on mobile
     loadConversationMessages(phoneKey)
+  }
+
+  const backToList = () => {
+    setShowConversationList(true)
+    setSelectedConversation(null)
   }
 
   const startNewConversation = (member: Member) => {
@@ -208,6 +239,7 @@ export default function MessagingClient() {
         memberId: member.id,
         memberName: member.name,
         memberCode: member.member_id,
+        memberImage: null,
         lastMessage: '',
         lastTimestamp: new Date().toISOString(),
         lastDirection: 'outgoing',
@@ -217,13 +249,15 @@ export default function MessagingClient() {
       }
       setConversations(prev => [newConv, ...prev])
       setSelectedConversation(phoneKey)
+      setShowConversationList(false)
       setConversationMessages([])
       setContact({
         member_id: member.id,
         member_name: member.name,
         member_code: member.member_id,
         phone: member.phone,
-        email: null
+        email: null,
+        image: null
       })
       setCanSendFreeText(false)
     }
@@ -254,7 +288,6 @@ export default function MessagingClient() {
       })
 
       if (res.ok) {
-        // Show full message if template was used
         const displayMessage = canSendFreeText 
           ? newMessage.trim()
           : `Salam ${effectiveName},\n\n${newMessage.trim()}\n\nThank you - Mesaq Association`
@@ -274,6 +307,7 @@ export default function MessagingClient() {
         setNewMessage('')
         showToast('Message sent!', 'success')
         loadConversations()
+        loadBalance() // Refresh balance after sending
       } else {
         const errorData = await res.json()
         showToast(errorData.error || 'Failed to send message', 'error')
@@ -349,6 +383,7 @@ export default function MessagingClient() {
         setBulkSearchQuery('')
         showToast(`✅ ${data.sent || data.queued} message(s) sent successfully!`, 'success')
         loadConversations()
+        loadBalance() // Refresh balance after sending
       } else {
         const errorData = await res.json()
         showToast(errorData.error || 'Failed to send messages', 'error')
@@ -419,33 +454,45 @@ export default function MessagingClient() {
     }
   }
 
+  const topupSteps = [
+    { image: '/process/1.png', text: <>Go to <a href="https://pickyassist.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">pickyassist.com</a> and click <strong>Login</strong></> },
+    { image: '/process/2.png', text: <>Click <strong>V 4.0 Login</strong></> },
+    { image: '/process/3.png', text: <>Login with your email and password</> },
+    { image: '/process/4.png', text: <>Now you should be on the dashboard. Click <strong>+Add</strong></> },
+    { image: '/process/5.png', text: <>Choose amount (minimum $25 USD) and pay</> },
+  ]
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Messages</h1>
-        <p className="text-muted-foreground mt-1">Send and view WhatsApp messages</p>
+        <h1 className="text-2xl md:text-3xl font-bold">Messages</h1>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">Send and view WhatsApp messages</p>
       </div>
 
       <Tabs defaultValue="conversations" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="conversations">
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
+          <TabsTrigger value="conversations" className="text-xs md:text-sm">
             Conversations
             {conversations.reduce((sum, c) => sum + c.unreadCount, 0) > 0 && (
-              <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+              <Badge variant="destructive" className="ml-1 md:ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                 {conversations.reduce((sum, c) => sum + c.unreadCount, 0)}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="bulk">Bulk Message</TabsTrigger>
+          <TabsTrigger value="bulk" className="text-xs md:text-sm">Bulk Message</TabsTrigger>
+          <TabsTrigger value="balance" className="text-xs md:text-sm">
+            <IconWallet className="size-4 mr-1" />
+            Balance
+          </TabsTrigger>
         </TabsList>
 
         {/* Conversations Tab */}
         <TabsContent value="conversations" className="mt-0">
-          <div className="h-[calc(100vh-220px)] flex bg-background rounded-lg border overflow-hidden">
+          <div className="h-[calc(100vh-220px)] min-h-[400px] flex bg-background rounded-lg border overflow-hidden">
             {/* Left Sidebar - Conversations List */}
-            <div className="w-80 border-r flex flex-col bg-card">
+            <div className={`${showConversationList ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-r flex-col bg-card`}>
               {/* Header */}
-              <div className="p-4 border-b">
+              <div className="p-3 md:p-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -453,7 +500,7 @@ export default function MessagingClient() {
                       placeholder="Search or start new chat..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 text-sm"
                     />
                   </div>
                   <Button 
@@ -486,7 +533,7 @@ export default function MessagingClient() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{member.name}</div>
+                        <div className="font-medium truncate text-sm">{member.name}</div>
                         <div className="text-xs text-muted-foreground">{member.phone}</div>
                       </div>
                       <Badge variant="outline" className="text-xs">New</Badge>
@@ -513,7 +560,7 @@ export default function MessagingClient() {
                       <div
                         key={conv.phoneKey}
                         onClick={() => selectConversation(conv.phoneKey)}
-                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                        className={`flex items-center gap-3 px-3 md:px-4 py-3 cursor-pointer transition-colors ${
                           selectedConversation === conv.phoneKey 
                             ? 'bg-primary/10' 
                             : conv.unreadCount > 0 
@@ -521,16 +568,16 @@ export default function MessagingClient() {
                               : 'hover:bg-muted/50'
                         }`}
                       >
-                        <Avatar className="h-12 w-12 flex-shrink-0">
+                        <Avatar className="h-11 w-11 md:h-12 md:w-12 flex-shrink-0">
                           <AvatarImage src={conv.memberImage || undefined} alt={conv.contactName || conv.memberName || 'Contact'} />
-                          <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold text-sm md:text-base">
                             {getInitials(conv.contactName || conv.memberName)}
                           </AvatarFallback>
                         </Avatar>
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className={`font-medium truncate ${conv.unreadCount > 0 ? 'text-foreground' : 'text-foreground/80'}`}>
+                            <span className={`font-medium truncate text-sm ${conv.unreadCount > 0 ? 'text-foreground' : 'text-foreground/80'}`}>
                               {conv.contactName || conv.memberName || conv.displayPhone}
                             </span>
                             <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
@@ -538,7 +585,7 @@ export default function MessagingClient() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                            <p className={`text-xs md:text-sm truncate ${conv.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                               {conv.lastDirection === 'outgoing' && (
                                 <span className={`mr-1 ${conv.lastStatus === 'read' ? 'text-blue-500' : 'text-muted-foreground'}`}>
                                   {getStatusIcon(conv.lastStatus)}
@@ -561,37 +608,45 @@ export default function MessagingClient() {
             </div>
 
             {/* Right Panel - Chat View */}
-            <div className="flex-1 flex flex-col bg-muted/30">
+            <div className={`${!showConversationList ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-muted/30`}>
               {!selectedConversation ? (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center p-4">
                   <div className="text-center text-muted-foreground">
-                    <IconMessage className="size-16 mx-auto mb-4 opacity-20" />
-                    <h3 className="text-xl font-medium mb-2">Select a conversation</h3>
-                    <p className="text-sm">Choose from your existing conversations or search for a member</p>
+                    <IconMessage className="size-12 md:size-16 mx-auto mb-4 opacity-20" />
+                    <h3 className="text-lg md:text-xl font-medium mb-2">Select a conversation</h3>
+                    <p className="text-xs md:text-sm">Choose from your existing conversations or search for a member</p>
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Chat Header */}
-                  <div className="px-6 py-4 border-b bg-card flex items-center gap-4">
-                    <Avatar className="h-10 w-10">
+                  <div className="px-3 md:px-6 py-3 md:py-4 border-b bg-card flex items-center gap-3 md:gap-4">
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={backToList}
+                      className="md:hidden"
+                    >
+                      <IconChevronRight className="size-5 rotate-180" />
+                    </Button>
+                    <Avatar className="h-9 w-9 md:h-10 md:w-10">
                       <AvatarImage src={contact?.image || selectedConv?.memberImage || undefined} alt={contact?.member_name || selectedConv?.contactName || 'Contact'} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold text-sm">
                         {getInitials(contact?.member_name || selectedConv?.contactName)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">
+                        <h3 className="font-semibold text-sm md:text-base truncate">
                           {contact?.member_name || selectedConv?.contactName || selectedConversation}
                         </h3>
                         {(contact?.member_code || selectedConv?.memberCode) && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                             {contact?.member_code || selectedConv?.memberCode}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         {contact?.phone || selectedConv?.displayPhone}
                       </p>
                     </div>
@@ -607,7 +662,7 @@ export default function MessagingClient() {
                   </div>
 
                   {/* Messages */}
-                  <ScrollArea className="flex-1 p-4">
+                  <ScrollArea className="flex-1 p-3 md:p-4">
                     {loadingMessages ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -655,7 +710,7 @@ export default function MessagingClient() {
                               
                               <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-1`}>
                                 <div 
-                                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                                  className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-3 md:px-4 py-2 ${
                                     isOutgoing 
                                       ? 'bg-primary text-primary-foreground rounded-br-sm' 
                                       : 'bg-card border rounded-bl-sm'
@@ -669,17 +724,20 @@ export default function MessagingClient() {
                                     </div>
                                   )}
                                   
-                                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                                    {msg.message}
-                                  </p>
+                                  {msg.message && (
+                                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                                      {msg.message}
+                                    </p>
+                                  )}
                                   
+                                  {/* Media attachments */}
                                   {msg.mediaUrl && (
-                                    <div className="mt-2">
+                                    <div className={msg.message ? 'mt-2' : ''}>
                                       {msg.mediaType === 'image' ? (
                                         <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
                                           <img 
                                             src={msg.mediaUrl} 
-                                            alt="Attached" 
+                                            alt="Image" 
                                             className="max-w-[200px] rounded-lg cursor-pointer hover:opacity-90"
                                           />
                                         </a>
@@ -688,11 +746,10 @@ export default function MessagingClient() {
                                           href={msg.mediaUrl} 
                                           target="_blank" 
                                           rel="noopener noreferrer"
-                                          className={`inline-flex items-center gap-2 px-3 py-1 rounded text-sm ${
-                                            isOutgoing ? 'bg-primary-foreground/20' : 'bg-muted'
-                                          }`}
+                                          className="inline-flex items-center gap-2 px-3 py-2 bg-background border rounded-lg hover:bg-muted transition-colors text-sm text-foreground"
                                         >
-                                          📎 Download File
+                                          <IconDownload className="size-4" />
+                                          Download File
                                         </a>
                                       )}
                                     </div>
@@ -723,29 +780,29 @@ export default function MessagingClient() {
                   </ScrollArea>
 
                   {/* Message Input */}
-                  <div className="p-4 border-t bg-card">
+                  <div className="p-3 md:p-4 border-t bg-card">
                     <div className="max-w-3xl mx-auto">
                       {!canSendFreeText && (
                         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                          <IconTemplate className="size-3" />
-                          <span>Using template: <span className="font-medium">Salam [Name], ... Thank you - Mesaq</span></span>
+                          <IconTemplate className="size-3 flex-shrink-0" />
+                          <span className="truncate">Using template: Salam [Name]... Thank you - Mesaq</span>
                         </div>
                       )}
                       {canSendFreeText && (
                         <div className="flex items-center gap-2 mb-2 text-xs text-green-600">
-                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                          <span>24h window active - Free text messaging enabled</span>
+                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></span>
+                          <span>24h window active - Free text enabled</span>
                         </div>
                       )}
                       
                       <div className="flex gap-2">
                         <Input
-                          placeholder={canSendFreeText ? "Type a message..." : "Type your message (will be sent with template)..."}
+                          placeholder={canSendFreeText ? "Type a message..." : "Type your message..."}
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           onKeyPress={handleKeyPress}
                           disabled={sending || (!effectiveMemberId && !effectivePhone)}
-                          className="flex-1"
+                          className="flex-1 text-sm"
                         />
                         <Button 
                           onClick={sendMessage}
@@ -761,7 +818,7 @@ export default function MessagingClient() {
                       </div>
                       {!effectiveMemberId && effectivePhone && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          ℹ This contact is not linked to a member. Message will be sent to {effectivePhone}
+                          ℹ Sending to {effectivePhone}
                         </p>
                       )}
                     </div>
@@ -774,19 +831,19 @@ export default function MessagingClient() {
 
         {/* Bulk Message Tab */}
         <TabsContent value="bulk" className="mt-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Member Selection */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <IconUsers className="size-5" />
               Select Recipients
             </CardTitle>
-            <CardDescription>
+                <CardDescription className="text-xs md:text-sm">
               Choose members to send messages to ({selectedMembers.size} selected)
             </CardDescription>
           </CardHeader>
-          <CardContent>
+              <CardContent className="p-4 md:p-6 pt-0">
             <div className="space-y-4">
               <div className="relative">
                 <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -795,7 +852,7 @@ export default function MessagingClient() {
                   placeholder="Search members..."
                       value={bulkSearchQuery}
                       onChange={(e) => setBulkSearchQuery(e.target.value)}
-                  className="pl-9"
+                      className="pl-9 text-sm"
                 />
               </div>
 
@@ -810,12 +867,12 @@ export default function MessagingClient() {
                 </label>
               </div>
 
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-2 max-h-[300px] md:max-h-[400px] overflow-y-auto">
                     {loadingMembers ? (
-                  <p className="text-center text-muted-foreground py-4">Loading members...</p>
+                      <p className="text-center text-muted-foreground py-4 text-sm">Loading members...</p>
                     ) : filteredMembersForBulk.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No members found</p>
-                ) : (
+                      <p className="text-center text-muted-foreground py-4 text-sm">No members found</p>
+                    ) : (
                       filteredMembersForBulk.map((member) => (
                     <div
                       key={member.id}
@@ -828,7 +885,7 @@ export default function MessagingClient() {
                         className="mt-0.5"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium">{member.name}</div>
+                            <div className="font-medium text-sm">{member.name}</div>
                         <div className="text-xs text-muted-foreground truncate">
                           {member.phone} • {member.email}
                         </div>
@@ -843,28 +900,28 @@ export default function MessagingClient() {
 
         {/* Message Composition */}
         <Card>
-          <CardHeader>
-            <CardTitle>Compose Message</CardTitle>
-            <CardDescription>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-base md:text-lg">Compose Message</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   Write your message (sent individually to each member via WhatsApp)
             </CardDescription>
           </CardHeader>
-          <CardContent>
+              <CardContent className="p-4 md:p-6 pt-0">
             <div className="space-y-4">
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
-                    <p className="font-semibold text-primary">Salam (Member Name),</p>
+                    <p className="font-semibold text-primary text-sm">Salam (Member Name),</p>
                   </div>
                   
               <Textarea
                     placeholder="Type your message content here..."
                     value={bulkMessage}
                     onChange={(e) => setBulkMessage(e.target.value)}
-                    rows={8}
-                    className="resize-none border-2 focus:border-primary"
+                    rows={6}
+                    className="resize-none border-2 focus:border-primary text-sm"
                   />
 
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
-                    <p className="font-semibold text-primary">Thank you - Mesaq Association</p>
+                    <p className="font-semibold text-primary text-sm">Thank you - Mesaq Association</p>
               </div>
 
                   {sendingBulk && (
@@ -886,6 +943,106 @@ export default function MessagingClient() {
             </div>
           </CardContent>
         </Card>
+          </div>
+        </TabsContent>
+
+        {/* Balance Tab */}
+        <TabsContent value="balance" className="mt-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            {/* Current Balance */}
+          <Card>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <IconWallet className="size-5" />
+                  Picky Assist Balance
+                  </CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  Your current WhatsApp messaging credit balance
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 md:p-6 pt-0">
+                <div className="space-y-4">
+                  <div className="text-center p-6 bg-muted/50 rounded-lg">
+                    {loadingBalance ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    ) : balance !== null ? (
+                      <>
+                        <p className="text-4xl md:text-5xl font-bold text-primary">
+                          ${balance.toFixed(2)}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">USD Balance</p>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">Unable to fetch balance</p>
+                    )}
+                </div>
+                  
+                  <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                      onClick={loadBalance}
+                      disabled={loadingBalance}
+                      className="flex-1"
+                    >
+                      <IconRefresh className={`size-4 mr-2 ${loadingBalance ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                    <Button asChild className="flex-1">
+                      <a href="https://app.pickyassist.com/" target="_blank" rel="noopener noreferrer">
+                        <IconExternalLink className="size-4 mr-2" />
+                        Topup
+                      </a>
+                    </Button>
+              </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* How to Topup */}
+            <Card>
+              <CardHeader className="p-4 md:p-6">
+                <button 
+                  onClick={() => setShowTopupGuide(!showTopupGuide)}
+                  className="flex items-center justify-between w-full text-left"
+                >
+                  <div>
+                    <CardTitle className="text-base md:text-lg">How to Topup</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">
+                      Step-by-step guide to add credit
+                    </CardDescription>
+                </div>
+                  {showTopupGuide ? (
+                    <IconChevronDown className="size-5 text-muted-foreground" />
+                  ) : (
+                    <IconChevronRight className="size-5 text-muted-foreground" />
+                  )}
+                </button>
+              </CardHeader>
+              {showTopupGuide && (
+                <CardContent className="p-4 md:p-6 pt-0">
+                  <div className="space-y-6">
+                    {topupSteps.map((step, index) => (
+                      <div key={index} className="space-y-2">
+                        <p className="text-sm font-medium">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs mr-2">
+                            {index + 1}
+                            </span>
+                          {step.text}
+                        </p>
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
+                          <Image
+                            src={step.image}
+                            alt={`Step ${index + 1}`}
+                            fill
+                            className="object-contain"
+                          />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </CardContent>
+              )}
+          </Card>
           </div>
         </TabsContent>
       </Tabs>
