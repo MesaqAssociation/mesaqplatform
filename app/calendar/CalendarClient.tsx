@@ -140,6 +140,14 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const handleCancel = async (id: string) => {
+    const confirmation = prompt('Type "confirm" to cancel this scheduled message:')
+    if (confirmation?.toLowerCase() !== 'confirm') {
+      if (confirmation !== null) {
+        showToast('Cancellation aborted - must type "confirm"', 'error')
+      }
+      return
+    }
+    
     try {
       const res = await fetch(`/api/notifications?id=${id}&action=cancel`, { method: 'DELETE' })
       if (res.ok) {
@@ -226,10 +234,17 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     return days
   }
 
-  const formatDateKey = (date: Date) => date.toISOString().split('T')[0]
+  // Format date to YYYY-MM-DD without timezone issues
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
 
   const getEventsForDate = (date: Date) => {
     const dateKey = formatDateKey(date)
+    console.log('Looking for events on:', dateKey, 'Found:', events.filter(e => e.event_date === dateKey).length)
     return events.filter(e => e.event_date === dateKey)
   }
 
@@ -280,7 +295,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Section */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-1">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Calendar</CardTitle>
@@ -364,7 +379,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         </Card>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Upcoming Events */}
           <Card>
             <CardHeader className="pb-2">
@@ -468,18 +483,33 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
           {getEventsForDate(popoverDate).length > 0 && (
             <div className="mb-3">
               <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-blue-500" /> Events
+                <div className="w-2 h-2 rounded-full bg-blue-500" /> Events ({getEventsForDate(popoverDate).length})
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {getEventsForDate(popoverDate).map(event => (
                   <div 
                     key={event.id} 
-                    className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/50"
+                    className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/50 border border-blue-200 dark:border-blue-800"
                     onClick={() => router.push(`/events/${event.id}`)}
                   >
-                    <p className="font-medium truncate">{event.title}</p>
+                    <p className="font-semibold">{event.title}</p>
                     {event.start_time && (
-                      <p className="text-xs text-muted-foreground">{formatTime(event.start_time)} - {formatTime(event.end_time)}</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        🕐 {formatTime(event.start_time)} - {formatTime(event.end_time)}
+                      </p>
+                    )}
+                    {event.address && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <IconMapPin className="size-3" /> {event.address}
+                      </p>
+                    )}
+                    {event.organizing_group && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        👥 {event.organizing_group}
+                      </p>
+                    )}
+                    {event.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{event.description}</p>
                     )}
                   </div>
                 ))}
