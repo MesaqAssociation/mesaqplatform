@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   IconSearch, IconPlus, IconRefresh, IconExternalLink, 
   IconTrash, IconCheck, IconX, IconClock, IconSparkles,
-  IconBuilding, IconMapPin, IconUsers, IconCalendar
+  IconBuilding, IconMapPin, IconUsers, IconCalendar, IconLoader2
 } from '@tabler/icons-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -74,6 +74,7 @@ export function GrantsClient() {
   const [profile, setProfile] = useState<CommunityProfile>({})
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
   const [showAddSource, setShowAddSource] = useState(false)
   const [newSource, setNewSource] = useState({ name: '', url: '', entity: '', keywords: '' })
   const { toast } = useToast()
@@ -197,15 +198,22 @@ export function GrantsClient() {
   }
 
   async function updateProfile() {
+    setSavingProfile(true)
     try {
-      await fetch('/api/grants', {
+      const res = await fetch('/api/grants', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'profile', profile }),
       })
-      toast({ title: 'Success', description: 'Community profile updated' })
+      if (res.ok) {
+        toast({ title: 'Profile Saved', description: 'Community profile updated successfully' })
+      } else {
+        throw new Error('Failed to save')
+      }
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to update profile', variant: 'destructive' })
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -337,7 +345,9 @@ export function GrantsClient() {
                         </div>
                         {grant.ai_eligibility_reason && (
                           <p className="text-xs text-muted-foreground mt-2 italic">
-                            AI: {grant.ai_eligibility_reason}
+                            {grant.ai_eligibility_reason.startsWith('Matched:') 
+                              ? `Rule-based: ${grant.ai_eligibility_reason}` 
+                              : `AI: ${grant.ai_eligibility_reason}`}
                           </p>
                         )}
                       </CardContent>
@@ -539,8 +549,15 @@ export function GrantsClient() {
                       />
                     </div>
                   </div>
-                  <Button onClick={updateProfile}>
-                    Save Profile
+                  <Button onClick={updateProfile} disabled={savingProfile}>
+                    {savingProfile ? (
+                      <>
+                        <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Profile'
+                    )}
                   </Button>
                 </CardContent>
               </Card>

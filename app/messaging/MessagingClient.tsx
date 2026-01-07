@@ -280,7 +280,7 @@ export default function MessagingClient() {
                 rows={8}
                 className="resize-none border-2 focus:border-primary"
               />
-              
+
               {/* Pre-written sign-off */}
               <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
                 <p className="font-semibold text-primary">Thank you - Mesaq Association</p>

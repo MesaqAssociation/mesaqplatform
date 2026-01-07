@@ -216,12 +216,12 @@ export default function FinanceClient({
     } catch (err) {
       // Only log error if this is still the latest request
       if (requestId === latestRequestRef.current) {
-        console.error('Failed to load transactions', err)
+      console.error('Failed to load transactions', err)
       }
     } finally {
       // Only set loading to false if this is still the latest request
       if (requestId === latestRequestRef.current) {
-        setLoadingTransactions(false)
+      setLoadingTransactions(false)
       }
     }
   }, [selectedAccountId, currentMonth])

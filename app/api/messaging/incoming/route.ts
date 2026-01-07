@@ -77,17 +77,17 @@ export async function GET(req: NextRequest) {
       }
       
       return {
-        id: msg.id,
-        phone: msg.phone,
+      id: msg.id,
+      phone: msg.phone,
         message: decodedMessage,
         mediaUrl: msg.media_url || null,
-        contactName: msg.contact_name,
-        timestamp: msg.timestamp,
-        type: msg.type,
-        read: msg.read,
-        memberId: msg.member_id,
-        memberName: msg.member_name,
-        memberCode: msg.member_code
+      contactName: msg.contact_name,
+      timestamp: msg.timestamp,
+      type: msg.type,
+      read: msg.read,
+      memberId: msg.member_id,
+      memberName: msg.member_name,
+      memberCode: msg.member_code
       }
     })
 
