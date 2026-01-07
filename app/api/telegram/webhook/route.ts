@@ -34,22 +34,24 @@ export async function POST(req: NextRequest) {
     const update = await req.json()
     console.log('Telegram webhook received:', JSON.stringify(update, null, 2))
 
-    // Get chat ID from message or callback query
-    const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id
-    const chatType = update.message?.chat?.type || update.callback_query?.message?.chat?.type
+    // Get chat ID and type from message or callback query
+    const chatInfo = update.message?.chat || update.callback_query?.message?.chat
+    const incomingChatId = chatInfo?.id
+    const chatType = chatInfo?.type
 
     // Check if TELEGRAM_ALLOWED_GROUP_ID is set and enforce group restriction
     if (TELEGRAM_ALLOWED_GROUP_ID) {
-      const allowedGroupId = TELEGRAM_ALLOWED_GROUP_ID.toString()
-      const currentChatId = chatId?.toString()
+      const allowedGroupId = parseInt(TELEGRAM_ALLOWED_GROUP_ID, 10)
       
-      // Block private messages and messages from other groups
-      if (chatType === 'private' || (currentChatId && currentChatId !== allowedGroupId)) {
-        console.log(`🚫 Blocked message from chat ${currentChatId} (type: ${chatType}). Only allowed from group ${allowedGroupId}`)
+      // Only allow messages from supergroups with matching ID
+      const isAllowedChat = chatType === 'supergroup' && incomingChatId === allowedGroupId
+      
+      if (!isAllowedChat) {
+        console.log(`🚫 Blocked message from chat ${incomingChatId} (type: ${chatType}). Only allowed from supergroup ${allowedGroupId}`)
         
-        // Optionally send a message to inform the user (only for private chats)
-        if (chatType === 'private' && chatId) {
-          await sendTelegramMessage(chatId, '⚠️ This bot only works in the authorized group chat. Please use the bot there.')
+        // Send a message to inform the user (only for private chats, once)
+        if (chatType === 'private' && incomingChatId) {
+          await sendTelegramMessage(incomingChatId, '⚠️ This bot only works in the authorized group chat. Please use the bot there.')
         }
         
         return NextResponse.json({ ok: true })
