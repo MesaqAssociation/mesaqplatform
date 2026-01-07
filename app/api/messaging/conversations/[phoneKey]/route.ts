@@ -35,16 +35,18 @@ export async function GET(
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'))
     const before = searchParams.get('before') // ISO timestamp for pagination
 
-    // Get contact info
+    // Get contact info - match with flexible phone format
     const { rows: contactRows } = await pool.query(`
       SELECT 
         u.id as member_id,
         u.name as member_name,
         u.member_id as member_code,
         u.phone,
-        u.email
+        u.email,
+        u.image
       FROM users u
       WHERE RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 9) = $1
+         OR RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 8) = RIGHT($1, 8)
       LIMIT 1
     `, [phoneKey])
 

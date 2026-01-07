@@ -83,10 +83,15 @@ export async function GET(req: NextRequest) {
         cs.total_messages,
         u.id as member_id,
         u.name as member_name,
-        u.member_id as member_code
+        u.member_id as member_code,
+        u.image as member_image
       FROM ranked_messages rm
       JOIN conversation_stats cs ON cs.phone_key = rm.phone_key
-      LEFT JOIN users u ON RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 9) = rm.phone_key
+      LEFT JOIN users u ON (
+        -- Match last 9 digits, accounting for different formats (04xxx vs 614xxx)
+        RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 9) = rm.phone_key
+        OR RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 8) = RIGHT(rm.phone_key, 8)
+      )
       WHERE rm.rn = 1
       ORDER BY rm.timestamp DESC
       LIMIT 100
@@ -100,6 +105,7 @@ export async function GET(req: NextRequest) {
         memberId: c.member_id,
         memberName: c.member_name,
         memberCode: c.member_code,
+        memberImage: c.member_image,
         lastMessage: c.last_message?.substring(0, 100) + (c.last_message?.length > 100 ? '...' : ''),
         lastTimestamp: c.timestamp,
         lastDirection: c.last_direction,

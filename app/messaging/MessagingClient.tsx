@@ -11,6 +11,8 @@ import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getInitials } from '@/lib/utils'
 
 type Conversation = {
   phoneKey: string
@@ -19,6 +21,7 @@ type Conversation = {
   memberId: string | null
   memberName: string | null
   memberCode: string | null
+  memberImage: string | null
   lastMessage: string
   lastTimestamp: string
   lastDirection: 'incoming' | 'outgoing'
@@ -45,6 +48,7 @@ type Contact = {
   member_code: string | null
   phone: string | null
   email: string | null
+  image: string | null
 }
 
 type Member = {
@@ -397,8 +401,8 @@ export default function MessagingClient() {
   const formatMessageTime = (timestamp: string) => {
     try {
       return new Date(timestamp).toLocaleTimeString('en-AU', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+        hour: '2-digit',
+        minute: '2-digit'
       })
     } catch {
       return ''
@@ -476,11 +480,11 @@ export default function MessagingClient() {
                       onClick={() => startNewConversation(member)}
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
                     >
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-primary">
-                          {member.name[0]?.toUpperCase()}
-                        </span>
-                      </div>
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                          {getInitials(member.name)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{member.name}</div>
                         <div className="text-xs text-muted-foreground">{member.phone}</div>
@@ -517,11 +521,12 @@ export default function MessagingClient() {
                               : 'hover:bg-muted/50'
                         }`}
                       >
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-lg font-semibold text-primary">
-                            {(conv.contactName || conv.memberName || '?')[0]?.toUpperCase()}
-                          </span>
-                        </div>
+                        <Avatar className="h-12 w-12 flex-shrink-0">
+                          <AvatarImage src={conv.memberImage || undefined} alt={conv.contactName || conv.memberName || 'Contact'} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold">
+                            {getInitials(conv.contactName || conv.memberName)}
+                          </AvatarFallback>
+                        </Avatar>
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-0.5">
@@ -569,11 +574,12 @@ export default function MessagingClient() {
                 <>
                   {/* Chat Header */}
                   <div className="px-6 py-4 border-b bg-card flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-primary">
-                        {(contact?.member_name || selectedConv?.contactName || '?')[0]?.toUpperCase()}
-                      </span>
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={contact?.image || selectedConv?.memberImage || undefined} alt={contact?.member_name || selectedConv?.contactName || 'Contact'} />
+                      <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-semibold">
+                        {getInitials(contact?.member_name || selectedConv?.contactName)}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold">
@@ -769,87 +775,87 @@ export default function MessagingClient() {
         {/* Bulk Message Tab */}
         <TabsContent value="bulk" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Member Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconUsers className="size-5" />
-                  Select Recipients
-                </CardTitle>
-                <CardDescription>
-                  Choose members to send messages to ({selectedMembers.size} selected)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
+        {/* Member Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconUsers className="size-5" />
+              Select Recipients
+            </CardTitle>
+            <CardDescription>
+              Choose members to send messages to ({selectedMembers.size} selected)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="relative">
+                <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search members..."
                       value={bulkSearchQuery}
                       onChange={(e) => setBulkSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
+                  className="pl-9"
+                />
+              </div>
 
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Checkbox
-                      id="select-all"
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Checkbox
+                  id="select-all"
                       checked={selectedMembers.size === filteredMembersForBulk.length && filteredMembersForBulk.length > 0}
-                      onCheckedChange={toggleAll}
-                    />
-                    <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                  onCheckedChange={toggleAll}
+                />
+                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
                       Select All ({filteredMembersForBulk.length})
-                    </label>
-                  </div>
+                </label>
+              </div>
 
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
                     {loadingMembers ? (
-                      <p className="text-center text-muted-foreground py-4">Loading members...</p>
+                  <p className="text-center text-muted-foreground py-4">Loading members...</p>
                     ) : filteredMembersForBulk.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">No members found</p>
-                    ) : (
+                  <p className="text-center text-muted-foreground py-4">No members found</p>
+                ) : (
                       filteredMembersForBulk.map((member) => (
-                        <div
-                          key={member.id}
-                          className="flex items-start gap-2 p-2 rounded hover:bg-accent cursor-pointer"
-                          onClick={() => toggleMember(member.id)}
-                        >
-                          <Checkbox
-                            checked={selectedMembers.has(member.id)}
-                            onCheckedChange={() => toggleMember(member.id)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{member.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {member.phone} • {member.email}
-                            </div>
-                          </div>
+                    <div
+                      key={member.id}
+                      className="flex items-start gap-2 p-2 rounded hover:bg-accent cursor-pointer"
+                      onClick={() => toggleMember(member.id)}
+                    >
+                      <Checkbox
+                        checked={selectedMembers.has(member.id)}
+                        onCheckedChange={() => toggleMember(member.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{member.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {member.phone} • {member.email}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Message Composition */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Compose Message</CardTitle>
-                <CardDescription>
+        {/* Message Composition */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Compose Message</CardTitle>
+            <CardDescription>
                   Write your message (sent individually to each member via WhatsApp)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
                     <p className="font-semibold text-primary">Salam (Member Name),</p>
                   </div>
                   
-                  <Textarea
+              <Textarea
                     placeholder="Type your message content here..."
                     value={bulkMessage}
                     onChange={(e) => setBulkMessage(e.target.value)}
@@ -859,27 +865,27 @@ export default function MessagingClient() {
 
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
                     <p className="font-semibold text-primary">Thank you - Mesaq Association</p>
-                  </div>
+              </div>
 
                   {sendingBulk && (
                     <div className="flex items-center justify-center gap-3 py-4">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                       <p className="text-sm text-muted-foreground">Sending messages...</p>
-                    </div>
-                  )}
+                </div>
+              )}
 
-                  <Button 
+              <Button 
                     onClick={handleBulkSend} 
                     disabled={selectedMembers.size === 0 || !bulkMessage.trim() || sendingBulk}
-                    className="w-full"
-                    size="lg"
-                  >
-                    <IconSend className="mr-2 size-4" />
+                className="w-full"
+                size="lg"
+              >
+                <IconSend className="mr-2 size-4" />
                     {sendingBulk ? 'Sending...' : `Send to ${selectedMembers.size} Member(s)`}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
           </div>
         </TabsContent>
       </Tabs>
