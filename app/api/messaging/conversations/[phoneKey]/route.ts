@@ -63,19 +63,19 @@ export async function GET(
       WITH all_messages AS (
         -- Incoming messages
         SELECT 
-          id,
-          RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) as phone_key,
-          phone as display_phone,
+          id::text,
+          RIGHT(REGEXP_REPLACE(from_phone, '[^0-9]', '', 'g'), 9) as phone_key,
+          from_phone as display_phone,
           contact_name,
-          message,
-          NULL as message_type,
+          message_text as message,
+          NULL::varchar as message_type,
           media_url,
           message_type as media_type,
           created_at as timestamp,
           'incoming' as direction,
           read,
-          NULL as status,
-          NULL as error_message
+          NULL::varchar as status,
+          NULL::text as error_message
         FROM incoming_messages
         
         UNION ALL
@@ -87,13 +87,13 @@ export async function GET(
           recipient_phone as display_phone,
           recipient_name as contact_name,
           message_content as message,
-          message_type,
-          NULL as media_url,
-          NULL as media_type,
+          message_type::varchar,
+          NULL::text as media_url,
+          NULL::varchar as media_type,
           COALESCE(sent_at, created_at) as timestamp,
           'outgoing' as direction,
           true as read,
-          status,
+          status::varchar,
           error_message
         FROM sent_messages
       )
@@ -109,7 +109,7 @@ export async function GET(
     await pool.query(`
       UPDATE incoming_messages 
       SET read = true 
-      WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = $1 
+      WHERE RIGHT(REGEXP_REPLACE(from_phone, '[^0-9]', '', 'g'), 9) = $1 
         AND read = false
     `, [phoneKey])
 

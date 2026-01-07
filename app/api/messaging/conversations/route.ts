@@ -33,14 +33,14 @@ export async function GET(req: NextRequest) {
       WITH all_messages AS (
         -- Incoming messages
         SELECT 
-          RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) as phone_key,
-          phone as display_phone,
+          RIGHT(REGEXP_REPLACE(from_phone, '[^0-9]', '', 'g'), 9) as phone_key,
+          from_phone as display_phone,
           contact_name,
-          message as last_message,
+          message_text as last_message,
           created_at as timestamp,
           'incoming' as direction,
           read,
-          NULL as status
+          NULL::varchar as status
         FROM incoming_messages
         
         UNION ALL
