@@ -25,17 +25,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, email, phone, password, address, image, role, group_name, banking_name, member_id, date_joined, household_members } = body
+    const { name, email, phone, password, address, image, role, group_name, banking_name, member_id, date_joined, household_members, custom_data } = body
     if (!name || !phone || !password) {
       return NextResponse.json({ error: 'Name, phone number, and password are required' }, { status: 400 })
     }
 
     const hashed = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, group_name, banking_name, member_id, date_joined, household_members) 
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, group_name, banking_name, member_id, date_joined, household_members, custom_data) 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
        RETURNING id, member_id, name, email, phone, role, group_name`,
-      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', group_name || null, banking_name || null, member_id || null, date_joined || null, household_members ? parseInt(household_members) : null]
+      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', group_name || null, banking_name || null, member_id || null, date_joined || null, household_members ? parseInt(household_members) : null, custom_data ? JSON.stringify(custom_data) : '{}']
     )
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {

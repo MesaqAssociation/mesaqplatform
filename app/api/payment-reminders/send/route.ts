@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     // If specific member requested (test mode), send to just that member
     if (memberId) {
       // Get member with their balance
+      // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
       const { rows: memberRows } = await pool.query(`
         SELECT 
           u.id, u.name, u.phone,
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
           SELECT COUNT(*)::int AS expected_months
           FROM generate_series(
             date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-            date_trunc('month', CURRENT_DATE),
+            date_trunc('month', CURRENT_DATE) - interval '1 month',
             interval '1 month'
           ) gs
         ) months
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get all members with their balances
+    // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
     const { rows: members } = await pool.query(`
       SELECT 
         u.id, u.name, u.phone,
@@ -198,7 +200,7 @@ export async function POST(req: NextRequest) {
         SELECT COUNT(*)::int AS expected_months
         FROM generate_series(
           date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-          date_trunc('month', CURRENT_DATE),
+          date_trunc('month', CURRENT_DATE) - interval '1 month',
           interval '1 month'
         ) gs
       ) months

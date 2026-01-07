@@ -15,6 +15,12 @@ type Group = {
   legacy?: boolean
 }
 
+type CustomField = {
+  key: string
+  name: string
+  type: string
+}
+
 export default function CreateMemberForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -24,21 +30,32 @@ export default function CreateMemberForm() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [groups, setGroups] = useState<Group[]>([])
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [customData, setCustomData] = useState<Record<string, string>>({})
 
-  // Load groups on mount
+  // Load groups and custom fields on mount
   useEffect(() => {
-    const loadGroups = async () => {
+    const loadData = async () => {
       try {
-        const res = await fetch('/api/groups')
-        if (res.ok) {
-          const data = await res.json()
+        const [groupsRes, fieldsRes] = await Promise.all([
+          fetch('/api/groups'),
+          fetch('/api/settings/custom-fields')
+        ])
+        
+        if (groupsRes.ok) {
+          const data = await groupsRes.json()
           setGroups(data.groups || [])
         }
+        
+        if (fieldsRes.ok) {
+          const data = await fieldsRes.json()
+          setCustomFields(data.fields || [])
+        }
       } catch (err) {
-        console.error('Failed to load groups:', err)
+        console.error('Failed to load data:', err)
       }
     }
-    loadGroups()
+    loadData()
   }, [])
 
   const [formData, setFormData] = useState({
@@ -147,7 +164,7 @@ export default function CreateMemberForm() {
       const res = await fetch('/api/members/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, image: imageUrl }),
+        body: JSON.stringify({ ...formData, image: imageUrl, custom_data: customData }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -425,6 +442,28 @@ export default function CreateMemberForm() {
           </div>
         )}
       </div>
+
+      {/* Custom Fields */}
+      {customFields.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <p className="text-sm font-medium text-muted-foreground">Additional Information</p>
+            {customFields.map(field => (
+              <div key={field.key}>
+                <Label htmlFor={`custom-${field.key}`}>{field.name}</Label>
+                <Input
+                  id={`custom-${field.key}`}
+                  value={customData[field.key] || ''}
+                  onChange={(e) => setCustomData({ ...customData, [field.key]: e.target.value })}
+                  className="mt-1"
+                  autoComplete="off"
+                />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {error ? (
         <>

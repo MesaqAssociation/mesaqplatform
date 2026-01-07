@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
         sn.created_at,
         sn.sent_at,
         sn.recipients_count,
+        sn.recipient_type,
+        sn.recipient_ids,
         u.name as created_by_name
       FROM scheduled_notifications sn
       LEFT JOIN users u ON sn.created_by = u.id
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { title, message, scheduled_date } = await req.json()
+    const { title, message, scheduled_date, recipient_type, recipient_ids } = await req.json()
 
     if (!title?.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -77,11 +79,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Scheduled date is required' }, { status: 400 })
     }
 
+    // recipient_type can be 'everyone' (default) or 'specific'
+    // recipient_ids is an array of user IDs when recipient_type is 'specific'
+    const type = recipient_type || 'everyone'
+    const ids = type === 'specific' && Array.isArray(recipient_ids) ? recipient_ids : null
+
+    // Ensure columns exist (will be created by migration, but safe fallback)
+    try {
+      await pool.query(`
+        ALTER TABLE scheduled_notifications 
+        ADD COLUMN IF NOT EXISTS recipient_type VARCHAR(20) DEFAULT 'everyone',
+        ADD COLUMN IF NOT EXISTS recipient_ids TEXT[]
+      `)
+    } catch {
+      // Column might already exist, ignore
+    }
+
     const { rows } = await pool.query(`
-      INSERT INTO scheduled_notifications (title, message, scheduled_date, created_by)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO scheduled_notifications (title, message, scheduled_date, created_by, recipient_type, recipient_ids)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [title.trim(), message.trim(), scheduled_date, userId])
+    `, [title.trim(), message.trim(), scheduled_date, userId, type, ids])
 
     return NextResponse.json({ notification: rows[0] })
   } catch (err: any) {

@@ -64,15 +64,17 @@ export async function GET(
       }, { headers: corsHeaders })
     }
 
-    // Calculate expected payment months (from join date to current month)
+    // Calculate expected payment months (from join date to PREVIOUS month)
+    // Since statements are uploaded on the 7th, we don't expect payment for current month yet
     const joinDate = new Date(member.date_joined)
     const currentDate = new Date()
     
     const expectedMonths: string[] = []
     let currentMonth = new Date(joinDate.getFullYear(), joinDate.getMonth(), 1)
-    const now = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    // End at previous month (current month - 1)
+    const lastExpectedMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
 
-    while (currentMonth <= now) {
+    while (currentMonth <= lastExpectedMonth) {
       expectedMonths.push(currentMonth.toISOString().split('T')[0])
       currentMonth.setMonth(currentMonth.getMonth() + 1)
     }

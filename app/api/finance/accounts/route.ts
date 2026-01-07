@@ -163,6 +163,62 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
+// PUT - Update account details (name, bsb, account number)
+export async function PUT(req: NextRequest) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
+  try {
+    jwt.verify(token, process.env.AUTH_SECRET)
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const { accountId, account_name, bsb, account_number } = body
+
+    if (!accountId) {
+      return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
+    }
+
+    if (!account_name?.trim() || !bsb?.trim() || !account_number?.trim()) {
+      return NextResponse.json({ error: 'Account name, BSB, and account number are required' }, { status: 400 })
+    }
+
+    // Validate BSB format (6 digits)
+    const cleanBSB = bsb.replace(/-/g, '')
+    if (!/^\d{6}$/.test(cleanBSB)) {
+      return NextResponse.json({ error: 'BSB must be 6 digits' }, { status: 400 })
+    }
+    // Format BSB as XXX-XXX
+    const formattedBSB = cleanBSB.slice(0, 3) + '-' + cleanBSB.slice(3)
+
+    // Validate account number (6-10 digits)
+    const cleanNumber = account_number.replace(/\s/g, '')
+    if (!/^\d{6,10}$/.test(cleanNumber)) {
+      return NextResponse.json({ error: 'Account number must be 6-10 digits' }, { status: 400 })
+    }
+
+    // Update the account
+    await pool.query(`
+      UPDATE financial_accounts 
+      SET account_name = $1, bsb = $2, account_number = $3, updated_at = NOW()
+      WHERE id = $4
+    `, [account_name.trim(), formattedBSB, cleanNumber, accountId])
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Account details updated successfully'
+    })
+  } catch (err: any) {
+    console.error('Update account details error:', err)
+    return NextResponse.json({ error: 'Failed to update account details' }, { status: 500 })
+  }
+}
+
 // DELETE account
 export async function DELETE(req: NextRequest) {
   const token = cookies().get('auth_token')?.value

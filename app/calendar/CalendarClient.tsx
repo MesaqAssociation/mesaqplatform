@@ -55,6 +55,10 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
   // Form state
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
+  const [recipientType, setRecipientType] = useState<'everyone' | 'specific'>('everyone')
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
+  const [members, setMembers] = useState<Array<{id: string, name: string}>>([])
+  const [memberSearch, setMemberSearch] = useState('')
   
   // Confirm cancel dialog state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -67,7 +71,20 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     loadData()
+    loadMembers()
   }, [])
+
+  const loadMembers = async () => {
+    try {
+      const res = await fetch('/api/members')
+      if (res.ok) {
+        const data = await res.json()
+        setMembers(data.members || [])
+      }
+    } catch (err) {
+      console.error('Failed to load members:', err)
+    }
+  }
 
   // Close popover on outside click
   useEffect(() => {
@@ -124,6 +141,10 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
       showToast('Please select a date', 'error')
       return
     }
+    if (recipientType === 'specific' && selectedRecipients.length === 0) {
+      showToast('Please select at least one recipient', 'error')
+      return
+    }
 
     setCreating(true)
     try {
@@ -133,7 +154,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         body: JSON.stringify({
           title: title.trim(),
           message: message.trim(),
-          scheduled_date: formatDateForApi(selectedDate)
+          scheduled_date: formatDateForApi(selectedDate),
+          recipient_type: recipientType,
+          recipient_ids: recipientType === 'specific' ? selectedRecipients : null
         })
       })
 
@@ -144,6 +167,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
         setMessage('')
         setSelectedDate(undefined)
         setPopoverDate(null)
+        setRecipientType('everyone')
+        setSelectedRecipients([])
+        setMemberSearch('')
         loadData() // Refresh data to show new notification
       } else {
         const data = await res.json()
@@ -617,7 +643,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
           <DialogHeader>
             <DialogTitle>Schedule Notification</DialogTitle>
             <DialogDescription>
-              Send a message to all members on {selectedDate?.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              Schedule a message for {selectedDate?.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </DialogDescription>
           </DialogHeader>
 
@@ -639,7 +665,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Enter the message to send to all members..."
+                placeholder="Enter the message to send..."
                 rows={4}
                 className="mt-1"
               />
@@ -651,10 +677,79 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
 
+            {/* Recipient Selection */}
+            <div>
+              <Label>Recipients *</Label>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  type="button"
+                  variant={recipientType === 'everyone' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setRecipientType('everyone')
+                    setSelectedRecipients([])
+                  }}
+                >
+                  Everyone
+                </Button>
+                <Button
+                  type="button"
+                  variant={recipientType === 'specific' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setRecipientType('specific')}
+                >
+                  Specific People
+                </Button>
+              </div>
+              
+              {recipientType === 'specific' && (
+                <div className="mt-3 space-y-2">
+                  <Input
+                    placeholder="Search members..."
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    className="text-sm"
+                  />
+                  <div className="max-h-32 overflow-y-auto border rounded-md">
+                    {members
+                      .filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
+                      .slice(0, 20)
+                      .map(m => (
+                        <div
+                          key={m.id}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 flex items-center gap-2 ${
+                            selectedRecipients.includes(m.id) ? 'bg-primary/10' : ''
+                          }`}
+                          onClick={() => {
+                            if (selectedRecipients.includes(m.id)) {
+                              setSelectedRecipients(selectedRecipients.filter(id => id !== m.id))
+                            } else {
+                              setSelectedRecipients([...selectedRecipients, m.id])
+                            }
+                          }}
+                        >
+                          <div className={`size-4 rounded border flex items-center justify-center ${
+                            selectedRecipients.includes(m.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                          }`}>
+                            {selectedRecipients.includes(m.id) && <IconCheck className="size-3 text-primary-foreground" />}
+                          </div>
+                          {m.name}
+                        </div>
+                      ))}
+                  </div>
+                  {selectedRecipients.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedRecipients.length} recipient{selectedRecipients.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button 
                 onClick={handleCreate} 
-                disabled={creating || !title.trim() || !message.trim() || !selectedDate}
+                disabled={creating || !title.trim() || !message.trim() || !selectedDate || (recipientType === 'specific' && selectedRecipients.length === 0)}
                 className="flex-1"
               >
                 <IconSend className="mr-2 size-4" />
@@ -666,6 +761,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                   setShowCreateDialog(false)
                   setTitle('')
                   setMessage('')
+                  setRecipientType('everyone')
+                  setSelectedRecipients([])
+                  setMemberSearch('')
                 }}
               >
                 Cancel

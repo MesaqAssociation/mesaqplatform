@@ -8,6 +8,8 @@ import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
 import BoardMemberReport from './BoardMemberReport'
 import BackupRestore from './BackupRestore'
+import BankAccountSettings from './BankAccountSettings'
+import CustomMemberFields from './CustomMemberFields'
 
 export default function SettingsClient({
   user,
@@ -50,6 +52,14 @@ export default function SettingsClient({
         {isAdmin && (
           <TabsContent value="community" className="space-y-6 mt-6">
             <div className="border rounded-lg p-6 shadow-md">
+              <h2 className="text-lg font-medium mb-4">Bank Account Details</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure the main membership account details shown in payment reminders
+              </p>
+              <BankAccountSettings />
+            </div>
+
+            <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Set the monthly membership fee for all members
@@ -82,6 +92,14 @@ export default function SettingsClient({
                 Export member, event, or finance data to CSV or Excel format
               </p>
               <ExportData />
+            </div>
+
+            <div className="border rounded-lg p-6 shadow-md">
+              <h2 className="text-lg font-medium mb-4">Custom Member Fields</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add custom fields to store additional information about members
+              </p>
+              <CustomMemberFields />
             </div>
 
             <div className="border rounded-lg p-6 shadow-md">

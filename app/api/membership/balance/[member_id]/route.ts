@@ -60,12 +60,14 @@ export async function GET(
     const startDate = member.date_joined ? new Date(member.date_joined) : new Date('2025-05-01')
     const currentDate = new Date()
     
-    // Generate list of months from start to current month
+    // Generate list of months from start to PREVIOUS month (exclude current month)
+    // Since statements are uploaded on the 7th, we don't expect payment for current month yet
     const months: Array<{ month: string, monthName: string }> = []
     let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-    const now = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    // End at previous month (current month - 1)
+    const lastExpectedMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
     
-    while (currentMonth <= now) {
+    while (currentMonth <= lastExpectedMonth) {
       const monthStr = currentMonth.toISOString().split('T')[0]
       const monthName = currentMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
       months.push({ month: monthStr, monthName })

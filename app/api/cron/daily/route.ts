@@ -135,6 +135,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   const monthlyFee = parseFloat(feeRows[0]?.value || '40')
 
   // Get all members with their calculated balance
+  // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
   const { rows: members } = await pool.query(`
     SELECT 
       u.id, u.name, u.phone,
@@ -151,7 +152,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(
         date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-        date_trunc('month', CURRENT_DATE),
+        date_trunc('month', CURRENT_DATE) - interval '1 month',
         interval '1 month'
       ) gs
     ) months
@@ -312,6 +313,7 @@ async function applyLateFines(): Promise<{ enabled: boolean; applied: number; am
   const accountId = accountRows[0].id
 
   // Find members with 2+ months overdue who haven't been fined this month
+  // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
   const { rows: overdueMembers } = await pool.query(`
     WITH member_balances AS (
       SELECT 
@@ -332,7 +334,7 @@ async function applyLateFines(): Promise<{ enabled: boolean; applied: number; am
         SELECT COUNT(*)::int AS expected_months
         FROM generate_series(
           date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-          date_trunc('month', CURRENT_DATE),
+          date_trunc('month', CURRENT_DATE) - interval '1 month',
           interval '1 month'
         ) gs
       ) months
