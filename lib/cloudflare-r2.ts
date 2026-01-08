@@ -11,7 +11,7 @@
  * - R2_PUBLIC_URL: Public URL for R2 bucket
  */
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
 // Check if R2 is configured
 export function isR2Configured(): boolean {
@@ -122,6 +122,109 @@ export async function testR2Connection(): Promise<boolean> {
     return true
   } catch (error) {
     console.error('R2 connection test failed:', error)
+    return false
+  }
+}
+
+/**
+ * List objects in a folder
+ */
+export async function listR2Objects(folder: string = 'backups'): Promise<Array<{
+  key: string
+  name: string
+  size: number
+  lastModified: Date
+  url: string
+}>> {
+  if (!isR2Configured()) {
+    return []
+  }
+
+  const client = getR2Client()
+  const bucketName = process.env.R2_BUCKET_NAME!
+
+  try {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: `${folder}/`,
+      })
+    )
+
+    return (response.Contents || []).map(obj => ({
+      key: obj.Key || '',
+      name: obj.Key?.replace(`${folder}/`, '') || '',
+      size: obj.Size || 0,
+      lastModified: obj.LastModified || new Date(),
+      url: getPublicUrl(obj.Key || ''),
+    })).filter(obj => obj.name) // Filter out empty folder entries
+  } catch (error) {
+    console.error('Failed to list R2 objects:', error)
+    return []
+  }
+}
+
+/**
+ * Get object content from R2
+ */
+export async function getR2Object(key: string): Promise<string | null> {
+  if (!isR2Configured()) {
+    return null
+  }
+
+  const client = getR2Client()
+  const bucketName = process.env.R2_BUCKET_NAME!
+
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      })
+    )
+
+    if (response.Body) {
+      // Convert stream to string
+      const chunks: Uint8Array[] = []
+      const reader = response.Body.transformToWebStream().getReader()
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+      }
+      
+      const buffer = Buffer.concat(chunks)
+      return buffer.toString('utf-8')
+    }
+    return null
+  } catch (error) {
+    console.error('Failed to get R2 object:', error)
+    return null
+  }
+}
+
+/**
+ * Delete object from R2
+ */
+export async function deleteR2Object(key: string): Promise<boolean> {
+  if (!isR2Configured()) {
+    return false
+  }
+
+  const client = getR2Client()
+  const bucketName = process.env.R2_BUCKET_NAME!
+
+  try {
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      })
+    )
+    return true
+  } catch (error) {
+    console.error('Failed to delete R2 object:', error)
     return false
   }
 }

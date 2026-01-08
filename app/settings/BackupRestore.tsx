@@ -1,78 +1,58 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { IconDownload, IconUpload, IconAlertTriangle } from '@tabler/icons-react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { IconAlertTriangle, IconChevronDown, IconHistory, IconRefresh } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
+type Backup = {
+  key: string
+  name: string
+  size: number
+  lastModified: string
+  url: string
+  month: string
+  year: number
+  timestamp: number
+}
+
 export default function BackupRestore() {
-  const [downloading, setDownloading] = useState(false)
+  const [backups, setBackups] = useState<Backup[]>([])
+  const [loading, setLoading] = useState(true)
   const [showRestoreDialog, setShowRestoreDialog] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [confirmText, setConfirmText] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [backupPreview, setBackupPreview] = useState<any>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
 
-  const handleDownloadBackup = async () => {
-    setDownloading(true)
+  // Load backups from R2
+  const loadBackups = async () => {
+    setLoading(true)
     try {
-      const res = await fetch('/api/backup')
-      if (!res.ok) {
+      const res = await fetch('/api/backup/r2')
+      if (res.ok) {
+        const data = await res.json()
+        setBackups(data.backups || [])
+      } else {
         const error = await res.json()
-        throw new Error(error.error || 'Failed to create backup')
+        if (error.error !== 'R2 storage not configured') {
+          showToast(error.error || 'Failed to load backups', 'error')
+        }
       }
-      
-      const blob = await res.blob()
-      const contentDisposition = res.headers.get('Content-Disposition')
-      const filename = contentDisposition?.split('filename="')[1]?.replace('"', '') || 'MesaqBackup.json'
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      
-      showToast('Backup downloaded successfully!', 'success')
-    } catch (err: any) {
-      console.error('Backup error:', err)
-      showToast(err.message || 'Failed to create backup', 'error')
+    } catch (err) {
+      console.error('Failed to load backups', err)
     } finally {
-      setDownloading(false)
+      setLoading(false)
     }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.name.endsWith('.json')) {
-      showToast('Please select a valid backup file (.json)', 'error')
-      return
-    }
-
-    try {
-      const text = await file.text()
-      const backup = JSON.parse(text)
-      
-      if (!backup.version || !backup.tables) {
-        throw new Error('Invalid backup file format')
-      }
-
-      setSelectedFile(file)
-      setBackupPreview(backup)
-      setShowRestoreDialog(true)
-    } catch (err: any) {
-      showToast('Invalid backup file: ' + err.message, 'error')
-    }
-  }
+  useEffect(() => {
+    loadBackups()
+  }, [])
 
   const handleRestore = async () => {
     if (confirmText !== 'confirm') {
@@ -80,18 +60,18 @@ export default function BackupRestore() {
       return
     }
 
-    if (!backupPreview) {
-      showToast('No backup file selected', 'error')
+    if (!selectedBackup) {
+      showToast('No backup selected', 'error')
       return
     }
 
     setRestoring(true)
     try {
-      const res = await fetch('/api/backup', {
-        method: 'POST',
+      const res = await fetch('/api/backup/r2', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          backup: backupPreview,
+          key: selectedBackup.key,
           confirmText
         })
       })
@@ -117,45 +97,82 @@ export default function BackupRestore() {
     }
   }
 
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-AU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   return (
     <div className="space-y-4">
-      {/* Download Backup */}
-      <div>
-        <Label className="text-sm font-medium">Download Backup</Label>
-        <p className="text-sm text-muted-foreground mb-3">
-          Download a complete backup of all your data including members, events, transactions, and settings.
-        </p>
-        <Button onClick={handleDownloadBackup} disabled={downloading}>
-          <IconDownload className="mr-2 size-4" />
-          {downloading ? 'Creating Backup...' : 'Download Backup'}
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Backups are automatically created on the last day of every month and stored securely.
+        You can restore from any previous backup below.
+      </p>
 
-      {/* Restore from Backup */}
-      <div className="pt-4 border-t">
-        <Label className="text-sm font-medium">Restore from Backup</Label>
-        <p className="text-sm text-muted-foreground mb-3">
-          Upload a previous backup file to restore your data. This will replace all current data.
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-          <IconUpload className="mr-2 size-4" />
-          Select Backup File
-        </Button>
-      </div>
+      {/* My Backups - Collapsible */}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <IconHistory className="size-4" />
+              My Backups ({backups.length})
+            </span>
+            <IconChevronDown className={`size-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-4">
+          {loading ? (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              Loading backups...
+            </div>
+          ) : backups.length === 0 ? (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              No backups found. Backups are created automatically at the end of each month.
+            </div>
+          ) : (
+            <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+              {backups.map((backup) => (
+                <div key={backup.key} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30">
+                  <div>
+                    <p className="font-medium">{backup.month} {backup.year}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(backup.lastModified)} • {formatSize(backup.size)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedBackup(backup)
+                      setShowRestoreDialog(true)
+                    }}
+                  >
+                    <IconRefresh className="size-4 mr-1" />
+                    Restore
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Restore Confirmation Dialog */}
       <Dialog open={showRestoreDialog} onOpenChange={(open) => {
         if (!open) {
           setConfirmText('')
-          setBackupPreview(null)
-          setSelectedFile(null)
+          setSelectedBackup(null)
         }
         setShowRestoreDialog(open)
       }}>
@@ -170,28 +187,24 @@ export default function BackupRestore() {
             </DialogDescription>
           </DialogHeader>
 
-          {backupPreview && (
+          {selectedBackup && (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <p className="text-sm font-medium">Backup Details:</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-muted-foreground">Period:</span>
+                  <span>{selectedBackup.month} {selectedBackup.year}</span>
                   <span className="text-muted-foreground">Created:</span>
-                  <span>{new Date(backupPreview.created_at).toLocaleString()}</span>
-                  <span className="text-muted-foreground">Users:</span>
-                  <span>{backupPreview.counts?.users || 0}</span>
-                  <span className="text-muted-foreground">Events:</span>
-                  <span>{backupPreview.counts?.events || 0}</span>
-                  <span className="text-muted-foreground">Transactions:</span>
-                  <span>{backupPreview.counts?.transactions || 0}</span>
-                  <span className="text-muted-foreground">Payments:</span>
-                  <span>{backupPreview.counts?.membership_payments || 0}</span>
+                  <span>{formatDate(selectedBackup.lastModified)}</span>
+                  <span className="text-muted-foreground">Size:</span>
+                  <span>{formatSize(selectedBackup.size)}</span>
                 </div>
               </div>
 
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
                 <p className="text-sm text-destructive font-medium mb-2">⚠️ Warning</p>
                 <p className="text-sm text-muted-foreground">
-                  All current data will be permanently replaced. Make sure you have a current backup before proceeding.
+                  All current data will be permanently replaced. Make sure you want to restore to this backup.
                 </p>
               </div>
 

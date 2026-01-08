@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { sendBulkPaymentReminders, sendBulkAdminMessages, AdminMessageData, PaymentReminderData, formatPhoneNumber } from '@/lib/picky-assist'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
+import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     paymentReminders: { sent: 0, failed: 0, skipped: 0, processed: false },
     scheduledMessages: { sent: 0, failed: 0, notificationsProcessed: 0 },
     feeUpdate: { applied: false, newFee: null as string | null },
+    backup: { created: false, url: null as string | null },
   }
 
   try {
@@ -113,6 +115,25 @@ export async function GET(req: NextRequest) {
       console.log(`✅ Scheduled notifications: ${scheduledResult.sent} sent`)
     } catch (err) {
       console.error('❌ Scheduled notifications error:', err)
+    }
+
+    // ============================================
+    // 3. MONTHLY BACKUP (last day of month)
+    // ============================================
+    // Check if today is the last day of the month
+    const tomorrow = new Date(melbourneNow)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const isLastDayOfMonth = tomorrow.getDate() === 1
+
+    if (isLastDayOfMonth && isR2Configured()) {
+      console.log('📦 Last day of month - Creating backup')
+      try {
+        const backupResult = await createMonthlyBackup(melbourneNow)
+        results.backup = backupResult
+        console.log(`✅ Monthly backup created: ${backupResult.url}`)
+      } catch (err) {
+        console.error('❌ Monthly backup error:', err)
+      }
     }
 
     return NextResponse.json({
@@ -289,5 +310,93 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
   }
 
   return { sent: totalSent, failed: totalFailed, notificationsProcessed: dueNotifications.length }
+}
+
+/**
+ * Create monthly backup and upload to R2
+ */
+async function createMonthlyBackup(melbourneDate: Date): Promise<{ created: boolean; url: string | null }> {
+  // Helper to safely query tables that might not exist
+  const safeQuery = async (sql: string) => {
+    try {
+      return await pool.query(sql)
+    } catch {
+      return { rows: [] }
+    }
+  }
+
+  // Fetch all tables data
+  const [
+    usersResult,
+    eventsResult,
+    memberEventsResult,
+    transactionsResult,
+    membershipPaymentsResult,
+    systemSettingsResult,
+    financialAccountsResult,
+    bankStatementsResult,
+    memberGroupsResult,
+    paymentKeywordsResult,
+    scheduledNotificationsResult,
+    communityDocumentsResult,
+  ] = await Promise.all([
+    pool.query('SELECT * FROM users'),
+    pool.query('SELECT * FROM events'),
+    safeQuery('SELECT * FROM member_events'),
+    pool.query('SELECT * FROM transactions'),
+    pool.query('SELECT * FROM membership_payments'),
+    pool.query('SELECT * FROM system_settings'),
+    pool.query('SELECT * FROM financial_accounts'),
+    pool.query('SELECT * FROM bank_statements'),
+    safeQuery('SELECT * FROM member_groups'),
+    safeQuery('SELECT * FROM payment_keywords'),
+    safeQuery('SELECT * FROM scheduled_notifications'),
+    safeQuery('SELECT * FROM community_documents'),
+  ])
+
+  const backupData = {
+    version: '2.0',
+    created_at: new Date().toISOString(),
+    created_by: 'cron',
+    tables: {
+      users: usersResult.rows,
+      events: eventsResult.rows,
+      member_events: memberEventsResult.rows,
+      transactions: transactionsResult.rows,
+      membership_payments: membershipPaymentsResult.rows,
+      system_settings: systemSettingsResult.rows,
+      financial_accounts: financialAccountsResult.rows,
+      bank_statements: bankStatementsResult.rows,
+      member_groups: memberGroupsResult.rows,
+      payment_keywords: paymentKeywordsResult.rows,
+      scheduled_notifications: scheduledNotificationsResult.rows,
+      community_documents: communityDocumentsResult.rows,
+    },
+    counts: {
+      users: usersResult.rows.length,
+      events: eventsResult.rows.length,
+      member_events: memberEventsResult.rows.length,
+      transactions: transactionsResult.rows.length,
+      membership_payments: membershipPaymentsResult.rows.length,
+      system_settings: systemSettingsResult.rows.length,
+      financial_accounts: financialAccountsResult.rows.length,
+      bank_statements: bankStatementsResult.rows.length,
+      member_groups: memberGroupsResult.rows.length,
+      payment_keywords: paymentKeywordsResult.rows.length,
+      scheduled_notifications: scheduledNotificationsResult.rows.length,
+      community_documents: communityDocumentsResult.rows.length,
+    }
+  }
+
+  const month = melbourneDate.toLocaleString('en-US', { month: 'long' })
+  const year = melbourneDate.getFullYear()
+  const jsonString = JSON.stringify(backupData, null, 2)
+  const buffer = Buffer.from(jsonString, 'utf-8')
+  const filename = `MesaqBackup-${month}-${year}.json`
+
+  // Upload to R2
+  const url = await uploadToR2(buffer, filename, 'application/json', 'backups')
+
+  return { created: true, url }
 }
 
