@@ -106,6 +106,34 @@ export async function POST(req: NextRequest) {
             WHERE group_name = $1 AND phone IS NOT NULL
           `, [organizing_group])
 
+          // Check Picky Assist balance before sending ($0.10 per message)
+          if (groupMembers.length > 0 && process.env.PICKY_ASSIST_API_KEY) {
+            try {
+              const balanceRes = await fetch('https://app.pickyassist.com/api/v2/check-balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: process.env.PICKY_ASSIST_API_KEY })
+              })
+              
+              if (balanceRes.ok) {
+                const balanceData = await balanceRes.json()
+                const currentBalance = balanceData.balance || 0
+                const requiredBalance = groupMembers.filter((m: any) => m.phone).length * 0.10
+                
+                if (currentBalance < requiredBalance) {
+                  // Return error - insufficient balance for event notifications
+                  return NextResponse.json({ 
+                    error: `Insufficient balance to notify group. Need $${requiredBalance.toFixed(2)}, have $${currentBalance.toFixed(2)}. Please top up or uncheck 'Notify Group Members'.`,
+                    event: result.rows[0] // Still return the event if created, but show the error
+                  }, { status: 400 })
+                }
+              }
+            } catch (balanceErr) {
+              console.error('Balance check failed:', balanceErr)
+              // Continue anyway if balance check fails
+            }
+          }
+
           if (groupMembers.length > 0) {
             // Format the event date for display with time
             const eventDate = new Date(event_date)

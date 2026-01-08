@@ -91,6 +91,8 @@ export default async function MemberDetailPage({
       created_at: member.created_at ? new Date(member.created_at).toISOString() : null,
       date_joined: member.date_joined ? new Date(member.date_joined).toISOString().split('T')[0] : null,
       household_members: member.household_members || 0,
+      payment_identifiers: member.payment_identifiers || [],
+      custom_data: member.custom_data || {},
     }
 
     const formattedAttendedEvents = attendedEvents.map(event => ({

@@ -97,9 +97,19 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { name, email, phone, address, group_name, banking_name, household_members } = body
+    const { name, email, phone, address, group_name, banking_name, household_members, payment_identifiers } = body
 
     const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
+    
+    // Parse payment_identifiers from comma-separated string to array
+    let paymentIdsArray: string[] = []
+    if (payment_identifiers) {
+      if (typeof payment_identifiers === 'string') {
+        paymentIdsArray = payment_identifiers.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+      } else if (Array.isArray(payment_identifiers)) {
+        paymentIdsArray = payment_identifiers
+      }
+    }
 
     const { rows } = await pool.query(`
       UPDATE users
@@ -110,9 +120,10 @@ export async function PATCH(
         address = $4,
         group_name = $5,
         banking_name = $6,
-        household_members = $7
-      WHERE id = $8
-      RETURNING id, name, email, phone, address, group_name, banking_name, household_members
+        household_members = $7,
+        payment_identifiers = $8
+      WHERE id = $9
+      RETURNING id, name, email, phone, address, group_name, banking_name, household_members, payment_identifiers
     `, [
       name?.trim() || null,
       email?.trim() || null,
@@ -121,6 +132,7 @@ export async function PATCH(
       group_name?.trim() || null,
       banking_name?.trim() || null,
       hh,
+      paymentIdsArray.length > 0 ? paymentIdsArray : null,
       memberId
     ])
 

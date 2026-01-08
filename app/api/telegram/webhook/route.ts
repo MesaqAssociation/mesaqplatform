@@ -790,10 +790,65 @@ async function handleMemberInput(chatId: number, text: string, state: CreationSt
         return
       }
       state.data.household_members = household
-      await createMember(chatId, state.data)
-      userStates.delete(chatId)
+      
+      // Check for custom fields
+      const customFields = await getCustomFields()
+      if (customFields.length > 0) {
+        state.data.custom_fields = customFields
+        state.data.custom_data = {}
+        state.data.current_field_index = 0
+        state.step = 'custom_field'
+        const field = customFields[0]
+        await sendTelegramMessage(chatId, `📝 ${field.name} (or type "skip" to skip):`)
+      } else {
+        await createMember(chatId, state.data)
+        userStates.delete(chatId)
+      }
+      break
+    
+    case 'custom_field':
+      const fields = state.data.custom_fields || []
+      const fieldIndex = state.data.current_field_index || 0
+      const currentField = fields[fieldIndex]
+      
+      if (currentField) {
+        // Store the value (unless skipped)
+        if (text.toLowerCase() !== 'skip') {
+          state.data.custom_data = state.data.custom_data || {}
+          state.data.custom_data[currentField.key] = text
+        }
+        
+        // Move to next field or create member
+        const nextIndex = fieldIndex + 1
+        if (nextIndex < fields.length) {
+          state.data.current_field_index = nextIndex
+          const nextField = fields[nextIndex]
+          await sendTelegramMessage(chatId, `📝 ${nextField.name} (or type "skip" to skip):`)
+        } else {
+          await createMember(chatId, state.data)
+          userStates.delete(chatId)
+        }
+      } else {
+        await createMember(chatId, state.data)
+        userStates.delete(chatId)
+      }
       break
   }
+}
+
+// Fetch custom member fields from system_settings
+async function getCustomFields(): Promise<Array<{key: string, name: string}>> {
+  try {
+    const { rows } = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'custom_member_fields'"
+    )
+    if (rows[0]?.value) {
+      return JSON.parse(rows[0].value)
+    }
+  } catch (err) {
+    console.error('Error fetching custom fields:', err)
+  }
+  return []
 }
 
 // Show notify option for event
@@ -1146,6 +1201,31 @@ async function createEvent(chatId: number, data: any): Promise<void> {
           `, [data.organizing_group])
 
           if (groupMembers.length > 0) {
+            // Check Picky Assist balance before sending ($0.10 per message)
+            const membersWithPhone = groupMembers.filter((m: any) => m.phone)
+            if (membersWithPhone.length > 0 && process.env.PICKY_ASSIST_API_KEY) {
+              try {
+                const balanceRes = await fetch('https://app.pickyassist.com/api/v2/check-balance', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ token: process.env.PICKY_ASSIST_API_KEY })
+                })
+                
+                if (balanceRes.ok) {
+                  const balanceData = await balanceRes.json()
+                  const currentBalance = balanceData.balance || 0
+                  const requiredBalance = membersWithPhone.length * 0.10
+                  
+                  if (currentBalance < requiredBalance) {
+                    await sendTelegramMessage(chatId, `⚠️ Event created but notifications NOT sent - insufficient balance. Need $${requiredBalance.toFixed(2)}, have $${currentBalance.toFixed(2)}. Please top up.`)
+                    return
+                  }
+                }
+              } catch (balanceErr) {
+                console.error('Balance check failed:', balanceErr)
+              }
+            }
+
             // Format the event date for display with time
             const eventDate = new Date(data.event_date)
             const formattedDateOnly = eventDate.toLocaleDateString('en-AU', { 
@@ -1237,12 +1317,16 @@ async function createMember(chatId: number, data: any): Promise<void> {
     await sendTelegramMessage(chatId, '⏳ Creating member...')
 
     const hashed = await bcrypt.hash(data.password, 10)
+    const customData = data.custom_data && Object.keys(data.custom_data).length > 0 
+      ? JSON.stringify(data.custom_data) 
+      : '{}'
+    
     const result = await pool.query(
       `INSERT INTO users (
         id, name, email, phone, password_hash, address, role, 
-        group_name, date_joined, household_members, member_id
+        group_name, date_joined, household_members, member_id, custom_data
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9
+        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10::jsonb
       ) RETURNING id, name, phone, role`,
       [
         data.name,
@@ -1254,6 +1338,7 @@ async function createMember(chatId: number, data: any): Promise<void> {
         data.group_name || null,
         data.household_members || 1,
         data.member_id || null,
+        customData,
       ]
     )
 

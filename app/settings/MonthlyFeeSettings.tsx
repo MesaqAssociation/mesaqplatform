@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +20,27 @@ type Props = {
 
 export default function MonthlyFeeSettings({ initialFee }: Props) {
   const [fee, setFee] = useState(initialFee)
+  const [pendingFee, setPendingFee] = useState<string | null>(null)
+  const [effectiveDate, setEffectiveDate] = useState<string | null>(null)
+  
+  // Load pending fee info
+  useEffect(() => {
+    const loadPendingFee = async () => {
+      try {
+        const res = await fetch('/api/settings/monthly-fee')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.pendingFee) {
+            setPendingFee(data.pendingFee.toFixed(2))
+            setEffectiveDate(data.effectiveDate)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load pending fee:', err)
+      }
+    }
+    loadPendingFee()
+  }, [])
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -52,11 +73,10 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
 
       if (response.ok) {
         const data = await response.json()
-        setFee(data.fee)
+        setPendingFee(data.fee)
+        setEffectiveDate(data.effectiveDate)
         setIsEditing(false)
-        showToast(`Monthly membership fee updated to $${data.fee}`, 'success')
-        // Reload page to update the fee everywhere
-        setTimeout(() => window.location.reload(), 1500)
+        showToast(`Fee will change to $${data.fee} on ${data.effectiveDate}`, 'success')
       } else {
         const error = await response.json()
         showToast(error.error || 'Failed to update fee', 'error')
@@ -101,8 +121,15 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            💡 Fee changes will apply from the next month onwards. Past months remain unchanged.
+            💡 Fee changes will apply from the 1st of next month. Past months remain unchanged.
           </p>
+          {pendingFee && effectiveDate && (
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                ⏳ Pending change: <strong>${pendingFee}</strong> starting {new Date(effectiveDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          )}
         </div>
 
         {isEditing && (

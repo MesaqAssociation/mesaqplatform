@@ -300,7 +300,6 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
   const getEventsForDate = (date: Date) => {
     const dateKey = formatDateKey(date)
-    console.log('Looking for events on:', dateKey, 'Found:', events.filter(e => e.event_date === dateKey).length)
     return events.filter(e => e.event_date === dateKey)
   }
 
@@ -845,7 +844,7 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+            <div className="space-y-2 text-sm text-muted-foreground">
               <div>
                 <span className="font-medium">Status:</span>{' '}
                 {viewNotification && getStatusBadge(viewNotification.status)}
@@ -853,7 +852,14 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               <div>
                 <span className="font-medium">Sending to:</span>{' '}
                 {viewNotification?.recipient_type === 'specific' 
-                  ? `${viewNotification?.recipient_ids?.length || 0} specific people` 
+                  ? (() => {
+                      const recipientNames = (viewNotification.recipient_ids || [])
+                        .map((id: string) => members.find(m => m.id === id)?.name)
+                        .filter(Boolean)
+                      return recipientNames.length > 0 
+                        ? recipientNames.join(', ')
+                        : `${viewNotification.recipient_ids?.length || 0} specific people`
+                    })()
                   : 'Everyone'}
               </div>
               {viewNotification?.recipients_count != null && viewNotification.recipients_count > 0 && (

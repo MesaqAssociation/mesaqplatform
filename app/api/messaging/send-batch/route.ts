@@ -70,6 +70,30 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Check Picky Assist balance before sending ($0.10 per message)
+    try {
+      const balanceRes = await fetch('https://app.pickyassist.com/api/v2/check-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: process.env.PICKY_ASSIST_API_KEY })
+      })
+      
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json()
+        const currentBalance = balanceData.balance || 0
+        const requiredBalance = memberIds.length * 0.10
+        
+        if (currentBalance < requiredBalance) {
+          return NextResponse.json({ 
+            error: `Balance too low to send ${memberIds.length} messages. Need $${requiredBalance.toFixed(2)}, have $${currentBalance.toFixed(2)}. Please top up.`
+          }, { status: 400 })
+        }
+      }
+    } catch (balanceErr) {
+      console.error('Balance check failed:', balanceErr)
+      // Continue anyway if balance check fails
+    }
+
     // Get member details
     const placeholders = memberIds.map((_: any, i: number) => `$${i + 1}`).join(',')
     const { rows: members } = await pool.query(`

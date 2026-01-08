@@ -20,8 +20,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
 -- Insert default system settings
 INSERT INTO system_settings (key, value) VALUES 
   ('monthly_membership_fee', '40.00'),
-  ('late_payment_fines_enabled', 'false'),
-  ('late_payment_fine_amount', '10.00'),
   ('whatsapp_reminders_enabled', 'true'),
   ('whatsapp_board_group_id', '')
 ON CONFLICT (key) DO NOTHING;
@@ -44,6 +42,8 @@ CREATE TABLE IF NOT EXISTS users (
   household_members INTEGER DEFAULT 1,
   date_joined DATE,
   current_balance DECIMAL(10,2) DEFAULT 0.00,
+  payment_identifiers TEXT[],
+  custom_data JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

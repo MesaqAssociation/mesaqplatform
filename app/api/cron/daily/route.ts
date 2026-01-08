@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     testMode: isTestMode,
     paymentReminders: { sent: 0, failed: 0, skipped: 0, processed: false },
     scheduledMessages: { sent: 0, failed: 0, notificationsProcessed: 0 },
+    feeUpdate: { applied: false, newFee: null as string | null },
   }
 
   try {
@@ -45,6 +46,47 @@ export async function GET(req: NextRequest) {
     const dayOfMonth = melbourneNow.getDate()
     
     console.log(`🕐 Daily Cron running at ${melbourneNow.toISOString()} (Melbourne day: ${dayOfMonth})`)
+
+    // ============================================
+    // 0. APPLY PENDING FEE CHANGE (1st of the month)
+    // ============================================
+    if (dayOfMonth === 1) {
+      console.log('📅 1st of month - Checking for pending fee changes')
+      try {
+        const { rows: settingsRows } = await pool.query(`
+          SELECT key, value FROM system_settings 
+          WHERE key IN ('pending_monthly_fee', 'pending_fee_effective_date')
+        `)
+        
+        const settings: Record<string, string> = {}
+        settingsRows.forEach((r: any) => settings[r.key] = r.value)
+        
+        if (settings.pending_monthly_fee && settings.pending_fee_effective_date) {
+          const effectiveDate = new Date(settings.pending_fee_effective_date)
+          const today = new Date(melbourneNow.toISOString().split('T')[0])
+          
+          if (today >= effectiveDate) {
+            // Apply the pending fee
+            await pool.query(`
+              UPDATE system_settings 
+              SET value = $1, updated_at = NOW()
+              WHERE key = 'monthly_membership_fee'
+            `, [settings.pending_monthly_fee])
+            
+            // Clear the pending fee
+            await pool.query(`
+              DELETE FROM system_settings 
+              WHERE key IN ('pending_monthly_fee', 'pending_fee_effective_date')
+            `)
+            
+            results.feeUpdate = { applied: true, newFee: settings.pending_monthly_fee }
+            console.log(`✅ Applied pending fee: $${settings.pending_monthly_fee}`)
+          }
+        }
+      } catch (err) {
+        console.error('Error applying pending fee:', err)
+      }
+    }
 
     // ============================================
     // 1. PAYMENT REMINDERS (7th of the month only)

@@ -418,6 +418,13 @@ export default function MessagingClient() {
       return
     }
 
+    // Check balance before sending ($0.10 per message)
+    const messageCost = selectedMembers.size * 0.10
+    if (balance !== null && balance < messageCost) {
+      showToast(`Balance too low to send ${selectedMembers.size} messages. Need $${messageCost.toFixed(2)}, have $${balance.toFixed(2)}. Please top up.`, 'error')
+      return
+    }
+
     setSendingBulk(true)
     try {
       const res = await fetch('/api/messaging/send-batch', {

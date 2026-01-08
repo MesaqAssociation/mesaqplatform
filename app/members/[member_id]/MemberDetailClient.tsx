@@ -41,6 +41,8 @@ type Member = {
   date_joined: string | null
   household_members: number
   created_at: string | null
+  payment_identifiers: string[]
+  custom_data: Record<string, any>
 }
 
 type Event = {
@@ -106,6 +108,7 @@ export default function MemberDetailClient({
     group_name: member.group_name || '',
     banking_name: member.banking_name || '',
     household_members: member.household_members || 1,
+    payment_identifiers: (member.payment_identifiers || []).join(', '),
   })
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -482,7 +485,7 @@ export default function MemberDetailClient({
                     )}
                     {editMode && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1 }) }}>
+                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', ') }) }}>
                           Cancel
                         </Button>
                         <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
@@ -633,6 +636,23 @@ export default function MemberDetailClient({
                     <Input value={draft.banking_name} onChange={(e) => setDraft({ ...draft, banking_name: e.target.value })} />
                   ) : (
                     <p className="font-medium">{member.banking_name || '-'}</p>
+                  )}
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center gap-3">
+                <IconCreditCard className="size-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Payment Identifiers</p>
+                  <p className="text-xs text-muted-foreground mb-1">Strings this member puts in payment descriptions</p>
+                  {editMode ? (
+                    <Input 
+                      value={draft.payment_identifiers} 
+                      onChange={(e) => setDraft({ ...draft, payment_identifiers: e.target.value })} 
+                      placeholder="e.g., john123, johns payment"
+                    />
+                  ) : (
+                    <p className="font-medium">{member.payment_identifiers?.length > 0 ? member.payment_identifiers.join(', ') : '-'}</p>
                   )}
                 </div>
               </div>
