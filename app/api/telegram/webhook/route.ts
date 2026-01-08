@@ -373,18 +373,34 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Update account balance
-        if (parsed.closingBalance !== undefined) {
-          await pool.query(
-            'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-            [parsed.closingBalance, accountId]
-          )
-          runningBalance = parsed.closingBalance
+        // Update account balance ONLY if this is the most recent statement
+        const { rows: latestStatements } = await pool.query(`
+          SELECT statement_date_to FROM bank_statements 
+          WHERE account_id = $1 AND statement_date_to IS NOT NULL
+          ORDER BY statement_date_to DESC
+          LIMIT 1
+        `, [accountId])
+        
+        const latestStatementDate = latestStatements[0]?.statement_date_to
+        const isNewestStatement = !latestStatementDate || 
+          !statementToDate || 
+          new Date(statementToDate) >= new Date(latestStatementDate)
+        
+        if (isNewestStatement) {
+          if (parsed.closingBalance !== undefined) {
+            await pool.query(
+              'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+              [parsed.closingBalance, accountId]
+            )
+            runningBalance = parsed.closingBalance
+          } else {
+            await pool.query(
+              'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+              [runningBalance, accountId]
+            )
+          }
         } else {
-          await pool.query(
-            'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-            [runningBalance, accountId]
-          )
+          console.log(`⚠️ Telegram: Skipping balance update - older statement`)
         }
 
         // Audit log removed - logs system no longer in use

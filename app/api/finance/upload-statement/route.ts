@@ -320,17 +320,20 @@ export async function POST(req: NextRequest) {
         let category = isDonationAccount ? 'Donation' : 'Event Payment'
 
         // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY - regardless of member match)
-        // ONLY check description for keywords (case-insensitive)
+        // Check both description AND transaction name for keywords (case-insensitive substring match)
         let keywordMatch: { keyword: string, paymentType: string } | null = null
-        if (!isDonationAccount && txn.description) {
-          const descLower = txn.description.toLowerCase()
+        if (!isDonationAccount) {
+          const descLower = (txn.description || '').toLowerCase()
+          const nameLower = (txn.name || '').toLowerCase()
 
-          // Find keyword in description only
-          keywordMatch = keywords.find(kw => descLower.includes(kw.keyword)) || null
+          // Find keyword anywhere in description OR transaction name (substring match)
+          keywordMatch = keywords.find(kw => 
+            descLower.includes(kw.keyword) || nameLower.includes(kw.keyword)
+          ) || null
 
           if (keywordMatch) {
             category = keywordMatch.paymentType
-            console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in description → ${keywordMatch.paymentType} (overrides all other logic)`)
+            console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found → ${keywordMatch.paymentType} (substring match)`)
           }
         }
 
@@ -459,19 +462,38 @@ export async function POST(req: NextRequest) {
       failedTransactions.forEach(f => console.log(`  - Date: ${f.date}, Name: ${f.name}, Error: ${f.error}`))
     }
 
-    // Update account balance (skip donation accounts)
+    // Update account balance ONLY if this is the most recent statement (skip donation accounts)
     if (!isDonationAccount) {
-      if (parsed.closingBalance !== undefined) {
-        await pool.query(
-          'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-          [parsed.closingBalance, finalAccountId]
-        )
-        runningBalance = parsed.closingBalance
+      // Check if this statement is the most recent one
+      const { rows: latestStatements } = await pool.query(`
+        SELECT statement_date_to FROM bank_statements 
+        WHERE account_id = $1 AND statement_date_to IS NOT NULL
+        ORDER BY statement_date_to DESC
+        LIMIT 1
+      `, [finalAccountId])
+      
+      const latestStatementDate = latestStatements[0]?.statement_date_to
+      const isNewestStatement = !latestStatementDate || 
+        !statementToDate || 
+        new Date(statementToDate) >= new Date(latestStatementDate)
+      
+      if (isNewestStatement) {
+        if (parsed.closingBalance !== undefined) {
+          await pool.query(
+            'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+            [parsed.closingBalance, finalAccountId]
+          )
+          runningBalance = parsed.closingBalance
+          console.log(`✅ Updated balance to ${parsed.closingBalance} (this is the newest statement)`)
+        } else {
+          await pool.query(
+            'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
+            [runningBalance, finalAccountId]
+          )
+          console.log(`✅ Updated balance to ${runningBalance} (this is the newest statement)`)
+        }
       } else {
-        await pool.query(
-          'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
-          [runningBalance, finalAccountId]
-        )
+        console.log(`⚠️ Skipping balance update - this statement (ending ${statementToDate}) is older than existing (ending ${latestStatementDate})`)
       }
     }
 
