@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText, IconStar, IconStarFilled, IconBuildingBank } from '@tabler/icons-react'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText, IconStar, IconStarFilled, IconBuildingBank, IconSend } from '@tabler/icons-react'
 import BankAccountSettings from './BankAccountSettings'
 
 type Account = {
@@ -117,6 +117,13 @@ export default function FinanceClient({
   
   // Bank Account Settings Dialog
   const [showBankAccountDialog, setShowBankAccountDialog] = useState(false)
+  
+  // Payment Reminders Dialog
+  const [showPaymentRemindersDialog, setShowPaymentRemindersDialog] = useState(false)
+  const [remindersPreview, setRemindersPreview] = useState<{ id: string; name: string; balance: number; phone: string }[]>([])
+  const [loadingRemindersPreview, setLoadingRemindersPreview] = useState(false)
+  const [sendingReminders, setSendingReminders] = useState(false)
+  
   const [chargeAmount, setChargeAmount] = useState('')
   const [chargeReason, setChargeReason] = useState('')
   const [chargeMemberId, setChargeMemberId] = useState<string | null>(null)
@@ -827,6 +834,71 @@ export default function FinanceClient({
     }
   }
 
+  // Load payment reminders preview
+  const loadRemindersPreview = async () => {
+    setLoadingRemindersPreview(true)
+    try {
+      const res = await fetch('/api/payment-reminders/send')
+      if (res.ok) {
+        const data = await res.json()
+        setRemindersPreview(data.members || [])
+      } else {
+        showToast('Failed to load members with outstanding balance', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to load reminders preview', err)
+      showToast('Failed to load preview', 'error')
+    } finally {
+      setLoadingRemindersPreview(false)
+    }
+  }
+
+  // Send payment reminders to all members with negative balance
+  const handleSendReminders = async () => {
+    if (remindersPreview.length === 0) {
+      showToast('No members to send reminders to', 'error')
+      return
+    }
+
+    // Check balance first
+    const cost = remindersPreview.length * 0.10
+    try {
+      const balanceRes = await fetch('/api/messaging/balance')
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json()
+        if (balanceData.balance < cost) {
+          showToast(`Insufficient balance. Need $${cost.toFixed(2)} but only have $${balanceData.balance.toFixed(2)}`, 'error')
+          return
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check balance', err)
+    }
+
+    setSendingReminders(true)
+    try {
+      const res = await fetch('/api/payment-reminders/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testMode: false }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(`Payment reminders sent to ${data.sent} members`, 'success')
+        setShowPaymentRemindersDialog(false)
+      } else {
+        showToast(data.error || 'Failed to send reminders', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to send reminders', err)
+      showToast('Failed to send reminders. Please try again.', 'error')
+    } finally {
+      setSendingReminders(false)
+    }
+  }
+
   // Match transaction to member
   const handleMatchMember = async (transactionId: string, memberId: string | null) => {
     setLoading(true)
@@ -1311,6 +1383,16 @@ export default function FinanceClient({
           </Button>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setShowPaymentRemindersDialog(true)
+              loadRemindersPreview()
+            }}
+          >
+            <IconSend className="mr-2 size-4" />
+            Send Payment Reminders
+          </Button>
           <Button variant="outline" onClick={() => setShowChargeMemberDialog(true)}>
             Charge Member
           </Button>
@@ -2500,6 +2582,73 @@ export default function FinanceClient({
             </DialogDescription>
           </DialogHeader>
           <BankAccountSettings />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Reminders Dialog */}
+      <Dialog open={showPaymentRemindersDialog} onOpenChange={setShowPaymentRemindersDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Send Payment Reminders</DialogTitle>
+            <DialogDescription>
+              Send WhatsApp payment reminders to all members with outstanding balances.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4">
+            {loadingRemindersPreview ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              </div>
+            ) : remindersPreview.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>🎉 All members are up to date!</p>
+                <p className="text-sm mt-2">No outstanding balances found.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm">
+                    <span className="font-medium">{remindersPreview.length} members</span> have outstanding balances.
+                    Sending reminders will cost approximately <span className="font-medium">${(remindersPreview.length * 0.10).toFixed(2)}</span>.
+                  </p>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium">Name</th>
+                        <th className="px-4 py-2 text-left font-medium">Phone</th>
+                        <th className="px-4 py-2 text-right font-medium">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {remindersPreview.map((member) => (
+                        <tr key={member.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-2">{member.name}</td>
+                          <td className="px-4 py-2 text-muted-foreground">{member.phone}</td>
+                          <td className="px-4 py-2 text-right text-red-600 dark:text-red-400 font-medium">
+                            -${Math.abs(member.balance).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => setShowPaymentRemindersDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSendReminders}
+              disabled={sendingReminders || remindersPreview.length === 0}
+            >
+              <IconSend className="mr-2 size-4" />
+              {sendingReminders ? 'Sending...' : `Send to ${remindersPreview.length} Members`}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
