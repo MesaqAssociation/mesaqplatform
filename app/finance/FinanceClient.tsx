@@ -587,8 +587,8 @@ export default function FinanceClient({
 
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
-    // Set category, defaulting to 'Other' if empty/null
-    const category = txn.category?.trim() || 'Other'
+    // Set category, defaulting to 'Event Payment' if empty/null
+    const category = txn.category?.trim() || 'Event Payment'
     setDialogCategory(category)
     setShowTransactionDialog(true)
   }
@@ -1558,7 +1558,9 @@ export default function FinanceClient({
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         {txn.category === 'Charges' ? (
-                          <span className="text-xs font-medium text-orange-600 dark:text-orange-400 px-2">Charges</span>
+                          <div className="w-[150px] h-8 text-xs bg-background text-foreground border border-input rounded-md flex items-center px-3">
+                            Charges
+                          </div>
                         ) : (
                           <Select 
                             value={
@@ -1566,8 +1568,6 @@ export default function FinanceClient({
                               txn.category === 'Membership Payment' ? 'Membership Payment' :
                               txn.category === 'Donation' ? 'Donation' :
                               txn.category === 'Event Payment' ? 'Event Payment' :
-                              txn.category === 'Special Payment' ? 'Special Payment' :
-                              !txn.category || txn.category.trim() === '' ? 'Event Payment' :
                               'Event Payment' // Default fallback
                             }
                             onValueChange={(value) => handleUpdateCategory(txn.id, value)}
@@ -1579,9 +1579,6 @@ export default function FinanceClient({
                               <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
                               <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
                               <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
-                              {txn.category === 'Special Payment' && (
-                                <SelectItem value="Special Payment" className="text-foreground cursor-pointer text-muted-foreground">Special Payment (Legacy)</SelectItem>
-                              )}
                             </SelectContent>
                           </Select>
                         )}
@@ -1680,7 +1677,9 @@ export default function FinanceClient({
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
                 {selectedTransaction?.category === 'Charges' ? (
-                  <p className="font-medium mt-1 text-orange-600 dark:text-orange-400">Charges</p>
+                  <div className="w-48 h-10 mt-1 bg-background text-foreground border border-input rounded-md flex items-center px-3">
+                    Charges
+                  </div>
                 ) : (
                   <Select 
                     value={dialogCategory} 
@@ -1693,9 +1692,6 @@ export default function FinanceClient({
                       <SelectItem value="Membership Payment">Membership Payment</SelectItem>
                       <SelectItem value="Event Payment">Event Payment</SelectItem>
                       <SelectItem value="Donation">Donation</SelectItem>
-                      <SelectItem value="Special Payment">Special Payment</SelectItem>
-                      <SelectItem value="Late Payment Fine">Late Payment Fine</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
