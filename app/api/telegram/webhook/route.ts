@@ -176,27 +176,32 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Create bank statement record
-        const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
-        const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
-        const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
+        // Use statement period from PDF if available, otherwise fall back to transaction dates
+        let statementFromDate: string | null = null
+        let statementToDate: string | null = null
         
-        // Check for duplicate statement - same file name or overlapping date range
+        if (parsed.statementPeriod?.from && parsed.statementPeriod?.to) {
+          statementFromDate = parsed.statementPeriod.from
+          statementToDate = parsed.statementPeriod.to
+          console.log(`📅 [Telegram] Using statement period from PDF: ${statementFromDate} to ${statementToDate}`)
+        } else {
+          const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
+          statementFromDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
+          statementToDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
+          console.log(`📅 [Telegram] Using transaction date range: ${statementFromDate} to ${statementToDate}`)
+        }
+        
+        // Check for duplicate statement - overlapping date range only (not filename)
         const { rows: existingStatements } = await pool.query(`
-          SELECT id, file_name, statement_date_from, statement_date_to 
+          SELECT id, statement_date_from, statement_date_to 
           FROM bank_statements 
           WHERE account_id = $1 
-            AND (
-              file_name = $2 
-              OR (
-                statement_date_from IS NOT NULL 
-                AND statement_date_to IS NOT NULL 
-                AND $3::date IS NOT NULL 
-                AND $4::date IS NOT NULL
-                AND (statement_date_from <= $4::date AND statement_date_to >= $3::date)
-              )
-            )
-        `, [accountId, document.file_name, minDate, maxDate])
+            AND statement_date_from IS NOT NULL 
+            AND statement_date_to IS NOT NULL 
+            AND $2::date IS NOT NULL 
+            AND $3::date IS NOT NULL
+            AND (statement_date_from <= $3::date AND statement_date_to >= $2::date)
+        `, [accountId, statementFromDate, statementToDate])
         
         if (existingStatements.length > 0) {
           const existingFile = existingStatements[0]
@@ -235,8 +240,8 @@ export async function POST(req: NextRequest) {
           document.file_name,
           document.file_size || 0,
           'application/pdf',
-          minDate,
-          maxDate,
+          statementFromDate,
+          statementToDate,
           parsed.transactions.length,
           fileUrl
         ])

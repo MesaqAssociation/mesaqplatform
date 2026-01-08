@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import MembersClient from './MembersClient'
-import { IconX, IconPlus, IconUsers, IconChevronDown, IconEye } from '@tabler/icons-react'
+import { IconX, IconPlus, IconUsers, IconChevronDown, IconEye, IconTrash } from '@tabler/icons-react'
 import { useI18n } from '@/components/I18nProvider'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,12 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const [loadingGroupMembers, setLoadingGroupMembers] = useState<string | null>(null)
+  
+  // Delete group state
+  const [showDeleteGroupDialog, setShowDeleteGroupDialog] = useState(false)
+  const [groupToDelete, setGroupToDelete] = useState<{ id: string | null, name: string } | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingGroup, setDeletingGroup] = useState(false)
 
   useEffect(() => {
     const success = searchParams.get('success')
@@ -174,6 +180,38 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
       if (!group?.members) {
         loadGroupMembers(groupName, groupId)
       }
+    }
+  }
+
+  // Handle delete group
+  const handleDeleteGroup = async () => {
+    if (deleteConfirmText.toLowerCase() !== 'confirm' || !groupToDelete) return
+    
+    setDeletingGroup(true)
+    try {
+      // Delete by setting all members' group_name to null
+      const res = await fetch('/api/groups', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupName: groupToDelete.name })
+      })
+
+      if (res.ok) {
+        toast('Group deleted successfully', 'success')
+        setShowDeleteGroupDialog(false)
+        setGroupToDelete(null)
+        setDeleteConfirmText('')
+        loadGroups()
+        router.refresh()
+      } else {
+        const data = await res.json()
+        toast(data.error || 'Failed to delete group', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to delete group:', err)
+      toast('Failed to delete group', 'error')
+    } finally {
+      setDeletingGroup(false)
     }
   }
 
@@ -376,6 +414,16 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                           <span className="text-sm text-muted-foreground">
                             {group.member_count || 0} member{(group.member_count || 0) !== 1 ? 's' : ''}
                           </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setGroupToDelete({ id: group.id, name: group.name })
+                              setShowDeleteGroupDialog(true)
+                            }}
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <IconTrash className="size-4" />
+                          </button>
                           <IconChevronDown className={`size-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
@@ -412,6 +460,49 @@ export default function MembersPageClient({ initial, isAdmin = true }: { initial
                 )
               })
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Group Confirmation Dialog */}
+      <Dialog open={showDeleteGroupDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowDeleteGroupDialog(false)
+          setGroupToDelete(null)
+          setDeleteConfirmText('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Group</DialogTitle>
+            <DialogDescription>
+              This will remove all members from "{groupToDelete?.name}" and delete the group. Members will not be deleted, only unassigned from this group.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="delete-confirm">Type "confirm" to delete this group</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="confirm"
+                className="mt-1"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteGroupDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteGroup}
+                disabled={deleteConfirmText.toLowerCase() !== 'confirm' || deletingGroup}
+              >
+                {deletingGroup ? 'Deleting...' : 'Delete Group'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

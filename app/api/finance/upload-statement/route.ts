@@ -150,10 +150,23 @@ export async function POST(req: NextRequest) {
       console.log('ℹ️ R2 not configured, skipping file upload')
     }
 
-    // Create bank statement record
-    const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
-    const minDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
-    const maxDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
+    // Use statement period from PDF if available, otherwise fall back to transaction dates
+    // The statementPeriod is extracted from the PDF header (e.g., "Statement period: 5 Dec 2024 to 4 Jan 2025")
+    let statementFromDate: string | null = null
+    let statementToDate: string | null = null
+    
+    if (parsed.statementPeriod?.from && parsed.statementPeriod?.to) {
+      // Use the statement period dates from the PDF
+      statementFromDate = parsed.statementPeriod.from
+      statementToDate = parsed.statementPeriod.to
+      console.log(`📅 Using statement period from PDF: ${statementFromDate} to ${statementToDate}`)
+    } else {
+      // Fall back to transaction date range
+      const statementDates = parsed.transactions.map(t => t.date).filter(d => d)
+      statementFromDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a < b ? a : b) : null
+      statementToDate = statementDates.length > 0 ? statementDates.reduce((a, b) => a > b ? a : b) : null
+      console.log(`📅 Using transaction date range: ${statementFromDate} to ${statementToDate}`)
+    }
 
     // Check for duplicate statement - overlapping date range only
     const { rows: existingStatements } = await pool.query(`
@@ -165,12 +178,18 @@ export async function POST(req: NextRequest) {
         AND $2::date IS NOT NULL 
         AND $3::date IS NOT NULL
         AND (statement_date_from <= $3::date AND statement_date_to >= $2::date)
-    `, [finalAccountId, minDate, maxDate])
+    `, [finalAccountId, statementFromDate, statementToDate])
 
     if (existingStatements.length > 0) {
       const existingFile = existingStatements[0]
+      // Format dates nicely
+      const formatDate = (d: string) => {
+        try {
+          return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+        } catch { return d }
+      }
       return NextResponse.json({
-        error: `Duplicate date range: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists. This statement covers ${minDate} to ${maxDate}.`
+        error: `Duplicate statement period: A statement covering ${formatDate(existingFile.statement_date_from)} to ${formatDate(existingFile.statement_date_to)} already exists.`
       }, { status: 400 })
     }
 
@@ -184,8 +203,8 @@ export async function POST(req: NextRequest) {
       file.name,
       file.size,
       file.type,
-      minDate,
-      maxDate,
+      statementFromDate,
+      statementToDate,
       parsed.transactions.length,
       userId,
       fileUrl

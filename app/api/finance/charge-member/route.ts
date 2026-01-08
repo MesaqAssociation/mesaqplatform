@@ -12,8 +12,10 @@ const pool = new Pool({
 
 /**
  * POST /api/finance/charge-member
- * Charge a member - creates a debit transaction that reduces their balance
- * and adds an expected payment to their account
+ * Charge a member - creates an expected payment that reduces their balance.
+ * Does NOT affect the bank account balance.
+ * Use case: Member prepaid (e.g., paid Jan-May in December), need to "charge" them
+ * to remove the prepaid balance so they owe that amount again.
  */
 export async function POST(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
@@ -62,9 +64,9 @@ export async function POST(req: NextRequest) {
 
     const member = memberRows[0]
 
-    // Get the main membership account
+    // Get the main membership account (just for reference, we won't modify its balance)
     const { rows: accountRows } = await pool.query(`
-      SELECT id, current_balance FROM financial_accounts 
+      SELECT id FROM financial_accounts 
       WHERE is_main_membership_account = true 
       LIMIT 1
     `)
@@ -74,11 +76,11 @@ export async function POST(req: NextRequest) {
     }
 
     const account = accountRows[0]
-
-    // Create a debit transaction (expected payment from member)
-    // This is recorded as a debit because money is expected TO the account
     const transactionDate = new Date().toISOString().split('T')[0]
-    
+
+    // Create a debit transaction to track the charge
+    // This does NOT affect the bank account balance
+    // It's marked with category 'Member Charge' so the balance calculation picks it up
     const { rows: txnRows } = await pool.query(`
       INSERT INTO transactions (
         id, 
@@ -91,8 +93,7 @@ export async function POST(req: NextRequest) {
         category,
         matched_member_id,
         source,
-        created_by,
-        balance_after
+        created_by
       ) VALUES (
         gen_random_uuid(),
         $1::uuid,
@@ -104,8 +105,7 @@ export async function POST(req: NextRequest) {
         'Member Charge',
         $6,
         'Manual Charge',
-        $7,
-        $8
+        $7
       ) RETURNING *
     `, [
       account.id,
@@ -114,23 +114,19 @@ export async function POST(req: NextRequest) {
       `Manual charge for ${member.name}: ${reason}`,
       chargeAmount,
       memberId,
-      userId,
-      account.current_balance - chargeAmount
+      userId
     ])
 
-    // Update account balance
-    await pool.query(`
-      UPDATE financial_accounts 
-      SET current_balance = current_balance - $1 
-      WHERE id = $2
-    `, [chargeAmount, account.id])
+    // NOTE: We do NOT update financial_accounts.current_balance
+    // The charge only affects the member's expected payments
 
     return NextResponse.json({
       success: true,
       transaction: txnRows[0],
       memberName: member.name,
       amount: chargeAmount,
-      reason
+      reason,
+      message: `Charged ${member.name} $${chargeAmount.toFixed(2)} for: ${reason}`
     })
   } catch (err: any) {
     console.error('Charge member error:', err)
@@ -140,4 +136,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

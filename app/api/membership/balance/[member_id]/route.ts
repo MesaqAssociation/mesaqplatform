@@ -98,13 +98,25 @@ export async function GET(
       paymentMap.set(monthKey, parseFloat(p.total_amount || 0))
     })
 
+    // Get total Member Charges (debit transactions with category 'Member Charge')
+    // These are amounts the member owes on top of regular monthly fees
+    const { rows: chargeRows } = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) as total_charges
+      FROM transactions
+      WHERE matched_member_id = $1
+        AND category = 'Member Charge'
+        AND transaction_type = 'debit'
+    `, [member.id])
+    const totalCharges = parseFloat(chargeRows[0]?.total_charges || 0)
+
     // Calculate membership balance
     let runningBalance = 0
     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0)
     const expectedPayments = months.length
       
-    // Running balance = total paid - total expected
-    runningBalance = totalPaid - (expectedPayments * monthlyFee)
+    // Running balance = total paid - total expected - charges
+    // Charges REDUCE the balance (member owes more)
+    runningBalance = totalPaid - (expectedPayments * monthlyFee) - totalCharges
 
     // Calculate status
     let status: 'caught_up' | 'ahead' | 'behind' = 'caught_up'
@@ -163,14 +175,31 @@ export async function GET(
       }
     })
 
+    // Get charge details for display
+    const { rows: chargeDetails } = await pool.query(`
+      SELECT 
+        t.id,
+        to_char(t.transaction_date, 'YYYY-MM-DD') as date,
+        t.transaction_name as name,
+        t.description,
+        t.amount
+      FROM transactions t
+      WHERE t.matched_member_id = $1
+        AND t.category = 'Member Charge'
+        AND t.transaction_type = 'debit'
+      ORDER BY t.transaction_date DESC
+    `, [member.id])
+
     return NextResponse.json({
       membershipBalance: {
-      currentBalance: runningBalance,
-      expectedPayments,
-      totalPaid,
-      monthlyFee,
-      status,
-      monthsBreakdown
+        currentBalance: runningBalance,
+        expectedPayments,
+        totalPaid,
+        totalCharges,
+        monthlyFee,
+        status,
+        monthsBreakdown,
+        charges: chargeDetails
       },
       eventPaymentBalance: {
         totalEventPayments,

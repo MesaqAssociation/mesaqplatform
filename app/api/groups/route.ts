@@ -206,18 +206,34 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url)
-    const groupId = searchParams.get('id')
-    const groupName = searchParams.get('name')
+    const body = await req.json()
+    const { groupName, groupId } = body
 
-    if (groupId) {
-      // Delete from member_groups table
-      await pool.query('DELETE FROM member_groups WHERE id = $1', [groupId])
-    } else if (groupName) {
-      // Legacy mode - clear group_name from users
-      await pool.query('UPDATE users SET group_name = NULL WHERE group_name = $1', [groupName])
-    } else {
+    if (!groupName && !groupId) {
       return NextResponse.json({ error: 'Group ID or name is required' }, { status: 400 })
+    }
+
+    // Clear group_name and group_id from all users in this group
+    if (groupName) {
+      await pool.query(
+        `UPDATE users SET group_name = NULL, group_id = NULL, is_group_leader = false WHERE group_name = $1`,
+        [groupName]
+      )
+    }
+
+    // Also delete from member_groups table if exists
+    if (groupId) {
+      try {
+        await pool.query('DELETE FROM member_groups WHERE id = $1', [groupId])
+      } catch {
+        // Table might not exist
+      }
+    } else if (groupName) {
+      try {
+        await pool.query('DELETE FROM member_groups WHERE name = $1', [groupName])
+      } catch {
+        // Table might not exist
+      }
     }
 
     return NextResponse.json({ success: true })
