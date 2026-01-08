@@ -43,6 +43,7 @@ type Member = {
   created_at: string | null
   payment_identifiers: string[]
   custom_data: Record<string, any>
+  occupation: string | null
 }
 
 type Event = {
@@ -111,6 +112,7 @@ export default function MemberDetailClient({
     banking_name: member.banking_name || '',
     household_members: member.household_members || 1,
     payment_identifiers: (member.payment_identifiers || []).join(', '),
+    occupation: member.occupation || '',
   })
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -521,7 +523,7 @@ export default function MemberDetailClient({
                         {saveError && (
                           <span className="text-sm text-red-500 mr-2">{saveError}</span>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setSaveError(null); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', ') }); setCustomDataDraft(member.custom_data || {}) }}>
+                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setSaveError(null); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', '), occupation: member.occupation || '' }); setCustomDataDraft(member.custom_data || {}) }}>
                           Cancel
                         </Button>
                         <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
@@ -689,6 +691,22 @@ export default function MemberDetailClient({
                     />
                   ) : (
                     <p className="font-medium">{member.payment_identifiers?.length > 0 ? member.payment_identifiers.join(', ') : '-'}</p>
+                  )}
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center gap-3">
+                <IconUserCircle className="size-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Occupation</p>
+                  {editMode ? (
+                    <Input 
+                      value={draft.occupation} 
+                      onChange={(e) => setDraft({ ...draft, occupation: e.target.value })} 
+                      placeholder="e.g., Engineer, Teacher"
+                    />
+                  ) : (
+                    <p className="font-medium">{member.occupation || '-'}</p>
                   )}
                 </div>
               </div>

@@ -97,7 +97,7 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data } = body
+    const { name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation } = body
 
     const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
     
@@ -111,6 +111,13 @@ export async function PATCH(
       }
     }
 
+    // Ensure occupation column exists
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation TEXT`)
+    } catch {
+      // Column might already exist
+    }
+
     const { rows } = await pool.query(`
       UPDATE users
       SET 
@@ -122,9 +129,10 @@ export async function PATCH(
         banking_name = $6,
         household_members = $7,
         payment_identifiers = $8,
-        custom_data = COALESCE($9::jsonb, custom_data, '{}')
-      WHERE id = $10
-      RETURNING id, name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data
+        custom_data = COALESCE($9::jsonb, custom_data, '{}'),
+        occupation = $10
+      WHERE id = $11
+      RETURNING id, name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation
     `, [
       name?.trim() || null,
       email?.trim() || null,
@@ -135,6 +143,7 @@ export async function PATCH(
       hh,
       paymentIdsArray.length > 0 ? paymentIdsArray : null,
       custom_data ? JSON.stringify(custom_data) : null,
+      occupation?.trim() || null,
       memberId
     ])
 

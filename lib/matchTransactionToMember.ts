@@ -3,7 +3,7 @@ import { Pool } from 'pg'
 export type MemberMatch = {
   memberId: string
   memberName: string
-  matchType: 'phone' | 'banking_name' | 'member_id' | 'none'
+  matchType: 'phone' | 'banking_name' | 'member_id' | 'payment_identifier' | 'none'
   confidence: 'high' | 'low'
 }
 
@@ -40,7 +40,31 @@ export async function matchTransactionToMember(
     `SELECT id, name, phone, banking_name FROM users WHERE phone IS NOT NULL OR banking_name IS NOT NULL`
   )
   
+  // Get all members with payment identifiers
+  const { rows: membersWithPaymentIds } = await pool.query(
+    `SELECT id, name, payment_identifiers FROM users WHERE payment_identifiers IS NOT NULL AND array_length(payment_identifiers, 1) > 0`
+  )
+  
   const descriptionLower = description.toLowerCase()
+  const transactionNameLower = transactionName.toLowerCase()
+  
+  // STEP 0: Check for payment identifiers (HIGHEST PRIORITY - case-insensitive)
+  for (const member of membersWithPaymentIds) {
+    if (member.payment_identifiers && Array.isArray(member.payment_identifiers)) {
+      for (const identifier of member.payment_identifiers) {
+        const idLower = identifier.toLowerCase()
+        // Check in both description and transaction name (case-insensitive)
+        if (descriptionLower.includes(idLower) || transactionNameLower.includes(idLower)) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            matchType: 'payment_identifier',
+            confidence: 'high'
+          }
+        }
+      }
+    }
+  }
   
   // STEP 1: Check for member_id in description (with zero-padding variations)
   for (const member of membersWithId) {
@@ -180,9 +204,9 @@ export async function batchMatchTransactions(
   transactions: Array<{ name: string; description: string; type?: string }>
 ): Promise<Array<MemberMatch | null>> {
   
-  // Get all members with member_id, phone numbers and banking names
+  // Get all members with member_id, phone numbers, banking names, and payment identifiers
   const { rows: members } = await pool.query(
-    `SELECT id, name, member_id, phone, banking_name FROM users WHERE member_id IS NOT NULL OR phone IS NOT NULL OR banking_name IS NOT NULL`
+    `SELECT id, name, member_id, phone, banking_name, payment_identifiers FROM users WHERE member_id IS NOT NULL OR phone IS NOT NULL OR banking_name IS NOT NULL OR (payment_identifiers IS NOT NULL AND array_length(payment_identifiers, 1) > 0)`
   )
   const allMembers = members
   
@@ -190,6 +214,7 @@ export async function batchMatchTransactions(
   const memberIdMap = new Map<number, { id: string; name: string }>()
   const phoneMap = new Map<string, { id: string; name: string }>()
   const bankingNameMap = new Map<string, { id: string; name: string }>()
+  const paymentIdMap = new Map<string, { id: string; name: string }>()
   
   members.forEach(member => {
     if (member.member_id) {
@@ -207,6 +232,13 @@ export async function batchMatchTransactions(
         }
       })
     }
+    if (member.payment_identifiers && Array.isArray(member.payment_identifiers)) {
+      member.payment_identifiers.forEach((identifier: string) => {
+        if (identifier) {
+          paymentIdMap.set(identifier.toLowerCase(), { id: member.id, name: member.name })
+        }
+      })
+    }
   })
   
   // Match each transaction
@@ -214,6 +246,21 @@ export async function batchMatchTransactions(
     // Safety check: Don't match debit transactions
     if (txn.type === 'debit') {
       return null
+    }
+    
+    const descriptionLower = txn.description.toLowerCase()
+    const txnNameLower = txn.name.toLowerCase()
+    
+    // Step 0: Check for payment identifiers (HIGHEST PRIORITY - case-insensitive)
+    for (const [identifier, member] of paymentIdMap.entries()) {
+      if (descriptionLower.includes(identifier) || txnNameLower.includes(identifier)) {
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          matchType: 'payment_identifier' as const,
+          confidence: 'high' as const
+        }
+      }
     }
     
     // Step 1: Check for member_id in description (with zero-padding)
@@ -285,8 +332,6 @@ export async function batchMatchTransactions(
     }
     
     // Step 2: Check for phone identifier in description
-    const descriptionLower = txn.description.toLowerCase()
-    
     // Check if any member's phone identifier appears in the description
     for (const [phone, member] of phoneMap.entries()) {
       const phoneIdentifier = phone.toLowerCase()

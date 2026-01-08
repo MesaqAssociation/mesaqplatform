@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
   current_balance DECIMAL(10,2) DEFAULT 0.00,
   payment_identifiers TEXT[],
   custom_data JSONB DEFAULT '{}',
+  occupation TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

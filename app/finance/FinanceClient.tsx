@@ -1370,62 +1370,64 @@ export default function FinanceClient({
         )}
       </div>
 
-      {/* Upload Bank Statement */}
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
-          <Button 
-            variant="destructive" 
-            onClick={handleClearAll} 
-            disabled={loading || transactions.length === 0}
-          >
-            <IconTrash className="mr-2 size-4" />
-            Clear All Transactions
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setShowPaymentRemindersDialog(true)
-              loadRemindersPreview()
-            }}
-          >
-            <IconSend className="mr-2 size-4" />
-            Send Payment Reminders
-          </Button>
-          <Button variant="outline" onClick={() => setShowChargeMemberDialog(true)}>
-            Charge Member
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button disabled={loading}>
-                <IconPlus className="mr-2 size-4" />
-                Add Transaction
-                <IconChevronDown className="ml-2 size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setShowAddTransactionDialog(true)}>
-                Add Transaction
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowAdvancePaymentDialog(true)}>
-                Advance Payment
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" onClick={() => setShowBankAccountDialog(true)}>
-            <IconBuildingBank className="mr-2 size-4" />
-            Edit Bank Account
-          </Button>
-          <label htmlFor="statement-upload">
-            <Button asChild disabled={uploading}>
-              <span>
-                <IconUpload className="mr-2 size-4" />
-                {uploading ? 'Uploading...' : 'Upload Bank Statement'}
-              </span>
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Primary actions - Add/Upload */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={loading}>
+              <IconPlus className="mr-2 size-4" />
+              Add Transaction
+              <IconChevronDown className="ml-2 size-4" />
             </Button>
-          </label>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setShowAddTransactionDialog(true)}>
+              Add Transaction
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowAdvancePaymentDialog(true)}>
+              Advance Payment
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <label htmlFor="statement-upload">
+          <Button asChild disabled={uploading}>
+            <span>
+              <IconUpload className="mr-2 size-4" />
+              {uploading ? 'Uploading...' : 'Upload Statement'}
+            </span>
+          </Button>
+        </label>
+        
+        {/* Secondary actions - Outlined */}
+        <Button variant="outline" onClick={() => setShowChargeMemberDialog(true)}>
+          Charge Member
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            setShowPaymentRemindersDialog(true)
+            loadRemindersPreview()
+          }}
+        >
+          <IconSend className="mr-2 size-4" />
+          Send Reminders
+        </Button>
+        <Button variant="outline" onClick={() => setShowBankAccountDialog(true)}>
+          <IconBuildingBank className="mr-2 size-4" />
+          Bank Account
+        </Button>
+        
+        {/* Destructive - at the end */}
+        <div className="flex-1" />
+        <Button 
+          variant="destructive" 
+          onClick={handleClearAll} 
+          disabled={loading || transactions.length === 0}
+        >
+          <IconTrash className="mr-2 size-4" />
+          Clear All
+        </Button>
         <input
           id="statement-upload"
           type="file"

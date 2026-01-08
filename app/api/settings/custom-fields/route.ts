@@ -130,3 +130,57 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE - Delete a custom field
+export async function DELETE(req: NextRequest) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!(await isAdmin(token))) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
+
+  try {
+    const { fieldKey } = await req.json()
+
+    if (!fieldKey) {
+      return NextResponse.json({ error: 'Field key is required' }, { status: 400 })
+    }
+
+    // Get existing custom fields
+    const { rows } = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'custom_member_fields'"
+    )
+    
+    const existingFields = rows[0]?.value ? JSON.parse(rows[0].value) : []
+    
+    // Find and remove the field
+    const fieldIndex = existingFields.findIndex((f: any) => f.key === fieldKey)
+    if (fieldIndex === -1) {
+      return NextResponse.json({ error: 'Field not found' }, { status: 404 })
+    }
+
+    existingFields.splice(fieldIndex, 1)
+
+    // Save to system_settings
+    await pool.query(`
+      INSERT INTO system_settings (key, value, updated_at)
+      VALUES ('custom_member_fields', $1, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+    `, [JSON.stringify(existingFields)])
+
+    // Remove the field data from all users' custom_data
+    await pool.query(`
+      UPDATE users
+      SET custom_data = custom_data - $1
+      WHERE custom_data ? $1
+    `, [fieldKey])
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error('Delete custom field error:', err)
+    return NextResponse.json({ error: 'Failed to delete custom field' }, { status: 500 })
+  }
+}
+

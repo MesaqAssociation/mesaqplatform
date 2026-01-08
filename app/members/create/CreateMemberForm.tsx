@@ -76,6 +76,7 @@ export default function CreateMemberForm() {
     member_id: '',
     date_joined: new Date().toISOString().split('T')[0],
     household_members: '1',
+    occupation: '',
   })
 
   function getDaysInMonth(year: number, month: number) {
@@ -475,6 +476,18 @@ export default function CreateMemberForm() {
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Enter address"
+              className="mt-1"
+              autoComplete="off"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="occupation">Occupation</Label>
+            <Input
+              id="occupation"
+              value={formData.occupation}
+              onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+              placeholder="e.g., Engineer, Teacher, Doctor"
               className="mt-1"
               autoComplete="off"
             />
