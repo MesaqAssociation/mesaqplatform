@@ -1,0 +1,35 @@
+MESAQ PLATFORM - COMPLETED TASKS
+=================================
+
+1. Group creation 400 error fix - Added leaderId to group creation API call
+2. Event notifications optional - Added checkbox to enable/disable WhatsApp notifications when creating events
+3. Telegram bot group restriction - Bot only responds in authorized supergroup, ignores private messages
+4. Google Calendar-style UI - Clicking a day shows popover with events and scheduled messages
+5. Telegram bot date selection - Button-based year/month/day selection with back buttons
+6. End time can reach 12:00 AM (midnight) - Website and Telegram bot support midnight as end time
+7. Telegram bot future-proofing - Dynamic year selection shows current year + next 2 years
+8. Bilingual message templates - Event and payment reminder templates include English and Persian text
+9. Calendar events clicking fix - Fixed date comparison issue so events show when clicking calendar days
+10. Smaller calendar UI - Reduced calendar size for better layout
+11. Script for phone numbers under 11 digits - Created SQL query to find users with short phone numbers
+12. Confirm dialog for deleting scheduled messages - Type "confirm" required before deletion
+13. Yellow dot for scheduled messages - Fixed date parsing for proper indicator display
+14. Recipient count removed when 0 - Hidden "0" from scheduled message status
+15. Bank account settings - Added Edit Bank Account Details with BSB, account number, and confirm input
+16. Custom member fields - Managers can add custom fields that appear on member creation and profile pages
+17. Targeted message scheduling - Choose "Everyone" or "Specific People" for scheduled messages
+18. Payment expectations exclude current month - Only expect payment for previous months
+19. Payment identifiers field - Added payment_identifiers column to users table for transaction matching
+20. Search bar on members page - Filter members by name or phone number
+21. Charge Member feature - Add expected payments/charges to specific members from finance page
+22. Remove late payment fines - Completely removed fines from UI, DB, and cron jobs
+23. Custom fields display on member pages - Custom fields show in member profile with edit capability
+24. Success toasts for all actions - Bulk messaging, settings changes, scheduling, events, documents
+25. Monthly fee pending system - Fee changes apply from 1st of next month via cron job
+26. Balance check for messages - Verify $0.10/message balance before sending bulk/event messages
+27. Custom fields in Telegram bot - Bot prompts for custom fields when creating members
+28. Simplified duplicate statement message - Cleaner date format for duplicate upload errors
+29. Validation errors in UI - Show errors next to Save button on member edit pages
+30. Recipient names display - Show comma-separated names instead of count in scheduled messages
+31. Console.log cleanup - Removed debug logs from calendar component
+

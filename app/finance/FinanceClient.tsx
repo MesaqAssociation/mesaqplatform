@@ -111,6 +111,16 @@ export default function FinanceClient({
   const [advanceMemberId, setAdvanceMemberId] = useState<string | null>(null)
   const [advanceMemberName, setAdvanceMemberName] = useState<string>('')
   
+  // Charge Member Dialog (for adding expected payments)
+  const [showChargeMemberDialog, setShowChargeMemberDialog] = useState(false)
+  const [chargeAmount, setChargeAmount] = useState('')
+  const [chargeReason, setChargeReason] = useState('')
+  const [chargeMemberId, setChargeMemberId] = useState<string | null>(null)
+  const [chargeMemberName, setChargeMemberName] = useState('')
+  const [chargeMemberQuery, setChargeMemberQuery] = useState('')
+  const [chargeMemberResults, setChargeMemberResults] = useState<Member[]>([])
+  const [chargingMember, setChargingMember] = useState(false)
+  
   // Member Search for matching (in table)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberSearchResults, setMemberSearchResults] = useState<Member[]>([])
@@ -161,6 +171,42 @@ export default function FinanceClient({
       setAdvanceMemberResults(filtered)
     }
   }, [advanceMemberQuery, allMembers])
+
+  // Load members when charge dialog opens
+  useEffect(() => {
+    if (showChargeMemberDialog && allMembers.length === 0) {
+      const loadMembers = async () => {
+        try {
+          const res = await fetch('/api/members')
+          if (res.ok) {
+            const data = await res.json()
+            setAllMembers(data.members || [])
+            setChargeMemberResults(data.members || [])
+          }
+        } catch (err) {
+          console.error('Failed to load members', err)
+        }
+      }
+      loadMembers()
+    } else if (showChargeMemberDialog) {
+      setChargeMemberResults(allMembers)
+    }
+  }, [showChargeMemberDialog, allMembers])
+
+  // Filter members for charge dialog
+  useEffect(() => {
+    if (chargeMemberQuery.trim() === '') {
+      setChargeMemberResults(allMembers)
+    } else {
+      const query = chargeMemberQuery.toLowerCase()
+      const filtered = allMembers.filter(m => 
+        m.name?.toLowerCase().includes(query) ||
+        m.email?.toLowerCase().includes(query) ||
+        m.phone?.toLowerCase().includes(query)
+      )
+      setChargeMemberResults(filtered)
+    }
+  }, [chargeMemberQuery, allMembers])
   
   
   // Transaction Search
@@ -721,6 +767,57 @@ export default function FinanceClient({
     }
   }
 
+  // Charge member (add expected payment/reduce balance)
+  const handleChargeMember = async () => {
+    if (!chargeMemberId || !chargeAmount.trim() || !chargeReason.trim()) {
+      showToast('Please select a member, enter amount and reason', 'error')
+      return
+    }
+
+    const amount = parseFloat(chargeAmount)
+    if (isNaN(amount) || amount <= 0) {
+      showToast('Please enter a valid amount', 'error')
+      return
+    }
+
+    setChargingMember(true)
+    try {
+      const res = await fetch('/api/finance/charge-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: chargeMemberId,
+          amount,
+          reason: chargeReason,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showToast(`Charged $${amount.toFixed(2)} to ${chargeMemberName}`, 'success')
+        
+        // Reset form
+        setShowChargeMemberDialog(false)
+        setChargeAmount('')
+        setChargeReason('')
+        setChargeMemberId(null)
+        setChargeMemberName('')
+        setChargeMemberQuery('')
+        
+        // Reload transactions
+        loadTransactions()
+      } else {
+        showToast(data.error || 'Failed to charge member', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to charge member', err)
+      showToast('Failed to charge member. Please try again.', 'error')
+    } finally {
+      setChargingMember(false)
+    }
+  }
+
   // Match transaction to member
   const handleMatchMember = async (transactionId: string, memberId: string | null) => {
     setLoading(true)
@@ -1149,6 +1246,9 @@ export default function FinanceClient({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowAdvancePaymentDialog(true)}>
                 Advance Payment
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowChargeMemberDialog(true)}>
+                Charge Member
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -2122,6 +2222,120 @@ export default function FinanceClient({
                 disabled={!advanceMemberId || advanceMonths < 1 || loading}
               >
                 {loading ? 'Recording...' : 'Record Payment'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Charge Member Dialog */}
+      <Dialog open={showChargeMemberDialog} onOpenChange={setShowChargeMemberDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Charge Member</DialogTitle>
+            <DialogDescription>
+              Add an expected payment for a member. This reduces their balance and creates a record of what they owe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="charge-member">Member *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between mt-1"
+                  >
+                    {chargeMemberName || "Select member..."}
+                    <IconSearch className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Search member..." 
+                      value={chargeMemberQuery}
+                      onValueChange={setChargeMemberQuery}
+                    />
+                    <CommandList>
+                      {chargeMemberResults.length === 0 && chargeMemberQuery ? (
+                        <CommandEmpty>No members found</CommandEmpty>
+                      ) : (
+                      <CommandGroup>
+                        {chargeMemberResults.slice(0, 10).map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            onSelect={() => {
+                              setChargeMemberId(member.id)
+                              setChargeMemberName(member.name)
+                              setChargeMemberQuery('')
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{member.name}</span>
+                              <span className="text-xs text-muted-foreground">{member.phone}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {chargeMemberName && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {chargeMemberName}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="charge-amount">Amount ($) *</Label>
+              <Input
+                id="charge-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={chargeAmount}
+                onChange={(e) => setChargeAmount(e.target.value)}
+                placeholder="0.00"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="charge-reason">Reason *</Label>
+              <Input
+                id="charge-reason"
+                value={chargeReason}
+                onChange={(e) => setChargeReason(e.target.value)}
+                placeholder="e.g., Event ticket, Special fee"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowChargeMemberDialog(false)
+                  setChargeAmount('')
+                  setChargeReason('')
+                  setChargeMemberId(null)
+                  setChargeMemberName('')
+                  setChargeMemberQuery('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleChargeMember} 
+                disabled={!chargeMemberId || !chargeAmount || !chargeReason || chargingMember}
+              >
+                {chargingMember ? 'Charging...' : 'Charge Member'}
               </Button>
             </div>
           </div>
