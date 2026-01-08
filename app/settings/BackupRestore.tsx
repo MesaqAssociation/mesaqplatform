@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { IconAlertTriangle, IconChevronDown, IconHistory, IconRefresh } from '@tabler/icons-react'
+import { IconAlertTriangle, IconChevronDown, IconHistory, IconRefresh, IconPlus } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Backup = {
@@ -28,6 +28,33 @@ export default function BackupRestore() {
   const [confirmText, setConfirmText] = useState('')
   const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+
+  // Create a new backup
+  const handleCreateBackup = async () => {
+    setCreating(true)
+    try {
+      const res = await fetch('/api/backup/r2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        showToast('Backup created successfully!', 'success')
+        // Reload backups list
+        loadBackups()
+      } else {
+        const error = await res.json()
+        showToast(error.error || 'Failed to create backup', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to create backup', err)
+      showToast('Failed to create backup', 'error')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   // Load backups from R2
   const loadBackups = async () => {
@@ -117,8 +144,14 @@ export default function BackupRestore() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Backups are automatically created on the last day of every month and stored securely.
-        You can restore from any previous backup below.
+        You can also create a backup manually or restore from any previous backup.
       </p>
+
+      {/* Create Backup Button */}
+      <Button onClick={handleCreateBackup} disabled={creating}>
+        <IconPlus className="size-4 mr-2" />
+        {creating ? 'Creating Backup...' : 'Create Backup Now'}
+      </Button>
 
       {/* My Backups - Collapsible */}
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>

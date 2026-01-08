@@ -386,6 +386,7 @@ export async function POST(req: NextRequest) {
           !statementToDate || 
           new Date(statementToDate) >= new Date(latestStatementDate)
         
+        let balanceUpdated = false
         if (isNewestStatement) {
           if (parsed.closingBalance !== undefined) {
             await pool.query(
@@ -393,11 +394,13 @@ export async function POST(req: NextRequest) {
               [parsed.closingBalance, accountId]
             )
             runningBalance = parsed.closingBalance
+            balanceUpdated = true
           } else {
             await pool.query(
               'UPDATE financial_accounts SET current_balance = $1, updated_at = NOW() WHERE id = $2',
               [runningBalance, accountId]
             )
+            balanceUpdated = true
           }
         } else {
           console.log(`⚠️ Telegram: Skipping balance update - older statement`)
@@ -410,7 +413,12 @@ export async function POST(req: NextRequest) {
         responseMessage += `📊 Summary:\n\n`
         responseMessage += `• Total transactions found: ${parsed.transactions.length}\n`
         responseMessage += `• Successfully imported: ${insertedCount.length}\n`
-        responseMessage += `\n💰 New balance: $${runningBalance.toFixed(2)}`
+        
+        if (balanceUpdated) {
+          responseMessage += `\n💰 Balance updated: $${runningBalance.toFixed(2)}`
+        } else {
+          responseMessage += `\n⚠️ Balance not updated (newer statement already exists)`
+        }
 
         if (parsed.accountNumber) {
           responseMessage += `\n🏦 Account: ${parsed.accountNumber}`
