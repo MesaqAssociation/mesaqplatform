@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { showToast } from '@/lib/toast'
 import { IconEdit, IconCheck } from '@tabler/icons-react'
 
@@ -138,103 +137,89 @@ export default function BankAccountSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">Account Name</p>
-          <p className="font-medium">{mainAccount.account_name || 'Not set'}</p>
+      <div className="grid grid-cols-1 gap-4 p-4 bg-muted/30 rounded-lg">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Account Name</span>
+          <span className="font-medium">{mainAccount.account_name || 'Not set'}</span>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">BSB</p>
-          <p className="font-medium font-mono">{formatBsb(mainAccount.bsb) || 'Not set'}</p>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">BSB</span>
+          <span className="font-medium font-mono">{formatBsb(mainAccount.bsb) || 'Not set'}</span>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-          <p className="font-medium font-mono">{mainAccount.account_number || 'Not set'}</p>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Account Number</span>
+          <span className="font-medium font-mono">{mainAccount.account_number || 'Not set'}</span>
         </div>
       </div>
 
-      <Button onClick={openEditDialog} variant="outline" size="sm">
-        <IconEdit className="size-4 mr-2" />
-        Edit Bank Details
-      </Button>
+      {!showEditDialog ? (
+        <Button onClick={openEditDialog} className="w-full">
+          <IconEdit className="size-4 mr-2" />
+          Edit Details
+        </Button>
+      ) : (
+        <div className="space-y-4 pt-4 border-t">
+          <div>
+            <Label htmlFor="accountName">Account Name</Label>
+            <Input
+              id="accountName"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="e.g., Mesaq Association"
+              className="mt-1"
+            />
+          </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={(open) => {
-        if (!open) {
-          setShowEditDialog(false)
-          setConfirmText('')
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Bank Account Details</DialogTitle>
-            <DialogDescription>
-              Update the main membership account details. These are shown in payment reminders.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="accountName">Account Name</Label>
+              <Label htmlFor="bsb">BSB</Label>
               <Input
-                id="accountName"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="e.g., Mesaq Association"
-                className="mt-1"
+                id="bsb"
+                value={bsb}
+                onChange={(e) => setBsb(e.target.value)}
+                placeholder="XXX-XXX"
+                className="mt-1 font-mono"
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="bsb">BSB</Label>
-                <Input
-                  id="bsb"
-                  value={bsb}
-                  onChange={(e) => setBsb(e.target.value)}
-                  placeholder="XXX-XXX"
-                  className="mt-1 font-mono"
-                />
-              </div>
-              <div>
-                <Label htmlFor="accountNumber">Account Number</Label>
-                <Input
-                  id="accountNumber"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  placeholder="XXXXXX"
-                  className="mt-1 font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 border-t">
-              <Label htmlFor="confirm">Type "confirm" to save changes</Label>
+            <div>
+              <Label htmlFor="accountNumber">Account Number</Label>
               <Input
-                id="confirm"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="confirm"
-                autoComplete="off"
-                className="mt-1"
+                id="accountNumber"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="XXXXXX"
+                className="mt-1 font-mono"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+          <div className="pt-2 border-t">
+            <Label htmlFor="confirm">Type "confirm" to save changes</Label>
+            <Input
+              id="confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="confirm"
+              autoComplete="off"
+              className="mt-1"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
               Cancel
             </Button>
             <Button 
               onClick={handleSave}
               disabled={saving || confirmText.toLowerCase() !== 'confirm'}
+              className="flex-1"
             >
               <IconCheck className="size-4 mr-2" />
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

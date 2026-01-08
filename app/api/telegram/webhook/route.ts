@@ -200,21 +200,16 @@ export async function POST(req: NextRequest) {
         
         if (existingStatements.length > 0) {
           const existingFile = existingStatements[0]
-          let errorMsg = ''
-          if (existingFile.file_name === document.file_name) {
-            errorMsg = `⚠️ Duplicate: A file named "${document.file_name}" has already been uploaded.`
-          } else {
-            // Format dates nicely
-            const formatDate = (dateStr: string) => {
-              try {
-                const d = new Date(dateStr)
-                return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long' })
-              } catch { return dateStr }
-            }
-            const fromDate = formatDate(existingFile.statement_date_from)
-            const toDate = formatDate(existingFile.statement_date_to)
-            errorMsg = `⚠️ A statement has already been uploaded for ${fromDate} - ${toDate}.`
+          // Format dates nicely - only check by date coverage, not filename
+          const formatDate = (dateStr: string) => {
+            try {
+              const d = new Date(dateStr)
+              return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long' })
+            } catch { return dateStr }
           }
+          const fromDate = formatDate(existingFile.statement_date_from)
+          const toDate = formatDate(existingFile.statement_date_to)
+          const errorMsg = `⚠️ A statement has already been uploaded for ${fromDate} - ${toDate}.`
           console.log(`[Telegram] ${errorMsg}`)
           
           // Send message back to user
@@ -766,18 +761,6 @@ async function handleMemberInput(chatId: number, text: string, state: CreationSt
         }
         state.data.email = text
       }
-      state.step = 'address'
-      await sendTelegramMessage(chatId, '🏠 Enter home address (or type "skip" to skip):')
-      break
-
-    case 'address':
-      state.data.address = text.toLowerCase() === 'skip' ? null : text
-      state.step = 'member_id'
-      await sendTelegramMessage(chatId, '🆔 Enter member ID (or type "skip" to skip):')
-      break
-
-    case 'member_id':
-      state.data.member_id = text.toLowerCase() === 'skip' ? null : text
       state.step = 'password'
       await sendTelegramMessage(chatId, '🔒 Enter a password (minimum 8 characters):')
       break
@@ -800,47 +783,9 @@ async function handleMemberInput(chatId: number, text: string, state: CreationSt
       }
       state.data.household_members = household
       
-      // Check for custom fields
-      const customFields = await getCustomFields()
-      if (customFields.length > 0) {
-        state.data.custom_fields = customFields
-        state.data.custom_data = {}
-        state.data.current_field_index = 0
-        state.step = 'custom_field'
-        const field = customFields[0]
-        await sendTelegramMessage(chatId, `📝 ${field.name} (or type "skip" to skip):`)
-      } else {
-        await createMember(chatId, state.data)
-        userStates.delete(chatId)
-      }
-      break
-    
-    case 'custom_field':
-      const fields = state.data.custom_fields || []
-      const fieldIndex = state.data.current_field_index || 0
-      const currentField = fields[fieldIndex]
-      
-      if (currentField) {
-        // Store the value (unless skipped)
-        if (text.toLowerCase() !== 'skip') {
-          state.data.custom_data = state.data.custom_data || {}
-          state.data.custom_data[currentField.key] = text
-        }
-        
-        // Move to next field or create member
-        const nextIndex = fieldIndex + 1
-        if (nextIndex < fields.length) {
-          state.data.current_field_index = nextIndex
-          const nextField = fields[nextIndex]
-          await sendTelegramMessage(chatId, `📝 ${nextField.name} (or type "skip" to skip):`)
-        } else {
-          await createMember(chatId, state.data)
-          userStates.delete(chatId)
-        }
-      } else {
-        await createMember(chatId, state.data)
-        userStates.delete(chatId)
-      }
+      // Create member directly (no advanced fields in telegram flow for simplicity)
+      await createMember(chatId, state.data)
+      userStates.delete(chatId)
       break
   }
 }
@@ -1013,12 +958,15 @@ async function showRoleSelection(chatId: number): Promise<void> {
   await sendTelegramMessage(chatId, '👔 Select member role:', { reply_markup: keyboard })
 }
 
-// Show group selection
+// Show group selection - uses unique group_name from users table as source of truth
 async function showGroupSelection(chatId: number): Promise<void> {
   try {
-    // First try member_groups table
+    // Get unique group names from users table
     const { rows: groups } = await pool.query(`
-      SELECT id, name FROM member_groups ORDER BY name ASC
+      SELECT DISTINCT group_name as name 
+      FROM users 
+      WHERE group_name IS NOT NULL AND group_name != ''
+      ORDER BY group_name ASC
     `)
     
     if (groups.length > 0) {
@@ -1031,31 +979,12 @@ async function showGroupSelection(chatId: number): Promise<void> {
       const keyboard = { inline_keyboard: buttons }
       await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
     } else {
-      // No groups found, try legacy group_name
-      const { rows: legacyGroups } = await pool.query(`
-        SELECT DISTINCT group_name as name 
-        FROM users 
-        WHERE group_name IS NOT NULL AND group_name != ''
-        ORDER BY group_name ASC
-      `)
-      
-      if (legacyGroups.length > 0) {
-        const buttons = legacyGroups.map((g: any) => [{
-          text: g.name,
-          callback_data: `group_${g.name}`,
-        }])
-        buttons.push([{ text: '❌ No Group', callback_data: 'group_none' }])
-
-        const keyboard = { inline_keyboard: buttons }
-        await sendTelegramMessage(chatId, '👥 Select member group:', { reply_markup: keyboard })
-      } else {
-        // No groups at all, skip to household
-        const state = userStates.get(chatId)
-        if (state) {
-          state.data.group_name = null
-          state.step = 'household'
-          await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number)')
-        }
+      // No groups at all, skip to household
+      const state = userStates.get(chatId)
+      if (state) {
+        state.data.group_name = null
+        state.step = 'household'
+        await sendTelegramMessage(chatId, '👥 How many household members? (Enter a number)')
       }
     }
   } catch (err) {
@@ -1069,35 +998,17 @@ async function showGroupSelection(chatId: number): Promise<void> {
   }
 }
 
-// Show organizing group selection
+// Show organizing group selection - uses unique group_name from users table as source of truth
 async function showOrgGroupSelection(chatId: number): Promise<void> {
   try {
-    // Get ALL groups from both member_groups table AND users.group_name
-    const groupNames = new Set<string>()
+    // Get unique group_name values from users table
+    const { rows } = await pool.query(`
+      SELECT DISTINCT group_name as name FROM users 
+      WHERE group_name IS NOT NULL AND group_name != ''
+      ORDER BY group_name ASC
+    `)
     
-    // Try to get from member_groups table
-    try {
-      const { rows } = await pool.query(`SELECT name FROM member_groups ORDER BY name ASC`)
-      rows.forEach((r: any) => groupNames.add(r.name))
-    } catch {
-      // Table might not exist, that's OK
-    }
-    
-    // Also get unique group_name values from users table
-    try {
-      const { rows } = await pool.query(`
-        SELECT DISTINCT group_name as name FROM users 
-        WHERE group_name IS NOT NULL AND group_name != ''
-        ORDER BY group_name ASC
-      `)
-      rows.forEach((r: any) => groupNames.add(r.name))
-    } catch {
-      // Ignore errors
-    }
-    
-    const groups = Array.from(groupNames).sort()
-    
-    if (groups.length === 0) {
+    if (rows.length === 0) {
       // No groups found, skip to date
       const state = userStates.get(chatId)
       if (state?.type === 'event') {
@@ -1108,9 +1019,9 @@ async function showOrgGroupSelection(chatId: number): Promise<void> {
       return
     }
     
-    const buttons = groups.map((name: string) => [{
-      text: name,
-      callback_data: `org_group_${name}`,
+    const buttons = rows.map((g: any) => [{
+      text: g.name,
+      callback_data: `org_group_${g.name}`,
     }])
     buttons.push([{ text: '❌ No Group', callback_data: 'org_group_none' }])
 

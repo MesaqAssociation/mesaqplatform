@@ -94,6 +94,31 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
     setIsEditing(false)
   }
 
+  const handleCancelPending = async () => {
+    if (!confirm('Cancel the pending fee change?')) return
+    
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/settings/monthly-fee', {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setPendingFee(null)
+        setEffectiveDate(null)
+        showToast('Pending fee change cancelled', 'success')
+      } else {
+        const error = await response.json()
+        showToast(error.error || 'Failed to cancel pending change', 'error')
+      }
+    } catch (error) {
+      console.error('Error cancelling pending fee:', error)
+      showToast('An error occurred', 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <>
       <div className="space-y-4">
@@ -124,10 +149,19 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
             💡 Fee changes will apply from the 1st of next month. Past months remain unchanged.
           </p>
           {pendingFee && effectiveDate && (
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md flex items-center justify-between gap-4">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 ⏳ Pending change: <strong>${pendingFee}</strong> starting {new Date(effectiveDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCancelPending}
+                disabled={isSaving}
+                className="shrink-0"
+              >
+                Cancel Change
+              </Button>
             </div>
           )}
         </div>

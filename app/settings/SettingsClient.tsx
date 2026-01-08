@@ -7,7 +7,6 @@ import ExportData from './ExportData'
 import PaymentKeywords from './PaymentKeywords'
 import BoardMemberReport from './BoardMemberReport'
 import BackupRestore from './BackupRestore'
-import BankAccountSettings from './BankAccountSettings'
 import CustomMemberFields from './CustomMemberFields'
 
 export default function SettingsClient({
@@ -46,14 +45,6 @@ export default function SettingsClient({
         {/* Community Settings Tab - Admin Only */}
         {isAdmin && (
           <TabsContent value="community" className="space-y-6 mt-6">
-            <div className="border rounded-lg p-6 shadow-md">
-              <h2 className="text-lg font-medium mb-4">Bank Account Details</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Configure the main membership account details shown in payment reminders
-              </p>
-              <BankAccountSettings />
-            </div>
-
             <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Membership Fee</h2>
               <p className="text-sm text-muted-foreground mb-4">

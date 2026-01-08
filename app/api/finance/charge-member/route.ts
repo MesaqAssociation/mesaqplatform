@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // Get member details
     const { rows: memberRows } = await pool.query(
-      'SELECT id, name, current_balance FROM users WHERE id = $1',
+      'SELECT id, name FROM users WHERE id = $1',
       [memberId]
     )
 
@@ -94,8 +94,8 @@ export async function POST(req: NextRequest) {
         created_by,
         balance_after
       ) VALUES (
-        gen_random_uuid()::text,
-        $1,
+        gen_random_uuid(),
+        $1::uuid,
         $2,
         $3,
         $4,

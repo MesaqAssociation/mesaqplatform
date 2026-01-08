@@ -29,7 +29,7 @@ type Member = {
   monthly_fee: number | null
 }
 
-type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first'
+type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first' | 'id-asc' | 'id-desc'
 
 export default function MembersClient({ initial, isAdmin = true }: { initial: Member[], isAdmin?: boolean }) {
   const { t } = useI18n()
@@ -109,6 +109,12 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
           return bOwes - aOwes
         })
       
+      case 'id-asc':
+        return filtered.sort((a, b) => (a.member_id || '').localeCompare(b.member_id || ''))
+      
+      case 'id-desc':
+        return filtered.sort((a, b) => (b.member_id || '').localeCompare(a.member_id || ''))
+      
       default:
         return filtered
     }
@@ -141,6 +147,8 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                <SelectItem value="id-asc">Member ID (A-Z)</SelectItem>
+                <SelectItem value="id-desc">Member ID (Z-A)</SelectItem>
                 <SelectItem value="most-paid">Most Paid</SelectItem>
                 <SelectItem value="least-paid">Least Paid</SelectItem>
                 <SelectItem value="unpaid-first">Unpaid First</SelectItem>
@@ -168,7 +176,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             <th className="py-3 px-2">{t("name")}</th>
               {isAdmin && (
                 <>
-            <th className="py-3 px-2">Group</th>
+            <th className="py-3 px-2">Member ID</th>
             <th className="py-3 px-2">{t("phone")}</th>
             <th className="py-3 px-2">{t("householdMembers")}</th>
             <th className="py-3 px-2">{t("role")}</th>
@@ -195,7 +203,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               </td>
               {isAdmin && (
                 <>
-              <td className="py-3 px-2 text-muted-foreground">{m.group_name || '-'}</td>
+              <td className="py-3 px-2 text-muted-foreground font-mono">{m.member_id || '-'}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.phone}</td>
               <td className="py-3 px-2 text-muted-foreground">{m.household_members || '-'}</td>
               <td className="py-3 px-2">

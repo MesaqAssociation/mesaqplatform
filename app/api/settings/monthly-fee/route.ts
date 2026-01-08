@@ -100,3 +100,47 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE - Cancel pending fee change
+export async function DELETE(req: NextRequest) {
+  const token = cookies().get('auth_token')?.value
+  if (!token || !process.env.AUTH_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
+  let userId: string
+  try {
+    const decoded = jwt.verify(token, process.env.AUTH_SECRET) as { sub: string }
+    userId = decoded.sub
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    // Check if user is Manager
+    const { rows: userRows } = await pool.query(
+      'SELECT role, name FROM users WHERE id = $1',
+      [userId]
+    )
+    
+    if (!userRows[0] || userRows[0].role !== 'Manager') {
+      return NextResponse.json({ 
+        error: 'Only Manager can cancel pending fee changes' 
+      }, { status: 403 })
+    }
+
+    // Delete pending fee settings
+    await pool.query(`
+      DELETE FROM system_settings 
+      WHERE key IN ('pending_monthly_fee', 'pending_fee_effective_date')
+    `)
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Pending fee change cancelled'
+    })
+  } catch (err: any) {
+    console.error('Cancel pending fee error:', err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+

@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText, IconStar, IconStarFilled } from '@tabler/icons-react'
+import { IconEdit, IconCheck, IconX, IconUpload, IconDownload, IconArrowUp, IconArrowDown, IconTrash, IconPlus, IconChevronLeft, IconChevronRight, IconSearch, IconChevronDown, IconGift, IconFileText, IconStar, IconStarFilled, IconBuildingBank } from '@tabler/icons-react'
+import BankAccountSettings from './BankAccountSettings'
 
 type Account = {
   id: string | null
@@ -113,6 +114,9 @@ export default function FinanceClient({
   
   // Charge Member Dialog (for adding expected payments)
   const [showChargeMemberDialog, setShowChargeMemberDialog] = useState(false)
+  
+  // Bank Account Settings Dialog
+  const [showBankAccountDialog, setShowBankAccountDialog] = useState(false)
   const [chargeAmount, setChargeAmount] = useState('')
   const [chargeReason, setChargeReason] = useState('')
   const [chargeMemberId, setChargeMemberId] = useState<string | null>(null)
@@ -1252,6 +1256,10 @@ export default function FinanceClient({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline" onClick={() => setShowBankAccountDialog(true)}>
+            <IconBuildingBank className="mr-2 size-4" />
+            Edit Bank Account
+          </Button>
           <label htmlFor="statement-upload">
             <Button asChild disabled={uploading}>
               <span>
@@ -2339,6 +2347,19 @@ export default function FinanceClient({
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Account Settings Dialog */}
+      <Dialog open={showBankAccountDialog} onOpenChange={setShowBankAccountDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Bank Account</DialogTitle>
+            <DialogDescription>
+              Update the main membership account details shown in payment reminders.
+            </DialogDescription>
+          </DialogHeader>
+          <BankAccountSettings />
         </DialogContent>
       </Dialog>
     </div>
