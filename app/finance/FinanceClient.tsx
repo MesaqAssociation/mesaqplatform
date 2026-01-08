@@ -1557,30 +1557,34 @@ export default function FinanceClient({
                         </Popover>
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
-                        <Select 
-                          value={
-                            // Normalize category to valid dropdown options
-                            txn.category === 'Membership Payment' ? 'Membership Payment' :
-                            txn.category === 'Donation' ? 'Donation' :
-                            txn.category === 'Event Payment' ? 'Event Payment' :
-                            txn.category === 'Special Payment' ? 'Special Payment' :
-                            !txn.category || txn.category.trim() === '' ? 'Event Payment' :
-                            'Event Payment' // Default fallback
-                          }
-                          onValueChange={(value) => handleUpdateCategory(txn.id, value)}
-                        >
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background border-input">
-                            <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
-                            <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
-                            <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
-                            {txn.category === 'Special Payment' && (
-                              <SelectItem value="Special Payment" className="text-foreground cursor-pointer text-muted-foreground">Special Payment (Legacy)</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        {txn.category === 'Charges' ? (
+                          <span className="text-xs font-medium text-orange-600 dark:text-orange-400 px-2">Charges</span>
+                        ) : (
+                          <Select 
+                            value={
+                              // Normalize category to valid dropdown options
+                              txn.category === 'Membership Payment' ? 'Membership Payment' :
+                              txn.category === 'Donation' ? 'Donation' :
+                              txn.category === 'Event Payment' ? 'Event Payment' :
+                              txn.category === 'Special Payment' ? 'Special Payment' :
+                              !txn.category || txn.category.trim() === '' ? 'Event Payment' :
+                              'Event Payment' // Default fallback
+                            }
+                            onValueChange={(value) => handleUpdateCategory(txn.id, value)}
+                          >
+                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border-input">
+                              <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
+                              <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
+                              <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
+                              {txn.category === 'Special Payment' && (
+                                <SelectItem value="Special Payment" className="text-foreground cursor-pointer text-muted-foreground">Special Payment (Legacy)</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
                         // Charges get black/neutral text with no +/-
@@ -1675,22 +1679,26 @@ export default function FinanceClient({
 
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
-                <Select 
-                  value={dialogCategory} 
-                  onValueChange={(v) => setDialogCategory(v)}
-                >
-                  <SelectTrigger className="w-48 mt-1">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                    <SelectItem value="Event Payment">Event Payment</SelectItem>
-                    <SelectItem value="Donation">Donation</SelectItem>
-                    <SelectItem value="Special Payment">Special Payment</SelectItem>
-                    <SelectItem value="Late Payment Fine">Late Payment Fine</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                {selectedTransaction?.category === 'Charges' ? (
+                  <p className="font-medium mt-1 text-orange-600 dark:text-orange-400">Charges</p>
+                ) : (
+                  <Select 
+                    value={dialogCategory} 
+                    onValueChange={(v) => setDialogCategory(v)}
+                  >
+                    <SelectTrigger className="w-48 mt-1">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                      <SelectItem value="Event Payment">Event Payment</SelectItem>
+                      <SelectItem value="Donation">Donation</SelectItem>
+                      <SelectItem value="Special Payment">Special Payment</SelectItem>
+                      <SelectItem value="Late Payment Fine">Late Payment Fine</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div>
