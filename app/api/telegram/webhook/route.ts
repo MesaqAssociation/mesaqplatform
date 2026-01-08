@@ -204,7 +204,16 @@ export async function POST(req: NextRequest) {
           if (existingFile.file_name === document.file_name) {
             errorMsg = `⚠️ Duplicate: A file named "${document.file_name}" has already been uploaded.`
           } else {
-            errorMsg = `⚠️ Duplicate: A statement covering ${existingFile.statement_date_from} to ${existingFile.statement_date_to} already exists.`
+            // Format dates nicely
+            const formatDate = (dateStr: string) => {
+              try {
+                const d = new Date(dateStr)
+                return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long' })
+              } catch { return dateStr }
+            }
+            const fromDate = formatDate(existingFile.statement_date_from)
+            const toDate = formatDate(existingFile.statement_date_to)
+            errorMsg = `⚠️ A statement has already been uploaded for ${fromDate} - ${toDate}.`
           }
           console.log(`[Telegram] ${errorMsg}`)
           

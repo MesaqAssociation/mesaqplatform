@@ -114,8 +114,10 @@ export default function MemberDetailClient({
   const [changingPassword, setChangingPassword] = useState(false)
   const [groups, setGroups] = useState<Array<{id: string | null, name: string}>>([])
   const [settingLeader, setSettingLeader] = useState(false)
+  const [customFields, setCustomFields] = useState<Array<{key: string, name: string}>>([])
+  const [customDataDraft, setCustomDataDraft] = useState<Record<string, any>>(member.custom_data || {})
 
-  // Load groups
+  // Load groups and custom fields
   useEffect(() => {
     const loadGroups = async () => {
       try {
@@ -128,7 +130,21 @@ export default function MemberDetailClient({
         console.error('Failed to load groups:', err)
       }
     }
+    
+    const loadCustomFields = async () => {
+      try {
+        const res = await fetch('/api/settings/custom-fields')
+        if (res.ok) {
+          const data = await res.json()
+          setCustomFields(data.fields || [])
+        }
+      } catch (err) {
+        console.error('Failed to load custom fields:', err)
+      }
+    }
+    
     loadGroups()
+    loadCustomFields()
   }, [])
 
   useEffect(() => {
@@ -356,22 +372,26 @@ export default function MemberDetailClient({
   const availableEvents = (allEvents || []).filter(e => !events.find(ae => ae.id === e.id))
 
   const [savingInfo, setSavingInfo] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleSaveInfo = async () => {
     if (!isAdmin || savingInfo) return
+    setSaveError(null)
     
     // Validate phone number (10 digits)
     const phoneDigits = draft.phone.replace(/\D/g, '')
     if (phoneDigits.length !== 10) {
-      console.log('Phone validation failed:', phoneDigits.length, 'digits')
-      showToast('Phone number must be exactly 10 digits', 'error')
+      const errMsg = `Phone must be 10 digits (currently ${phoneDigits.length})`
+      setSaveError(errMsg)
+      showToast(errMsg, 'error')
       return
     }
     
     // Validate email if provided
     if (draft.email && !draft.email.includes('@')) {
-      console.log('Email validation failed:', draft.email)
-      showToast('Email must contain @', 'error')
+      const errMsg = 'Email must contain @'
+      setSaveError(errMsg)
+      showToast(errMsg, 'error')
       return
     }
     
@@ -380,19 +400,27 @@ export default function MemberDetailClient({
       const res = await fetch(`/api/members/${member.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
+        body: JSON.stringify({
+          ...draft,
+          custom_data: customDataDraft,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
-        showToast(data.error || 'Failed to update member', 'error')
+        const errMsg = data.error || 'Failed to update member'
+        setSaveError(errMsg)
+        showToast(errMsg, 'error')
         return
       }
       showToast('Member info updated successfully!', 'success')
       setEditMode(false)
+      setSaveError(null)
       router.refresh()
     } catch (err) {
       console.error('Update member failed', err)
-      showToast('Failed to update member', 'error')
+      const errMsg = 'Failed to update member'
+      setSaveError(errMsg)
+      showToast(errMsg, 'error')
     } finally {
       setSavingInfo(false)
     }
@@ -485,7 +513,10 @@ export default function MemberDetailClient({
                     )}
                     {editMode && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', ') }) }}>
+                        {saveError && (
+                          <span className="text-sm text-red-500 mr-2">{saveError}</span>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setSaveError(null); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', ') }); setCustomDataDraft(member.custom_data || {}) }}>
                           Cancel
                         </Button>
                         <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
@@ -672,6 +703,28 @@ export default function MemberDetailClient({
                   <p className="font-medium">{formatDate(member.created_at ? member.created_at.split('T')[0] : null)}</p>
                 </div>
               </div>
+              
+              {/* Custom Fields */}
+              {customFields.length > 0 && customFields.map(field => (
+                <div key={field.key}>
+                  <Separator />
+                  <div className="flex items-center gap-3 mt-4">
+                    <IconUserCircle className="size-5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">{field.name}</p>
+                      {editMode ? (
+                        <Input 
+                          value={customDataDraft[field.key] || ''} 
+                          onChange={(e) => setCustomDataDraft({ ...customDataDraft, [field.key]: e.target.value })} 
+                          placeholder={`Enter ${field.name}`}
+                        />
+                      ) : (
+                        <p className="font-medium">{member.custom_data?.[field.key] || '-'}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
