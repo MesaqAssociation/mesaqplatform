@@ -172,8 +172,8 @@ export default function MemberDetailClient({
   }, [member.id])
 
   // Group transactions by month
-  // Filter out Member Charges (they're shown in Expected Payments section)
-  const filteredTransactions = (transactions || []).filter(txn => txn.category !== 'Member Charge')
+  // Filter out Charges (they're shown in Expected Payments section)
+  const filteredTransactions = (transactions || []).filter(txn => txn.category !== 'Charges')
   const transactionsByMonth = filteredTransactions.reduce((acc, txn) => {
     if (!txn.transaction_date) return acc
     const date = new Date(txn.transaction_date + 'T00:00:00')

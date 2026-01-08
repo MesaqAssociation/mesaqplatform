@@ -98,13 +98,13 @@ export async function GET(
       paymentMap.set(monthKey, parseFloat(p.total_amount || 0))
     })
 
-    // Get total Member Charges (debit transactions with category 'Member Charge')
+    // Get total Charges (debit transactions with category 'Charges')
     // These are amounts the member owes on top of regular monthly fees
     const { rows: chargeRows } = await pool.query(`
       SELECT COALESCE(SUM(amount), 0) as total_charges
       FROM transactions
       WHERE matched_member_id = $1
-        AND category = 'Member Charge'
+        AND category = 'Charges'
         AND transaction_type = 'debit'
     `, [member.id])
     const totalCharges = parseFloat(chargeRows[0]?.total_charges || 0)
@@ -185,7 +185,7 @@ export async function GET(
         t.amount
       FROM transactions t
       WHERE t.matched_member_id = $1
-        AND t.category = 'Member Charge'
+        AND t.category = 'Charges'
         AND t.transaction_type = 'debit'
       ORDER BY t.transaction_date DESC
     `, [member.id])

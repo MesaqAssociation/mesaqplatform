@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         $4,
         $5,
         'debit',
-        'Member Charge',
+        'Charges',
         $6,
         'Manual Charge',
         $7

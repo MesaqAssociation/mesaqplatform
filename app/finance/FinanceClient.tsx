@@ -141,6 +141,11 @@ export default function FinanceClient({
   const [advanceMemberResults, setAdvanceMemberResults] = useState<Member[]>([])
   const [advanceSearching, setAdvanceSearching] = useState(false)
   const [allMembers, setAllMembers] = useState<Member[]>([])
+  
+  // Multi-select transactions for bulk delete
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
+  const [deletingSelected, setDeletingSelected] = useState(false)
 
   // Load all members when advance payment dialog opens
   useEffect(() => {
@@ -940,6 +945,73 @@ export default function FinanceClient({
     }
   }
 
+  // Handle bulk delete of selected transactions
+  const handleDeleteSelectedTransactions = async () => {
+    if (selectedTransactions.size === 0) return
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selectedTransactions.size} transaction${selectedTransactions.size > 1 ? 's' : ''}?\n\nThis will also remove any associated member payment records.`
+    )
+
+    if (!confirmDelete) return
+
+    setDeletingSelected(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const txnId of selectedTransactions) {
+      try {
+        const res = await fetch(`/api/finance/transactions?id=${txnId}`, {
+          method: 'DELETE',
+        })
+        if (res.ok) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch {
+        failCount++
+      }
+    }
+
+    if (successCount > 0) {
+      showToast(`Deleted ${successCount} transaction${successCount > 1 ? 's' : ''}`, 'success')
+      // Reload transactions
+      loadTransactions()
+    }
+    if (failCount > 0) {
+      showToast(`Failed to delete ${failCount} transaction${failCount > 1 ? 's' : ''}`, 'error')
+    }
+
+    setSelectedTransactions(new Set())
+    setSelectMode(false)
+    setDeletingSelected(false)
+  }
+
+  // Toggle transaction selection
+  const toggleTransactionSelection = (txnId: string) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(txnId)) {
+        newSet.delete(txnId)
+      } else {
+        newSet.add(txnId)
+      }
+      return newSet
+    })
+  }
+
+  // Select all visible transactions
+  const selectAllTransactions = () => {
+    const allIds = new Set(transactions.map(t => t.id))
+    setSelectedTransactions(allIds)
+  }
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedTransactions(new Set())
+  }
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AU', {
@@ -1208,10 +1280,10 @@ export default function FinanceClient({
                         <p className="text-xs text-muted-foreground">{new Date(txn.transaction_date).toLocaleDateString('en-AU')}</p>
                       </div>
                       <span className={`ml-3 font-medium ${
-                        txn.category === 'Member Charge' ? 'text-foreground' 
+                        txn.category === 'Charges' ? 'text-foreground' 
                         : txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {txn.category === 'Member Charge' ? '' : txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
+                        {txn.category === 'Charges' ? '' : txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
                       </span>
                     </div>
                   </button>
@@ -1239,6 +1311,9 @@ export default function FinanceClient({
           </Button>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowChargeMemberDialog(true)}>
+            Charge Member
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button disabled={loading}>
@@ -1249,13 +1324,10 @@ export default function FinanceClient({
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => setShowAddTransactionDialog(true)}>
-                Regular Transaction
+                Add Transaction
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowAdvancePaymentDialog(true)}>
                 Advance Payment
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowChargeMemberDialog(true)}>
-                Charge Member
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1285,13 +1357,61 @@ export default function FinanceClient({
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Transactions</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">Transactions</h2>
+              {!selectMode ? (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectMode(true)}
+                >
+                  Select
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={selectAllTransactions}
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={clearSelection}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={handleDeleteSelectedTransactions}
+                    disabled={selectedTransactions.size === 0 || deletingSelected}
+                  >
+                    <IconTrash className="size-4 mr-1" />
+                    {deletingSelected ? 'Deleting...' : `Delete (${selectedTransactions.size})`}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectMode(false)
+                      setSelectedTransactions(new Set())
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b">
+                  {selectMode && <th className="text-left py-3 px-2 w-10"></th>}
                   <th className="text-left py-3 px-2">Date</th>
                   <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
@@ -1327,7 +1447,7 @@ export default function FinanceClient({
                   ))
                 ) : transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={selectMode ? 7 : 6} className="text-center py-8 text-muted-foreground">
                       No transactions yet
                     </td>
                   </tr>
@@ -1335,9 +1455,19 @@ export default function FinanceClient({
                   transactions.map((txn) => (
                     <tr 
                       key={txn.id} 
-                      className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => handleTransactionClick(txn)}
+                      className={`border-b hover:bg-muted/50 transition-colors cursor-pointer ${
+                        selectedTransactions.has(txn.id) ? 'bg-primary/10' : ''
+                      }`}
+                      onClick={() => selectMode ? toggleTransactionSelection(txn.id) : handleTransactionClick(txn)}
                     >
+                      {selectMode && (
+                        <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox 
+                            checked={selectedTransactions.has(txn.id)}
+                            onCheckedChange={() => toggleTransactionSelection(txn.id)}
+                          />
+                        </td>
+                      )}
                       <td className="py-3 px-2">{formatDate(txn.transaction_date)}</td>
                       <td className="py-3 px-2">
                         <div>
@@ -1453,8 +1583,8 @@ export default function FinanceClient({
                         </Select>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
-                        // Member Charges get black/neutral text with no +/-
-                        txn.category === 'Member Charge'
+                        // Charges get black/neutral text with no +/-
+                        txn.category === 'Charges'
                           ? 'text-foreground'
                         // Mark membership payments under the fee in red
                           : txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
@@ -1468,8 +1598,8 @@ export default function FinanceClient({
                           : 'text-red-600 dark:text-red-400'
                       }`}>
                         <div className="flex items-center justify-end gap-1">
-                          {txn.category !== 'Member Charge' && (txn.transaction_type === 'credit' || (txn.transaction_type === 'adjustment' && txn.amount > 0)) && <IconArrowUp className="size-3" />}
-                          {txn.category !== 'Member Charge' && (txn.transaction_type === 'debit' || (txn.transaction_type === 'adjustment' && txn.amount < 0)) && <IconArrowDown className="size-3" />}
+                          {txn.category !== 'Charges' && (txn.transaction_type === 'credit' || (txn.transaction_type === 'adjustment' && txn.amount > 0)) && <IconArrowUp className="size-3" />}
+                          {txn.category !== 'Charges' && (txn.transaction_type === 'debit' || (txn.transaction_type === 'adjustment' && txn.amount < 0)) && <IconArrowDown className="size-3" />}
                           {formatCurrency(Math.abs(txn.amount))}
                         </div>
                       </td>
