@@ -164,8 +164,6 @@ export async function matchTransactionToMember(
     `SELECT id, name, banking_name FROM users WHERE banking_name IS NOT NULL AND banking_name != ''`
   )
   
-  const transactionNameLower = transactionName.toLowerCase()
-  
   // Match full banking names only (separated by comma)
   for (const member of members) {
     // Split by comma to support multiple banking names like "jack adams, mark smith"
