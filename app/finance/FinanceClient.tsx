@@ -1558,7 +1558,7 @@ export default function FinanceClient({
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         {txn.category === 'Charges' ? (
-                          <div className="w-[150px] h-8 text-xs bg-background text-foreground border border-input rounded-md flex items-center px-3">
+                          <div className="w-[150px] h-8 text-xs bg-background text-foreground border border-input rounded-md flex items-center justify-center">
                             Charges
                           </div>
                         ) : (
@@ -1572,7 +1572,7 @@ export default function FinanceClient({
                             }
                             onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                           >
-                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input">
+                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input justify-center">
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent className="bg-background border-input">
@@ -1677,7 +1677,7 @@ export default function FinanceClient({
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
                 {selectedTransaction?.category === 'Charges' ? (
-                  <div className="w-48 h-10 mt-1 bg-background text-foreground border border-input rounded-md flex items-center px-3">
+                  <div className="w-48 h-10 mt-1 bg-background text-foreground border border-input rounded-md flex items-center justify-center">
                     Charges
                   </div>
                 ) : (
@@ -1685,7 +1685,7 @@ export default function FinanceClient({
                     value={dialogCategory} 
                     onValueChange={(v) => setDialogCategory(v)}
                   >
-                    <SelectTrigger className="w-48 mt-1">
+                    <SelectTrigger className="w-48 mt-1 justify-center">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
