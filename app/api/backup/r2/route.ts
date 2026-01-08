@@ -59,7 +59,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    console.log('📋 Listing backups from R2...')
     const backups = await listR2Objects('backups')
+    console.log(`📋 Found ${backups.length} backup files:`, backups.map(b => b.name))
     
     // Parse backup info from filenames
     const parsedBackups = backups.map(b => {

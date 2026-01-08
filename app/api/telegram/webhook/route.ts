@@ -415,9 +415,7 @@ export async function POST(req: NextRequest) {
         responseMessage += `• Successfully imported: ${insertedCount.length}\n`
         
         if (balanceUpdated) {
-          responseMessage += `\n💰 Balance updated: $${runningBalance.toFixed(2)}`
-        } else {
-          responseMessage += `\n⚠️ Balance not updated (newer statement already exists)`
+          responseMessage += `\n💰 New balance: $${runningBalance.toFixed(2)}`
         }
 
         if (parsed.accountNumber) {

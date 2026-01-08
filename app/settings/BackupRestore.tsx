@@ -39,14 +39,14 @@ export default function BackupRestore() {
         headers: { 'Content-Type': 'application/json' },
       })
       
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
-        showToast('Backup created successfully!', 'success')
+        showToast(`Backup created: ${data.filename || 'Success'}`, 'success')
         // Reload backups list
         loadBackups()
       } else {
-        const error = await res.json()
-        showToast(error.error || 'Failed to create backup', 'error')
+        console.error('Backup creation failed:', data)
+        showToast(data.error || 'Failed to create backup', 'error')
       }
     } catch (err) {
       console.error('Failed to create backup', err)
@@ -61,13 +61,13 @@ export default function BackupRestore() {
     setLoading(true)
     try {
       const res = await fetch('/api/backup/r2')
+      const data = await res.json()
+      console.log('Backup list response:', data)
       if (res.ok) {
-        const data = await res.json()
         setBackups(data.backups || [])
       } else {
-        const error = await res.json()
-        if (error.error !== 'R2 storage not configured') {
-          showToast(error.error || 'Failed to load backups', 'error')
+        if (data.error !== 'R2 storage not configured') {
+          showToast(data.error || 'Failed to load backups', 'error')
         }
       }
     } catch (err) {

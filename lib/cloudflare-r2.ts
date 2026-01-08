@@ -144,12 +144,18 @@ export async function listR2Objects(folder: string = 'backups'): Promise<Array<{
   const bucketName = process.env.R2_BUCKET_NAME!
 
   try {
+    console.log(`📂 Listing R2 objects in bucket "${bucketName}" with prefix "${folder}/"`)
     const response = await client.send(
       new ListObjectsV2Command({
         Bucket: bucketName,
         Prefix: `${folder}/`,
       })
     )
+
+    console.log(`📂 R2 ListObjects response: ${response.Contents?.length || 0} objects found`)
+    if (response.Contents) {
+      console.log(`📂 Objects:`, response.Contents.map(c => c.Key))
+    }
 
     return (response.Contents || []).map(obj => ({
       key: obj.Key || '',
@@ -159,7 +165,7 @@ export async function listR2Objects(folder: string = 'backups'): Promise<Array<{
       url: getPublicUrl(obj.Key || ''),
     })).filter(obj => obj.name) // Filter out empty folder entries
   } catch (error) {
-    console.error('Failed to list R2 objects:', error)
+    console.error('❌ Failed to list R2 objects:', error)
     return []
   }
 }
