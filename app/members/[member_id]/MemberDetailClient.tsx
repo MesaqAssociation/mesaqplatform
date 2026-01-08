@@ -891,29 +891,25 @@ export default function MemberDetailClient({
               </CardHeader>
               <CardContent>
                 <div className="max-h-80 overflow-y-auto space-y-2">
-                  {/* Member Charges Section */}
+                  {/* Member Charges - displayed chronologically */}
                   {memberCharges.length > 0 && (
                     <>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Charges</p>
-                      {memberCharges.map((charge) => (
-                        <div key={charge.id} className="flex items-center justify-between py-2 px-3 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                      {memberCharges
+                        .slice()
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((charge) => (
+                        <div key={charge.id} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
                           <div>
                             <p className="text-sm font-medium">{charge.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {new Date(charge.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>
                           </div>
-                          <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                          <span className="text-sm font-semibold">
                             -${Number(charge.amount).toFixed(2)}
                           </span>
                         </div>
                       ))}
-                      {totalCharges > 0 && (
-                        <div className="flex justify-between py-2 px-3 border-t border-orange-200 dark:border-orange-800 mt-2">
-                          <span className="text-sm font-medium">Total Charges</span>
-                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">-${totalCharges.toFixed(2)}</span>
-                        </div>
-                      )}
                       <Separator className="my-3" />
                     </>
                   )}

@@ -1207,8 +1207,11 @@ export default function FinanceClient({
                         <p className="text-xs text-muted-foreground truncate">{txn.description}</p>
                         <p className="text-xs text-muted-foreground">{new Date(txn.transaction_date).toLocaleDateString('en-AU')}</p>
                       </div>
-                      <span className={`ml-3 font-medium ${txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                        {txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
+                      <span className={`ml-3 font-medium ${
+                        txn.category === 'Member Charge' ? 'text-foreground' 
+                        : txn.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {txn.category === 'Member Charge' ? '' : txn.transaction_type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
                       </span>
                     </div>
                   </button>
@@ -1450,8 +1453,11 @@ export default function FinanceClient({
                         </Select>
                       </td>
                       <td className={`py-3 px-2 text-right font-medium ${
+                        // Member Charges get black/neutral text with no +/-
+                        txn.category === 'Member Charge'
+                          ? 'text-foreground'
                         // Mark membership payments under the fee in red
-                        txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
+                          : txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
                           ? 'text-red-600 dark:text-red-400'
                           : txn.transaction_type === 'credit' 
                           ? 'text-green-600 dark:text-green-400' 
@@ -1462,8 +1468,8 @@ export default function FinanceClient({
                           : 'text-red-600 dark:text-red-400'
                       }`}>
                         <div className="flex items-center justify-end gap-1">
-                          {(txn.transaction_type === 'credit' || (txn.transaction_type === 'adjustment' && txn.amount > 0)) && <IconArrowUp className="size-3" />}
-                          {(txn.transaction_type === 'debit' || (txn.transaction_type === 'adjustment' && txn.amount < 0)) && <IconArrowDown className="size-3" />}
+                          {txn.category !== 'Member Charge' && (txn.transaction_type === 'credit' || (txn.transaction_type === 'adjustment' && txn.amount > 0)) && <IconArrowUp className="size-3" />}
+                          {txn.category !== 'Member Charge' && (txn.transaction_type === 'debit' || (txn.transaction_type === 'adjustment' && txn.amount < 0)) && <IconArrowDown className="size-3" />}
                           {formatCurrency(Math.abs(txn.amount))}
                         </div>
                       </td>
