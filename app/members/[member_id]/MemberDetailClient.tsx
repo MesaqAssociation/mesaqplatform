@@ -99,6 +99,8 @@ export default function MemberDetailClient({
   const [balance, setBalance] = useState<number | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
   const [monthsBreakdown, setMonthsBreakdown] = useState<MonthBreakdown[]>([])
+  const [memberCharges, setMemberCharges] = useState<Array<{id: string, date: string, name: string, amount: number, description: string}>>([])
+  const [totalCharges, setTotalCharges] = useState(0)
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState({
     name: member.name || '',
@@ -157,6 +159,8 @@ export default function MemberDetailClient({
           const current = Number(data?.membershipBalance?.currentBalance ?? 0)
           setBalance(current)
           setMonthsBreakdown(data?.membershipBalance?.monthsBreakdown || [])
+          setMemberCharges(data?.membershipBalance?.charges || [])
+          setTotalCharges(Number(data?.membershipBalance?.totalCharges || 0))
         }
       } catch (err) {
         console.error('Failed to load balance', err)
@@ -168,8 +172,9 @@ export default function MemberDetailClient({
   }, [member.id])
 
   // Group transactions by month
-  // Show all transactions
-  const transactionsByMonth = (transactions || []).reduce((acc, txn) => {
+  // Filter out Member Charges (they're shown in Expected Payments section)
+  const filteredTransactions = (transactions || []).filter(txn => txn.category !== 'Member Charge')
+  const transactionsByMonth = filteredTransactions.reduce((acc, txn) => {
     if (!txn.transaction_date) return acc
     const date = new Date(txn.transaction_date + 'T00:00:00')
     const monthKey = date.toISOString().slice(0, 7) // YYYY-MM format
@@ -801,7 +806,7 @@ export default function MemberDetailClient({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {transactions.length === 0 ? (
+              {filteredTransactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No transactions found for this member</p>
               ) : (
                 <div className="space-y-2">
@@ -879,30 +884,63 @@ export default function MemberDetailClient({
           </Card>
 
           {/* Expected Payments - Next to Transactions for easy viewing */}
-          {isAdmin && monthsBreakdown.length > 0 && (
+          {isAdmin && (monthsBreakdown.length > 0 || memberCharges.length > 0) && (
             <Card>
               <CardHeader>
                 <CardTitle>Expected Payments</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="max-h-64 overflow-y-auto space-y-2">
-                  {monthsBreakdown.slice().reverse().map((month) => (
-                    <div key={month.month} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium">{month.monthName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Expected: ${month.expected.toFixed(2)} | Paid: ${month.paid.toFixed(2)}
-                        </p>
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        month.status === 'paid' 
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
-                        {month.status === 'paid' ? 'PAID' : 'UNPAID'}
-                      </span>
-                    </div>
-                  ))}
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {/* Member Charges Section */}
+                  {memberCharges.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Charges</p>
+                      {memberCharges.map((charge) => (
+                        <div key={charge.id} className="flex items-center justify-between py-2 px-3 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">{charge.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(charge.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                            -${Number(charge.amount).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                      {totalCharges > 0 && (
+                        <div className="flex justify-between py-2 px-3 border-t border-orange-200 dark:border-orange-800 mt-2">
+                          <span className="text-sm font-medium">Total Charges</span>
+                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">-${totalCharges.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <Separator className="my-3" />
+                    </>
+                  )}
+                  
+                  {/* Monthly Fees Section */}
+                  {monthsBreakdown.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Monthly Fees</p>
+                      {monthsBreakdown.slice().reverse().map((month) => (
+                        <div key={month.month} className="flex items-center justify-between py-2 px-3 border border-border rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">{month.monthName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Expected: ${month.expected.toFixed(2)} | Paid: ${month.paid.toFixed(2)}
+                            </p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            month.status === 'paid' 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {month.status === 'paid' ? 'PAID' : 'UNPAID'}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -213,10 +213,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Group ID or name is required' }, { status: 400 })
     }
 
-    // Clear group_name and group_id from all users in this group
+    // Clear group_name from all users in this group
     if (groupName) {
       await pool.query(
-        `UPDATE users SET group_name = NULL, group_id = NULL, is_group_leader = false WHERE group_name = $1`,
+        `UPDATE users SET group_name = NULL, is_group_leader = false WHERE group_name = $1`,
         [groupName]
       )
     }
