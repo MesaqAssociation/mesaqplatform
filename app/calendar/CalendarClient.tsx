@@ -663,47 +663,41 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
             <div>
               <Label htmlFor="message">Message *</Label>
               
-              {/* Variable buttons */}
-              <div className="flex flex-wrap gap-2 mt-2 mb-2">
-                <span className="text-xs text-muted-foreground self-center">Insert variable:</span>
-                <Button
+              {/* Variable buttons - styled badges */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 mb-2">
+                <span className="text-xs text-muted-foreground">Insert:</span>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={() => setMessage(prev => prev + '{{name}}')}
-                  className="text-xs h-7"
+                  className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-medium hover:bg-blue-200 transition-colors"
                 >
-                  Full Name
-                </Button>
-                <Button
+                  Member Name
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={() => setMessage(prev => prev + '{{phone}}')}
-                  className="text-xs h-7"
+                  className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-medium hover:bg-green-200 transition-colors"
                 >
-                  Phone
-                </Button>
-                <Button
+                  Phone Number
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={() => setMessage(prev => prev + '{{group}}')}
-                  className="text-xs h-7"
+                  className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-medium hover:bg-purple-200 transition-colors"
                 >
-                  Group
-                </Button>
+                  Group Name
+                </button>
               </div>
               
               <Textarea
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Enter the message to send... Use variables like {{name}}, {{phone}}, {{group}}"
+                placeholder="Enter your message here..."
                 rows={4}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                💡 Variables will be replaced with member data. If a member doesn't have a value set, "N/A" will be used.
+                💡 Click the colored badges above to insert variables. They'll be replaced with each member's data.
               </p>
             </div>
 

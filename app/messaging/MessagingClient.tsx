@@ -881,20 +881,20 @@ export default function MessagingClient() {
 
         {/* Bulk Message Tab */}
         <TabsContent value="bulk" className="mt-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        {/* Member Selection */}
-        <Card>
-              <CardHeader className="p-4 md:p-6 pb-2">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-              <IconUsers className="size-5" />
-              Select Recipients
-            </CardTitle>
-                <CardDescription className="text-xs md:text-sm">
-              Choose members to send messages to ({selectedMembers.size} selected)
-            </CardDescription>
-          </CardHeader>
-              <CardContent className="p-4 md:p-6 pt-2">
-            <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Member Selection */}
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <IconUsers className="size-5" />
+                  Select Recipients
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Choose members to send messages to ({selectedMembers.size} selected)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-2">
               <div className="relative">
                 <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
@@ -948,43 +948,40 @@ export default function MessagingClient() {
           </CardContent>
         </Card>
 
-        {/* Message Composition */}
-        <Card>
-              <CardHeader className="p-4 md:p-6 pb-2">
-                <CardTitle className="text-base md:text-lg">Compose Message</CardTitle>
-                <CardDescription className="text-xs md:text-sm">
+            {/* Message Composition */}
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base">Compose Message</CardTitle>
+                <CardDescription className="text-xs">
                   Write your message (sent individually to each member via SMS)
-            </CardDescription>
-          </CardHeader>
-              <CardContent className="p-4 md:p-6 pt-2">
-            <div className="space-y-3">
-                  {/* Variable Dropdown */}
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs text-muted-foreground self-center">Insert variable:</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-2">
+                  {/* Variable Buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Insert:</span>
+                    <button
+                      type="button"
                       onClick={() => setBulkMessage(prev => prev + '{{name}}')}
-                      className="text-xs h-7"
+                      className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-medium hover:bg-blue-200 transition-colors"
                     >
-                      Full Name
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                      Member Name
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setBulkMessage(prev => prev + '{{phone}}')}
-                      className="text-xs h-7"
+                      className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-medium hover:bg-green-200 transition-colors"
                     >
-                      Phone
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                      Phone Number
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setBulkMessage(prev => prev + '{{group}}')}
-                      className="text-xs h-7"
+                      className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-medium hover:bg-purple-200 transition-colors"
                     >
-                      Group
-                    </Button>
+                      Group Name
+                    </button>
                   </div>
                   
               <Textarea
@@ -996,7 +993,7 @@ export default function MessagingClient() {
                   />
 
                   <p className="text-xs text-muted-foreground">
-                    💡 Variables will be replaced with member data. If a member doesn't have a value set, "N/A" will be used.
+                    💡 Click the colored badges above to insert variables. They'll be replaced with each member's data. "N/A" is used for missing values.
                   </p>
 
                   {sendingBulk && (
