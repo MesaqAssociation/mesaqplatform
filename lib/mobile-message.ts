@@ -4,6 +4,15 @@
  * 
  * API Documentation: https://mobilemessage.com.au/api-documentation
  * 
+ * Required Environment Variables:
+ * - MOBILE_MESSAGE_USERNAME: API username from Mobile Message
+ * - MOBILE_MESSAGE_PASSWORD: API password from Mobile Message
+ * - MOBILE_MESSAGE_SENDER: Approved sender ID (check your Mobile Message dashboard)
+ * 
+ * API Endpoints:
+ * - GET /v1/account - Check balance (returns credit_balance)
+ * - POST /v1/messages - Send SMS (requires messages array with to, message, sender)
+ * 
  * Each message costs 2 credits
  */
 
@@ -96,11 +105,9 @@ export async function getBalance(): Promise<{ credits: number; success: boolean 
     const data = await response.json()
     console.log('✅ Mobile Message account info:', data)
     
-    // The account endpoint returns credits in a "credits" or "balance" field
-    return { 
-      credits: data.credits || data.balance || data.credit || 0, 
-      success: true 
-    }
+    // The account endpoint returns credits in "credit_balance" field
+    const credits = data.credit_balance ?? data.credits ?? data.balance ?? 0
+    return { credits, success: true }
   } catch (error) {
     console.error('❌ Error checking Mobile Message balance:', error)
     return { credits: 0, success: false }
@@ -109,6 +116,7 @@ export async function getBalance(): Promise<{ credits: number; success: boolean 
 
 /**
  * Send a single SMS message
+ * Uses the /v1/messages endpoint with messages array format
  */
 export async function sendSMS(
   to: string,
@@ -121,38 +129,51 @@ export async function sendSMS(
     return { success: false, error: 'Invalid phone number' }
   }
 
+  // Sender ID must be configured in Mobile Message dashboard
+  const sender = process.env.MOBILE_MESSAGE_SENDER
+  if (!sender) {
+    console.error('❌ MOBILE_MESSAGE_SENDER not configured')
+    return { success: false, error: 'Sender ID not configured' }
+  }
+
   try {
-    // Mobile Message API expects the phone number and message
-    const response = await fetch('https://api.mobilemessage.com.au/v1/sms', {
+    // Mobile Message API: POST /v1/messages with messages array
+    const response = await fetch('https://api.mobilemessage.com.au/v1/messages', {
       method: 'POST',
       headers: {
         'Authorization': getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: phone,
-        message: message,
-        // Sender ID is optional - Mobile Message will use default if not provided
-        // from: process.env.MOBILE_MESSAGE_SENDER || undefined
+        messages: [{
+          to: phone,
+          message: message,
+          sender: sender
+        }]
       })
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`❌ Mobile Message send failed:`, {
-        status: response.status,
-        error: errorText
-      })
-      return { success: false, error: errorText }
+    const data = await response.json()
+    console.log(`📤 Mobile Message response for ${phone}:`, JSON.stringify(data))
+    
+    // Check the result for the first message
+    const result = data.results?.[0]
+    if (result?.status === 'error') {
+      console.error(`❌ SMS failed to ${phone}:`, result.error)
+      return { success: false, error: result.error }
+    }
+    
+    if (result?.status === 'queued' || result?.status === 'sent' || result?.status === 'success') {
+      console.log(`✅ SMS sent to ${phone}`)
+      return { 
+        success: true, 
+        messageId: result.message_id || result.id
+      }
     }
 
-    const data = await response.json()
-    console.log(`✅ SMS sent to ${phone}:`, data)
-    
-    return { 
-      success: true, 
-      messageId: data.messageId || data.id || data.message_id
-    }
+    // Unknown status
+    console.warn(`⚠️ Unknown SMS status for ${phone}:`, result)
+    return { success: false, error: 'Unknown response status' }
   } catch (error: any) {
     console.error('❌ Error sending SMS:', error)
     return { success: false, error: error.message }
@@ -160,7 +181,8 @@ export async function sendSMS(
 }
 
 /**
- * Send bulk SMS messages (one by one, no delay)
+ * Send bulk SMS messages in a single API call
+ * The API supports sending multiple messages at once
  */
 export async function sendBulkSMS(
   messages: SMSMessage[]
@@ -169,38 +191,76 @@ export async function sendBulkSMS(
     return { success: true, sent: 0, failed: 0, skipped: 0 }
   }
 
+  const sender = process.env.MOBILE_MESSAGE_SENDER
+  if (!sender) {
+    console.error('❌ MOBILE_MESSAGE_SENDER not configured')
+    return { success: false, sent: 0, failed: messages.length, skipped: 0 }
+  }
+
   console.log(`📤 Sending ${messages.length} SMS messages via Mobile Message`)
 
-  let sent = 0
-  let failed = 0
+  // Prepare messages array, filtering out invalid phone numbers
+  const validMessages: { to: string; message: string; sender: string }[] = []
   let skipped = 0
 
-  // Send all messages without delay
-  const results = await Promise.all(
-    messages.map(async (msg) => {
-      const phone = formatPhoneNumber(msg.to)
-      if (!isValidPhoneNumber(phone)) {
-        skipped++
-        return { success: false, skipped: true }
-      }
-
-      const result = await sendSMS(msg.to, msg.message)
-      if (result.success) {
-        sent++
-      } else {
-        failed++
-      }
-      return result
+  for (const msg of messages) {
+    const phone = formatPhoneNumber(msg.to)
+    if (!isValidPhoneNumber(phone)) {
+      console.log(`⏭️ Skipping invalid phone: ${msg.to}`)
+      skipped++
+      continue
+    }
+    validMessages.push({
+      to: phone,
+      message: msg.message,
+      sender: sender
     })
-  )
+  }
 
-  console.log(`✅ Bulk SMS: ${sent} sent, ${failed} failed, ${skipped} skipped`)
+  if (validMessages.length === 0) {
+    return { success: true, sent: 0, failed: 0, skipped }
+  }
 
-  return {
-    success: failed === 0,
-    sent,
-    failed,
-    skipped
+  try {
+    // Send all messages in one API call
+    const response = await fetch('https://api.mobilemessage.com.au/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messages: validMessages })
+    })
+
+    const data = await response.json()
+    console.log('📤 Bulk SMS response:', JSON.stringify(data).substring(0, 500))
+
+    // Count results
+    let sent = 0
+    let failed = 0
+
+    if (data.results && Array.isArray(data.results)) {
+      for (const result of data.results) {
+        if (result.status === 'queued' || result.status === 'sent' || result.status === 'success') {
+          sent++
+        } else {
+          failed++
+          console.log(`❌ Failed to send to ${result.to}: ${result.error || result.status}`)
+        }
+      }
+    }
+
+    console.log(`✅ Bulk SMS: ${sent} sent, ${failed} failed, ${skipped} skipped`)
+
+    return {
+      success: failed === 0,
+      sent,
+      failed,
+      skipped
+    }
+  } catch (error: any) {
+    console.error('❌ Error sending bulk SMS:', error)
+    return { success: false, sent: 0, failed: messages.length - skipped, skipped }
   }
 }
 
