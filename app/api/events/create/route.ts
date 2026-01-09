@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
           const membersWithPhone = groupMembers.filter((m: any) => m.phone)
 
-          // Check credit balance before sending (2 credits per message)
+          // Check credit balance before sending (1 credit per message)
           if (membersWithPhone.length > 0 && process.env.MOBILE_MESSAGE_USERNAME) {
             const creditCheck = await hasEnoughCredits(membersWithPhone.length)
             

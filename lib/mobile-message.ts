@@ -7,13 +7,13 @@
  * Required Environment Variables:
  * - MOBILE_MESSAGE_USERNAME: API username from Mobile Message
  * - MOBILE_MESSAGE_PASSWORD: API password from Mobile Message
- * - MOBILE_MESSAGE_SENDER: Approved sender ID (check your Mobile Message dashboard)
+ * - MOBILE_MESSAGE_SENDER_ID: Approved sender ID (check your Mobile Message dashboard)
  * 
  * API Endpoints:
  * - GET /v1/account - Check balance (returns credit_balance)
  * - POST /v1/messages - Send SMS (requires messages array with to, message, sender)
  * 
- * Each message costs 2 credits
+ * Each message costs 1 credit
  */
 
 export type SMSMessage = {
@@ -130,9 +130,9 @@ export async function sendSMS(
   }
 
   // Sender ID must be configured in Mobile Message dashboard
-  const sender = process.env.MOBILE_MESSAGE_SENDER
+  const sender = process.env.MOBILE_MESSAGE_SENDER_ID
   if (!sender) {
-    console.error('❌ MOBILE_MESSAGE_SENDER not configured')
+    console.error('❌ MOBILE_MESSAGE_SENDER_ID not configured')
     return { success: false, error: 'Sender ID not configured' }
   }
 
@@ -191,9 +191,9 @@ export async function sendBulkSMS(
     return { success: true, sent: 0, failed: 0, skipped: 0 }
   }
 
-  const sender = process.env.MOBILE_MESSAGE_SENDER
+  const sender = process.env.MOBILE_MESSAGE_SENDER_ID
   if (!sender) {
-    console.error('❌ MOBILE_MESSAGE_SENDER not configured')
+    console.error('❌ MOBILE_MESSAGE_SENDER_ID not configured')
     return { success: false, sent: 0, failed: messages.length, skipped: 0 }
   }
 
@@ -266,10 +266,10 @@ export async function sendBulkSMS(
 
 /**
  * Calculate credit cost for sending messages
- * Each message costs 2 credits
+ * Each message costs 1 credit
  */
 export function calculateCreditCost(messageCount: number): number {
-  return messageCount * 2
+  return messageCount * 1
 }
 
 /**

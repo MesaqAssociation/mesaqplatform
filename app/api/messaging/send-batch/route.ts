@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check credit balance (2 credits per message) - but don't fail if balance check fails
+    // Check credit balance (1 credit per message) - but don't fail if balance check fails
     try {
       const creditCheck = await hasEnoughCredits(membersWithPhone.length)
       if (!creditCheck.hasEnough && creditCheck.currentCredits > 0) {

@@ -1032,7 +1032,7 @@ export default function MessagingClient() {
                   SMS Credits
                   </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Your current SMS messaging credits (2 credits per message)
+                  Your current SMS messaging credits (1 credit per message)
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
@@ -1046,7 +1046,7 @@ export default function MessagingClient() {
                           {Math.floor(balance)}
                         </p>
                         <p className="text-sm text-muted-foreground mt-2">Credits Available</p>
-                        <p className="text-xs text-muted-foreground mt-1">({Math.floor(balance / 2)} messages)</p>
+                        <p className="text-xs text-muted-foreground mt-1">({balance} messages)</p>
                       </>
                     ) : (
                       <p className="text-muted-foreground">Unable to fetch balance</p>
@@ -1119,7 +1119,7 @@ export default function MessagingClient() {
                   ))}
                     <div className="mt-4 p-4 bg-muted/50 rounded-lg">
                       <p className="text-xs text-muted-foreground">
-                        <strong>Note:</strong> Each SMS costs 2 credits. Contact Mobile Message support if you need help with your account.
+                        <strong>Note:</strong> Each SMS costs 1 credit. Contact Mobile Message support if you need help with your account.
                       </p>
                     </div>
                 </div>
