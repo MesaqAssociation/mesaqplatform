@@ -125,35 +125,65 @@ export function VariableTextarea({
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    
+    const range = selection.getRangeAt(0)
+    
     // Handle backspace on variable badges
-    if (e.key === 'Backspace') {
-      const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        if (range.collapsed && range.startOffset === 0) {
-          const prevSibling = range.startContainer.previousSibling as Element
-          if (prevSibling?.getAttribute?.('data-variable')) {
-            e.preventDefault()
-            prevSibling.remove()
-            handleInput()
-            return
-          }
+    if (e.key === 'Backspace' && range.collapsed) {
+      // Find the element just before the cursor
+      let prevElement: Element | null = null
+      
+      // Case 1: Cursor at start of a text node, check previous sibling
+      if (range.startOffset === 0) {
+        prevElement = range.startContainer.previousSibling as Element
+      }
+      
+      // Case 2: Cursor is in the container div, check child at offset-1
+      if (!prevElement && range.startContainer === editorRef.current && range.startOffset > 0) {
+        const children = editorRef.current.childNodes
+        if (range.startOffset <= children.length) {
+          prevElement = children[range.startOffset - 1] as Element
         }
+      }
+      
+      // Case 3: Check if parent's previous sibling is a variable
+      if (!prevElement) {
+        const parent = range.startContainer.parentElement
+        if (parent && parent !== editorRef.current && range.startOffset === 0) {
+          prevElement = parent.previousSibling as Element
+        }
+      }
+      
+      if (prevElement?.getAttribute?.('data-variable')) {
+        e.preventDefault()
+        prevElement.remove()
+        handleInput()
+        return
       }
     }
     
     // Handle delete on variable badges
-    if (e.key === 'Delete') {
-      const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        const nextSibling = range.endContainer.nextSibling as Element
-        if (nextSibling?.getAttribute?.('data-variable')) {
-          e.preventDefault()
-          nextSibling.remove()
-          handleInput()
-          return
+    if (e.key === 'Delete' && range.collapsed) {
+      let nextElement: Element | null = null
+      
+      // Case 1: Check next sibling of current container
+      nextElement = range.endContainer.nextSibling as Element
+      
+      // Case 2: Cursor is in the container div
+      if (!nextElement && range.endContainer === editorRef.current) {
+        const children = editorRef.current.childNodes
+        if (range.endOffset < children.length) {
+          nextElement = children[range.endOffset] as Element
         }
+      }
+      
+      if (nextElement?.getAttribute?.('data-variable')) {
+        e.preventDefault()
+        nextElement.remove()
+        handleInput()
+        return
       }
     }
   }

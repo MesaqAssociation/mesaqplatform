@@ -102,19 +102,32 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
   const loadData = async () => {
     try {
-      const [notifRes, eventsRes] = await Promise.all([
-        fetch('/api/notifications'),
-        fetch('/api/events')
-      ])
-      
-      if (notifRes.ok) {
-        const data = await notifRes.json()
-        setNotifications(data.notifications || [])
+      // Only load notifications for admins
+      const promises: Promise<Response>[] = [fetch('/api/events')]
+      if (isAdmin) {
+        promises.unshift(fetch('/api/notifications'))
       }
       
-      if (eventsRes.ok) {
-        const data = await eventsRes.json()
-        setEvents(data.events || [])
+      const responses = await Promise.all(promises)
+      
+      if (isAdmin) {
+        const [notifRes, eventsRes] = responses
+        if (notifRes.ok) {
+          const data = await notifRes.json()
+          setNotifications(data.notifications || [])
+        }
+        if (eventsRes.ok) {
+          const data = await eventsRes.json()
+          setEvents(data.events || [])
+        }
+      } else {
+        // Regular members only see events, no scheduled messages
+        const [eventsRes] = responses
+        if (eventsRes.ok) {
+          const data = await eventsRes.json()
+          setEvents(data.events || [])
+        }
+        setNotifications([]) // Clear any notifications for non-admins
       }
     } catch (err) {
       console.error('Failed to load data:', err)

@@ -33,8 +33,10 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const type = searchParams.get('type') || 'Event'
+    const upcoming = searchParams.get('upcoming') === 'true'
+    const limit = parseInt(searchParams.get('limit') || '200', 10)
 
-    const { rows } = await pool.query(`
+    let query = `
       SELECT 
         id, 
         title, 
@@ -49,9 +51,16 @@ export async function GET(req: NextRequest) {
         completed_at
       FROM events 
       WHERE event_type = $1
-      ORDER BY event_date ASC, start_time ASC 
-      LIMIT 200
-    `, [type])
+    `
+    
+    // Only show upcoming (future) events if requested
+    if (upcoming) {
+      query += ` AND event_date >= CURRENT_DATE`
+    }
+    
+    query += ` ORDER BY event_date ASC, start_time ASC LIMIT $2`
+
+    const { rows } = await pool.query(query, [type, limit])
 
     return NextResponse.json({ events: rows }, { headers: corsHeaders })
   } catch (err: any) {

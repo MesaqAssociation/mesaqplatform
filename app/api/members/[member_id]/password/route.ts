@@ -61,10 +61,10 @@ export async function PATCH(
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Update password
+    // Update password_hash
     const { rows } = await pool.query(`
       UPDATE users 
-      SET password = $1
+      SET password_hash = $1
       WHERE id = $2
       RETURNING id, name
     `, [hashedPassword, memberId])
