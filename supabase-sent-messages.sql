@@ -1,4 +1,4 @@
--- Sent Messages Table for tracking all outgoing WhatsApp messages
+-- Sent Messages Table for tracking all outgoing SMS messages
 -- Run this in Supabase SQL Editor
 
 CREATE TABLE IF NOT EXISTS sent_messages (
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS sent_messages (
   
   -- Status tracking
   status VARCHAR(50) DEFAULT 'sent', -- 'pending', 'sent', 'delivered', 'read', 'failed'
-  picky_assist_id VARCHAR(100), -- Unique ID from Picky Assist for status tracking
+  external_message_id VARCHAR(100), -- Unique ID from SMS provider for status tracking
   error_message TEXT,
   
   -- Metadata
@@ -37,8 +37,8 @@ CREATE INDEX IF NOT EXISTS idx_sent_messages_status ON sent_messages(status);
 CREATE INDEX IF NOT EXISTS idx_sent_messages_type ON sent_messages(message_type);
 CREATE INDEX IF NOT EXISTS idx_sent_messages_recipient ON sent_messages(recipient_member_id);
 CREATE INDEX IF NOT EXISTS idx_sent_messages_batch ON sent_messages(batch_id);
-CREATE INDEX IF NOT EXISTS idx_sent_messages_picky_assist ON sent_messages(picky_assist_id);
+CREATE INDEX IF NOT EXISTS idx_sent_messages_external_id ON sent_messages(external_message_id);
 
 -- Add comment
-COMMENT ON TABLE sent_messages IS 'Tracks all outgoing WhatsApp messages sent via Picky Assist';
+COMMENT ON TABLE sent_messages IS 'Tracks all outgoing SMS messages sent via Mobile Message';
 

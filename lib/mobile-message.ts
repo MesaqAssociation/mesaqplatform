@@ -79,7 +79,7 @@ function getAuthHeader(): string {
  */
 export async function getBalance(): Promise<{ credits: number; success: boolean }> {
   try {
-    const response = await fetch('https://api.mobilemessage.com.au/v1/balance', {
+    const response = await fetch('https://api.mobilemessage.com.au/v1/account', {
       method: 'GET',
       headers: {
         'Authorization': getAuthHeader(),
@@ -88,15 +88,17 @@ export async function getBalance(): Promise<{ credits: number; success: boolean 
     })
 
     if (!response.ok) {
-      console.error('❌ Mobile Message balance check failed:', response.status)
+      const errorText = await response.text()
+      console.error('❌ Mobile Message balance check failed:', response.status, errorText)
       return { credits: 0, success: false }
     }
 
     const data = await response.json()
-    console.log('✅ Mobile Message balance:', data)
+    console.log('✅ Mobile Message account info:', data)
     
+    // The account endpoint returns credits in a "credits" or "balance" field
     return { 
-      credits: data.credits || data.balance || 0, 
+      credits: data.credits || data.balance || data.credit || 0, 
       success: true 
     }
   } catch (error) {
@@ -120,7 +122,8 @@ export async function sendSMS(
   }
 
   try {
-    const response = await fetch('https://api.mobilemessage.com.au/v1/sms/send', {
+    // Mobile Message API expects the phone number and message
+    const response = await fetch('https://api.mobilemessage.com.au/v1/sms', {
       method: 'POST',
       headers: {
         'Authorization': getAuthHeader(),
@@ -148,7 +151,7 @@ export async function sendSMS(
     
     return { 
       success: true, 
-      messageId: data.messageId || data.id 
+      messageId: data.messageId || data.id || data.message_id
     }
   } catch (error: any) {
     console.error('❌ Error sending SMS:', error)

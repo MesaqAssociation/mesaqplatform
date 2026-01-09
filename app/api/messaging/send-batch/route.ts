@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkSMS, formatPhoneNumber, buildAdminMessage, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
+import { sendBulkSMS, formatPhoneNumber, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
@@ -12,6 +12,17 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 })
+
+/**
+ * Replace variables in message with member data
+ * Variables: {{name}}, {{phone}}, {{group}}
+ */
+function replaceVariables(message: string, member: any): string {
+  return message
+    .replace(/\{\{name\}\}/gi, member.name || 'N/A')
+    .replace(/\{\{phone\}\}/gi, member.phone || 'N/A')
+    .replace(/\{\{group\}\}/gi, member.group_name || 'N/A')
+}
 
 export async function POST(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
@@ -62,10 +73,10 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get member details
+    // Get member details including group_name
     const placeholders = memberIds.map((_: any, i: number) => `$${i + 1}`).join(',')
     const { rows: members } = await pool.query(`
-      SELECT id, name, phone, email
+      SELECT id, name, phone, email, group_name
       FROM users
       WHERE id IN (${placeholders})
     `, memberIds)
@@ -78,20 +89,25 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check credit balance (2 credits per message)
-    const creditCheck = await hasEnoughCredits(membersWithPhone.length)
-    if (!creditCheck.hasEnough) {
-      return NextResponse.json({ 
-        error: `Not enough credits to send ${membersWithPhone.length} messages. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up.`
-      }, { status: 400 })
+    // Check credit balance (2 credits per message) - but don't fail if balance check fails
+    try {
+      const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+      if (!creditCheck.hasEnough && creditCheck.currentCredits > 0) {
+        return NextResponse.json({ 
+          error: `Not enough credits to send ${membersWithPhone.length} messages. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up.`
+        }, { status: 400 })
+      }
+    } catch (creditErr) {
+      console.log('Credit check failed, proceeding anyway:', creditErr)
+      // Continue anyway if credit check fails
     }
 
     console.log(`📤 Sending SMS to ${membersWithPhone.length} members...`)
 
-    // Prepare SMS messages
+    // Prepare SMS messages - replace variables for each member
     const smsMessages: SMSMessage[] = membersWithPhone.map((member: any) => ({
       to: member.phone,
-      message: buildAdminMessage(member.name, message.trim())
+      message: replaceVariables(message.trim(), member)
     }))
 
     const result = await sendBulkSMS(smsMessages)
@@ -103,7 +119,7 @@ export async function POST(req: NextRequest) {
     const sentMessageData: SentMessageData[] = membersWithPhone.map((member: any) => ({
       messageType: 'admin_message' as const,
       templateId: undefined,
-      messageContent: buildAdminMessage(member.name, message.trim()),
+      messageContent: replaceVariables(message.trim(), member),
       recipientPhone: formatPhoneNumber(member.phone),
       recipientName: member.name,
       recipientMemberId: member.id,

@@ -23,28 +23,41 @@ export async function GET(req: NextRequest) {
 
   try {
     if (!process.env.MOBILE_MESSAGE_USERNAME || !process.env.MOBILE_MESSAGE_PASSWORD) {
-      return NextResponse.json({ error: 'Mobile Message not configured' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Mobile Message not configured',
+        credits: 0,
+        balance: 0
+      }, { status: 400 })
     }
 
     const { credits, success } = await getBalance()
 
     if (!success) {
-      throw new Error('Failed to fetch balance')
+      // Return 0 credits but don't fail the request completely
+      console.log('Balance check failed, returning 0 credits')
+      return NextResponse.json({
+        credits: 0,
+        balance: 0,
+        status: 100,
+        message: 'Balance check unavailable - API may be down'
+      })
     }
     
     return NextResponse.json({
       credits,
-      // Keep balance field for backward compatibility (convert credits to approximate dollar value)
-      // 2 credits = 1 message, assuming ~$0.05 per message
-      balance: credits * 0.025,
+      // Keep balance field for backward compatibility (use credits directly)
+      balance: credits,
       status: 100,
       message: 'Success'
     })
   } catch (err: any) {
     console.error('Balance check error:', err)
+    // Return a response with 0 balance instead of failing
     return NextResponse.json({ 
+      credits: 0,
+      balance: 0,
       error: 'Failed to check balance',
       details: err.message 
-    }, { status: 500 })
+    })
   }
 }

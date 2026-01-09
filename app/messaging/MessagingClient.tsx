@@ -402,12 +402,7 @@ export default function MessagingClient() {
       return
     }
 
-    // Check balance before sending (2 credits per message)
-    const requiredCredits = selectedMembers.size * 2
-    if (balance !== null && balance < requiredCredits) {
-      showToast(`Not enough credits to send ${selectedMembers.size} messages. Need ${requiredCredits} credits, have ${balance} credits. Please top up.`, 'error')
-      return
-    }
+    // Balance check is handled by the API
 
     setSendingBulk(true)
     try {
@@ -958,26 +953,51 @@ export default function MessagingClient() {
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg">Compose Message</CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Write your message (sent individually to each member via WhatsApp)
+                  Write your message (sent individually to each member via SMS)
             </CardDescription>
           </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
             <div className="space-y-4">
-                  <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
-                    <p className="font-semibold text-primary text-sm">Salam (Member Name),</p>
+                  {/* Variable Dropdown */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs text-muted-foreground self-center">Insert variable:</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkMessage(prev => prev + '{{name}}')}
+                      className="text-xs h-7"
+                    >
+                      Full Name
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkMessage(prev => prev + '{{phone}}')}
+                      className="text-xs h-7"
+                    >
+                      Phone
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkMessage(prev => prev + '{{group}}')}
+                      className="text-xs h-7"
+                    >
+                      Group
+                    </Button>
                   </div>
                   
               <Textarea
-                    placeholder="Type your message content here..."
+                    placeholder="Type your message here... Use variables like {{name}}, {{phone}}, {{group}}"
                     value={bulkMessage}
                     onChange={(e) => setBulkMessage(e.target.value)}
                     rows={6}
-                    className="resize-none border-2 focus:border-primary text-sm"
+                    className="resize-none border-2 focus:border-primary text-sm font-mono"
                   />
 
-                  <div className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r">
-                    <p className="font-semibold text-primary text-sm">Kind Regards - Mesaq Association</p>
-              </div>
+                  <p className="text-xs text-muted-foreground">
+                    💡 Variables will be replaced with member data. If a member doesn't have a value set, "N/A" will be used.
+                  </p>
 
                   {sendingBulk && (
                     <div className="flex items-center justify-center gap-3 py-4">
