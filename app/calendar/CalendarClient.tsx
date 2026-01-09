@@ -443,10 +443,12 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                 <span>Event</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                <span>Scheduled Message</span>
-              </div>
+              {isAdmin && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                  <span>Scheduled Message</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
