@@ -1,4 +1,4 @@
-import { toast } from '@/components/ui/use-toast'
+import { toast } from '@/hooks/use-toast'
 
 export function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
   const variant = type === 'error' ? 'destructive' : type === 'success' ? 'success' : 'default'

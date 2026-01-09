@@ -641,7 +641,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
           
           {/* No items message */}
           {getEventsForDate(popoverDate).length === 0 && getNotificationsForDate(popoverDate).length === 0 && (
-            <p className="text-sm text-muted-foreground mb-3">No events or messages scheduled</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              {isAdmin ? 'No events or messages scheduled' : 'No events scheduled'}
+            </p>
           )}
           
           {/* Schedule button */}
