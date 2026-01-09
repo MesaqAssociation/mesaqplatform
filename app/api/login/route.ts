@@ -18,7 +18,7 @@ const pool = new Pool({
 })
 
 const schema = z.object({
-  identifier: z.string().min(1), // Can be phone or name
+  identifier: z.string().min(1), // Phone number or email
   password: z.string().min(8).max(128),
 })
 
@@ -35,19 +35,23 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { identifier, password } = schema.parse(body)
 
-    // Try to find user by phone or name
+    // Try to find user by phone or email (no longer by name to avoid duplicates)
     const { rows } = await pool.query(
-      'select id, password_hash, name, image, phone, role, email, address, banking_name, date_joined, household_members, member_id from "users" where phone = $1 OR LOWER(name) = LOWER($1) limit 1',
+      'SELECT id, password_hash, name, image, phone, role, email, address, banking_name, date_joined, household_members, member_id FROM users WHERE phone = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
       [identifier]
     )
     const user = rows[0]
-    if (!user?.password_hash) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401, headers: corsHeaders })
+    if (!user) {
+      return NextResponse.json({ error: 'No account found with this phone number or email' }, { status: 401, headers: corsHeaders })
+    }
+    
+    if (!user.password_hash) {
+      return NextResponse.json({ error: 'Account has no password set. Please contact an administrator.' }, { status: 401, headers: corsHeaders })
     }
 
     const ok = await bcrypt.compare(password, user.password_hash)
     if (!ok) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401, headers: corsHeaders })
+      return NextResponse.json({ error: 'Incorrect password' }, { status: 401, headers: corsHeaders })
     }
 
     const token = jwt.sign({ sub: user.id }, process.env.AUTH_SECRET, {

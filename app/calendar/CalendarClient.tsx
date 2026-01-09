@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { VariableTextarea } from '@/components/ui/VariableTextarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { IconPlus, IconBell, IconTrash, IconSend, IconCheck, IconX, IconClock, IconCalendarEvent, IconMapPin, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
@@ -662,43 +663,19 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
             <div>
               <Label htmlFor="message">Message *</Label>
-              
-              {/* Variable buttons - styled badges */}
-              <div className="flex flex-wrap items-center gap-1.5 mt-2 mb-2">
-                <span className="text-xs text-muted-foreground">Insert:</span>
-                <button
-                  type="button"
-                  onClick={() => setMessage(prev => prev + '{{name}}')}
-                  className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-medium hover:bg-blue-200 transition-colors"
-                >
-                  Member Name
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMessage(prev => prev + '{{phone}}')}
-                  className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-medium hover:bg-green-200 transition-colors"
-                >
-                  Phone Number
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMessage(prev => prev + '{{group}}')}
-                  className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-medium hover:bg-purple-200 transition-colors"
-                >
-                  Group Name
-                </button>
+              <div className="mt-2">
+                <VariableTextarea
+                  value={message}
+                  onChange={setMessage}
+                  placeholder="Enter your message here..."
+                  rows={4}
+                  variables={[
+                    { key: 'name', display: 'Member Name', color: 'blue' },
+                    { key: 'phone', display: 'Phone Number', color: 'green' },
+                    { key: 'group', display: 'Group Name', color: 'purple' }
+                  ]}
+                />
               </div>
-              
-              <Textarea
-                id="message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Enter your message here..."
-                rows={4}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                💡 Click the colored badges above to insert variables. They'll be replaced with each member's data.
-              </p>
             </div>
 
             {/* Recipient Selection */}

@@ -49,8 +49,8 @@ export default function LoginPage() {
         throw new Error(data?.error || 'Invalid credentials')
       }
       router.push('/dashboard')
-    } catch (err) {
-      setError('Something went wrong')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -131,8 +131,8 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Phone or Name</Label>
-              <Input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="0456789012 or John Smith" required autoComplete="off" />
+              <Label htmlFor="identifier">Phone Number or Email</Label>
+              <Input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="0412345678 or email@example.com" required autoComplete="off" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

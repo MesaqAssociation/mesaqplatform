@@ -5,6 +5,8 @@ import { useI18n } from '@/components/I18nProvider'
 import { IconCash, IconCalendarEvent, IconUser, IconArrowRight } from '@tabler/icons-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency } from '@/lib/utils'
 
@@ -28,6 +30,7 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -188,11 +191,12 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
               <div className="space-y-2">
                 {(() => {
                   const statusRaw = paymentStatus || balance?.membershipBalance?.status
-                  const status = statusRaw ? String(statusRaw).toUpperCase() : 'UNKNOWN'
-                  const isPaid = ['PAID', 'AHEAD', 'CURRENT'].includes(status)
+                  const status = statusRaw ? String(statusRaw).toLowerCase() : 'unknown'
+                  const isCaughtUp = ['caught_up', 'paid', 'ahead', 'current'].includes(status)
+                  const displayText = isCaughtUp ? 'Caught Up' : 'Behind'
                   return (
-                    <p className={`text-lg font-semibold ${isPaid ? 'text-green-500' : 'text-red-500'}`}>
-                      {status}
+                    <p className={`text-lg font-semibold ${isCaughtUp ? 'text-green-500' : 'text-red-500'}`}>
+                      {displayText}
                     </p>
                   )
                 })()}
@@ -250,7 +254,11 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
           ) : (
             <>
               {recentTransactions.map((tx) => (
-                <div key={tx.id} className="py-2 border-b border-border last:border-0">
+                <div 
+                  key={tx.id} 
+                  className="py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-2 -mx-2 transition-colors"
+                  onClick={() => setSelectedTransaction(tx)}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">{tx.description || 'Payment'}</p>
@@ -333,6 +341,59 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
           <p className="text-xs text-muted-foreground mt-1">See payment history, attended events, and more</p>
         </Link>
       )}
+
+      {/* Transaction Detail Dialog */}
+      <Dialog open={!!selectedTransaction} onOpenChange={() => setSelectedTransaction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <p className={`text-3xl font-bold ${selectedTransaction.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                  {selectedTransaction.transaction_type === 'credit' ? '+' : '-'}{formatCurrency(Math.abs(Number(selectedTransaction.amount) || 0))}
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium">{formatDate(selectedTransaction.transaction_date)}</span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Description</span>
+                  <span className="font-medium text-right max-w-[60%]">
+                    {selectedTransaction.description || selectedTransaction.transaction_name || 'Payment'}
+                  </span>
+                </div>
+                
+                {selectedTransaction.category && (
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Category</span>
+                    <Badge variant="secondary">
+                      {selectedTransaction.category}
+                    </Badge>
+                  </div>
+                )}
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Source</span>
+                  <span className="font-medium">{selectedTransaction.source || 'Bank Transfer'}</span>
+                </div>
+                
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className={`font-medium ${selectedTransaction.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                    {selectedTransaction.transaction_type === 'credit' ? 'Credit (Payment)' : 'Debit'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

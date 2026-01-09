@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { VariableTextarea } from '@/components/ui/VariableTextarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { IconSend, IconSearch, IconChevronUp, IconMessage, IconRefresh, IconUsers, IconWallet, IconExternalLink, IconDownload, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
@@ -958,43 +959,17 @@ export default function MessagingClient() {
               </CardHeader>
               <CardContent className="p-4 pt-2">
                 <div className="space-y-2">
-                  {/* Variable Buttons */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Insert:</span>
-                    <button
-                      type="button"
-                      onClick={() => setBulkMessage(prev => prev + '{{name}}')}
-                      className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-medium hover:bg-blue-200 transition-colors"
-                    >
-                      Member Name
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBulkMessage(prev => prev + '{{phone}}')}
-                      className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-medium hover:bg-green-200 transition-colors"
-                    >
-                      Phone Number
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBulkMessage(prev => prev + '{{group}}')}
-                      className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-medium hover:bg-purple-200 transition-colors"
-                    >
-                      Group Name
-                    </button>
-                  </div>
-                  
-              <Textarea
-                    placeholder="Type your message here... Use variables like {{name}}, {{phone}}, {{group}}"
+                  <VariableTextarea
                     value={bulkMessage}
-                    onChange={(e) => setBulkMessage(e.target.value)}
+                    onChange={setBulkMessage}
+                    placeholder="Type your message here..."
                     rows={6}
-                    className="resize-none border-2 focus:border-primary text-sm font-mono"
+                    variables={[
+                      { key: 'name', display: 'Member Name', color: 'blue' },
+                      { key: 'phone', display: 'Phone Number', color: 'green' },
+                      { key: 'group', display: 'Group Name', color: 'purple' }
+                    ]}
                   />
-
-                  <p className="text-xs text-muted-foreground">
-                    💡 Click the colored badges above to insert variables. They'll be replaced with each member's data. "N/A" is used for missing values.
-                  </p>
 
                   {sendingBulk && (
                     <div className="flex items-center justify-center gap-3 py-4">
@@ -1029,7 +1004,7 @@ export default function MessagingClient() {
                   SMS Credits
                   </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Your current SMS messaging credits (1 credit per message)
+                  Your current SMS messaging credits
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
@@ -1113,11 +1088,6 @@ export default function MessagingClient() {
                         <p className="text-sm">{step.text}</p>
                     </div>
                   ))}
-                    <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
-                        <strong>Note:</strong> Each SMS costs 1 credit. Contact Mobile Message support if you need help with your account.
-                      </p>
-                    </div>
                 </div>
                 </CardContent>
               )}

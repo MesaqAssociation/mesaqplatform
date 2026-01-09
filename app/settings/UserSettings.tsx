@@ -136,6 +136,24 @@ export default function UserSettings({ user }: Props) {
   }
 
   const handleSave = async () => {
+    // Validate email format
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.email.trim())) {
+        showNotification('Please enter a valid email address', 'error')
+        return
+      }
+    }
+    
+    // Validate phone format (10-11 digits for Australian numbers)
+    if (formData.phone && formData.phone.trim()) {
+      const phoneDigits = formData.phone.replace(/\D/g, '')
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        showNotification('Please enter a valid phone number (10-11 digits)', 'error')
+        return
+      }
+    }
+    
     setSaving(true)
     try {
       const res = await fetch('/api/user/update', {
