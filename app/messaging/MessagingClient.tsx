@@ -1046,7 +1046,6 @@ export default function MessagingClient() {
                           {Math.floor(balance)}
                         </p>
                         <p className="text-sm text-muted-foreground mt-2">Credits Available</p>
-                        <p className="text-xs text-muted-foreground mt-1">({balance} messages)</p>
                       </>
                     ) : (
                       <p className="text-muted-foreground">Unable to fetch balance</p>

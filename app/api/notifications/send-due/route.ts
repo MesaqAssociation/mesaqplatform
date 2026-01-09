@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { sendBulkSMS, formatPhoneNumber, buildAdminMessage, SMSMessage } from '@/lib/mobile-message'
+import { sendBulkSMS, formatPhoneNumber, SMSMessage } from '@/lib/mobile-message'
+import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
+
+/**
+ * Replace variables in message with member data
+ * Variables: {{name}}, {{phone}}, {{group}}
+ */
+function replaceVariables(message: string, member: any): string {
+  return message
+    .replace(/\{\{name\}\}/gi, member.name || 'N/A')
+    .replace(/\{\{phone\}\}/gi, member.phone || 'N/A')
+    .replace(/\{\{group\}\}/gi, member.group_name || 'N/A')
+}
+
+/**
+ * Build scheduled message content with variable replacement
+ */
+function buildScheduledMessage(memberName: string, title: string, messageBody: string, member: any): string {
+  // Replace variables in the message body
+  const processedMessage = replaceVariables(messageBody, member)
+  return `Salam ${memberName},\n\n📢 ${title}\n\n${processedMessage}\n\nKind Regards - Mesaq Association`
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -37,20 +58,20 @@ export async function POST(req: NextRequest) {
     const results: Array<{ id: string, title: string, sent: number, failed: number }> = []
 
     for (const notification of dueNotifications) {
-      let members: Array<{ id: string, name: string, phone: string }> = []
+      let members: Array<{ id: string, name: string, phone: string, group_name: string | null }> = []
       
-      // Get recipients based on recipient_type
+      // Get recipients based on recipient_type (include group_name for variable replacement)
       if (notification.recipient_type === 'specific' && notification.recipient_ids && notification.recipient_ids.length > 0) {
         // Get specific members
         const { rows } = await pool.query(`
-          SELECT id, name, phone FROM users 
+          SELECT id, name, phone, group_name FROM users 
           WHERE id = ANY($1) AND phone IS NOT NULL AND phone != ''
         `, [notification.recipient_ids])
         members = rows
       } else {
         // Get all members (default: everyone)
         const { rows } = await pool.query(`
-          SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''
+          SELECT id, name, phone, group_name FROM users WHERE phone IS NOT NULL AND phone != ''
         `)
         members = rows
       }
@@ -66,10 +87,10 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Prepare SMS messages for recipients
+      // Prepare SMS messages for recipients with variable replacement
       const smsMessages: SMSMessage[] = members.map(member => ({
         to: member.phone,
-        message: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`)
+        message: buildScheduledMessage(member.name, notification.title, notification.message, member)
       }))
 
       const result = await sendBulkSMS(smsMessages)
@@ -83,6 +104,29 @@ export async function POST(req: NextRequest) {
           recipients_count = $1
         WHERE id = $2
       `, [result.sent, notification.id])
+
+      // Store sent messages in database with external message IDs
+      const batchId = generateBatchId()
+      const sentMessageData: SentMessageData[] = members.map((member: any) => {
+        const phone = formatPhoneNumber(member.phone)
+        // Find the matching result by phone number
+        const apiResult = result.results.find(r => r.to === phone)
+        
+        return {
+          messageType: 'scheduled' as const,
+          templateId: undefined,
+          messageContent: buildScheduledMessage(member.name, notification.title, notification.message, member),
+          recipientPhone: phone,
+          recipientName: member.name,
+          recipientMemberId: member.id,
+          status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+          externalMessageId: apiResult?.messageId || undefined,
+          errorMessage: apiResult?.error || undefined,
+          batchId
+        }
+      })
+
+      await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
       totalSent += result.sent
       results.push({ 

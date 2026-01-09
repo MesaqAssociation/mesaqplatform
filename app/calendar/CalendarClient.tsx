@@ -662,20 +662,49 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
 
             <div>
               <Label htmlFor="message">Message *</Label>
+              
+              {/* Variable buttons */}
+              <div className="flex flex-wrap gap-2 mt-2 mb-2">
+                <span className="text-xs text-muted-foreground self-center">Insert variable:</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMessage(prev => prev + '{{name}}')}
+                  className="text-xs h-7"
+                >
+                  Full Name
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMessage(prev => prev + '{{phone}}')}
+                  className="text-xs h-7"
+                >
+                  Phone
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMessage(prev => prev + '{{group}}')}
+                  className="text-xs h-7"
+                >
+                  Group
+                </Button>
+              </div>
+              
               <Textarea
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Enter the message to send..."
+                placeholder="Enter the message to send... Use variables like {{name}}, {{phone}}, {{group}}"
                 rows={4}
-                className="mt-1"
               />
-              <div className="mt-2 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
-                <p className="font-medium mb-1">Message will be sent as:</p>
-                <p className="italic">Salam [Member Name],</p>
-                <p className="italic my-1">[Your message here]</p>
-                <p className="italic">Kind Regards - Mesaq Association</p>
-              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                💡 Variables will be replaced with member data. If a member doesn't have a value set, "N/A" will be used.
+              </p>
             </div>
 
             {/* Recipient Selection */}

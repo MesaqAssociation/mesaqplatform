@@ -247,14 +247,34 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
 }
 
 /**
+ * Replace variables in message with member data
+ * Variables: {{name}}, {{phone}}, {{group}}
+ */
+function replaceVariables(message: string, member: any): string {
+  return message
+    .replace(/\{\{name\}\}/gi, member.name || 'N/A')
+    .replace(/\{\{phone\}\}/gi, member.phone || 'N/A')
+    .replace(/\{\{group\}\}/gi, member.group_name || 'N/A')
+}
+
+/**
+ * Build scheduled message content with variable replacement
+ */
+function buildScheduledMessage(memberName: string, title: string, messageBody: string, member: any): string {
+  // Replace variables in the message body
+  const processedMessage = replaceVariables(messageBody, member)
+  return `Salam ${memberName},\n\n📢 ${title}\n\n${processedMessage}\n\nKind Regards - Mesaq Association`
+}
+
+/**
  * Send scheduled notifications that are due
  */
 async function sendScheduledNotifications(): Promise<{ sent: number; failed: number; notificationsProcessed: number }> {
   const today = new Date().toISOString().split('T')[0]
 
-  // Get all pending notifications for today or earlier
+  // Get all pending notifications for today or earlier (include recipient info)
   const { rows: dueNotifications } = await pool.query(`
-    SELECT id, title, message 
+    SELECT id, title, message, recipient_type, recipient_ids 
     FROM scheduled_notifications 
     WHERE status = 'pending' AND scheduled_date <= $1
   `, [today])
@@ -263,23 +283,42 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
     return { sent: 0, failed: 0, notificationsProcessed: 0 }
   }
 
-  // Get all members with valid phone numbers
-  const { rows: members } = await pool.query(`
-    SELECT id, name, phone FROM users WHERE phone IS NOT NULL AND phone != ''
-  `)
-
-  if (members.length === 0) {
-    return { sent: 0, failed: 0, notificationsProcessed: dueNotifications.length }
-  }
-
   let totalSent = 0
   let totalFailed = 0
 
   for (const notification of dueNotifications) {
-    // Prepare SMS messages
+    let members: Array<{ id: string, name: string, phone: string, group_name: string | null }> = []
+    
+    // Get recipients based on recipient_type (include group_name for variable replacement)
+    if (notification.recipient_type === 'specific' && notification.recipient_ids && notification.recipient_ids.length > 0) {
+      // Get specific members
+      const { rows } = await pool.query(`
+        SELECT id, name, phone, group_name FROM users 
+        WHERE id = ANY($1) AND phone IS NOT NULL AND phone != ''
+      `, [notification.recipient_ids])
+      members = rows
+    } else {
+      // Get all members (default: everyone)
+      const { rows } = await pool.query(`
+        SELECT id, name, phone, group_name FROM users WHERE phone IS NOT NULL AND phone != ''
+      `)
+      members = rows
+    }
+    
+    if (members.length === 0) {
+      console.log(`⚠️ Notification "${notification.title}": No recipients with phone numbers`)
+      await pool.query(`
+        UPDATE scheduled_notifications 
+        SET status = 'sent', sent_at = NOW(), recipients_count = 0
+        WHERE id = $1
+      `, [notification.id])
+      continue
+    }
+
+    // Prepare SMS messages with variable replacement
     const smsMessages: SMSMessage[] = members.map((member: any) => ({
       to: member.phone,
-      message: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`)
+      message: buildScheduledMessage(member.name, notification.title, notification.message, member)
     }))
 
     const result = await sendBulkSMS(smsMessages)
@@ -301,7 +340,7 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
       return {
         messageType: 'scheduled' as const,
         templateId: undefined,
-        messageContent: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`),
+        messageContent: buildScheduledMessage(member.name, notification.title, notification.message, member),
         recipientPhone: phone,
         recipientName: member.name,
         recipientMemberId: member.id,
@@ -316,6 +355,8 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
 
     totalSent += result.sent
     totalFailed += result.failed
+    
+    console.log(`✅ Notification "${notification.title}": ${result.sent} sent, ${result.failed} failed`)
   }
 
   return { sent: totalSent, failed: totalFailed, notificationsProcessed: dueNotifications.length }
