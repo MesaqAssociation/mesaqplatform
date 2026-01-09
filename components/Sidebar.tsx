@@ -46,9 +46,13 @@ export function Sidebar({ user }: SidebarProps) {
   // Determine if user is admin/board
   const userRole = (user?.role || '').toLowerCase()
   const isAdminOrBoard = ['admin', 'board', 'manager', 'head', 'finance officer', 'logistics officer', 'public officer'].includes(userRole)
+  
+  // If user is still loading (null), show admin nav items to prevent flash
+  // Better UX to show more items that hide than fewer items that appear
+  const showAdminNav = user === null || isAdminOrBoard
 
   // Define navigation items based on role - with Calendar before Members
-  const NAV_ITEMS = isAdminOrBoard ? [
+  const NAV_ITEMS = showAdminNav ? [
     { title: t("dashboard"), url: "/dashboard", icon: IconDashboard },
     { title: "Calendar", url: "/calendar", icon: IconBell },
     { title: t("members"), url: "/members", icon: IconUsers },

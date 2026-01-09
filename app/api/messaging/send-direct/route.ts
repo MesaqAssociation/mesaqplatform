@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`📤 Sent SMS to ${phone}:`, result.success ? 'OK' : 'FAILED')
 
-    // Store sent message
+    // Store sent message with external message ID
     await storeSentMessage(pool, {
       messageType: 'admin_message',
       templateId: undefined,
@@ -102,6 +102,8 @@ export async function POST(req: NextRequest) {
       recipientName: recipientName,
       recipientMemberId: recipientMemberId || undefined,
       status: result.success ? 'sent' : 'failed',
+      externalMessageId: result.messageId || undefined,
+      errorMessage: result.error || undefined,
       sentBy: userId
     })
 

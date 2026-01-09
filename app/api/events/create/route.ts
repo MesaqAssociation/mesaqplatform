@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkSMS, formatPhoneNumber, buildEventNotificationMessage, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
+import { sendBulkSMS, formatPhoneNumber, buildEventNotificationMessage, hasEnoughCredits, hasEnoughCreditsSimple, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
@@ -107,9 +107,9 @@ export async function POST(req: NextRequest) {
 
           const membersWithPhone = groupMembers.filter((m: any) => m.phone)
 
-          // Check credit balance before sending (1 credit per message)
+          // Check credit balance before sending (estimate 2 credits per event notification)
           if (membersWithPhone.length > 0 && process.env.MOBILE_MESSAGE_USERNAME) {
-            const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+            const creditCheck = await hasEnoughCreditsSimple(membersWithPhone.length * 2)
             
             if (!creditCheck.hasEnough) {
               return NextResponse.json({ 
@@ -166,10 +166,14 @@ export async function POST(req: NextRequest) {
 
             console.log(`✅ Event notifications: ${smsResult.sent} sent, ${smsResult.failed} failed, ${smsResult.skipped} skipped`)
 
-            // Store sent messages in database
+            // Store sent messages in database with external message IDs
             const batchId = generateBatchId()
             const sentMessageData: SentMessageData[] = membersWithPhone.map((m: any) => {
+              const phone = formatPhoneNumber(m.phone)
               const otherMembers = allMemberNames.filter((name: string) => name !== m.name).join(', ') || 'None'
+              // Find the matching result by phone number
+              const apiResult = smsResult.results.find(r => r.to === phone)
+              
               return {
                 messageType: 'event_notification' as const,
                 templateId: undefined,
@@ -180,10 +184,12 @@ export async function POST(req: NextRequest) {
                   organizing_group,
                   otherMembers
                 ),
-                recipientPhone: formatPhoneNumber(m.phone),
+                recipientPhone: phone,
                 recipientName: m.name,
                 recipientMemberId: m.id,
-                status: smsResult.sent > 0 ? 'sent' : 'failed',
+                status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+                externalMessageId: apiResult?.messageId || undefined,
+                errorMessage: apiResult?.error || undefined,
                 batchId
               }
             })

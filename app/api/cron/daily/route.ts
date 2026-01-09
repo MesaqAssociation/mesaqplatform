@@ -220,18 +220,26 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
 
   const result = await sendBulkSMS(smsMessages)
 
-  // Store sent messages in database
+  // Store sent messages in database with external message IDs
   const batchId = generateBatchId()
-  const sentMessageData: SentMessageData[] = membersWithDebt.map((m: any) => ({
-    messageType: 'payment_reminder' as const,
-    templateId: undefined,
-    messageContent: buildPaymentReminderMessage(m.name, Math.abs(parseFloat(m.balance)), bsb, account_number),
-    recipientPhone: formatPhoneNumber(m.phone),
-    recipientName: m.name,
-    recipientMemberId: m.id,
-    status: result.sent > 0 ? 'sent' : 'failed',
-    batchId
-  }))
+  const sentMessageData: SentMessageData[] = membersWithDebt.map((m: any) => {
+    const phone = formatPhoneNumber(m.phone)
+    // Find the matching result by phone number
+    const apiResult = result.results.find(r => r.to === phone)
+    
+    return {
+      messageType: 'payment_reminder' as const,
+      templateId: undefined,
+      messageContent: buildPaymentReminderMessage(m.name, Math.abs(parseFloat(m.balance)), bsb, account_number),
+      recipientPhone: phone,
+      recipientName: m.name,
+      recipientMemberId: m.id,
+      status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+      externalMessageId: apiResult?.messageId || undefined,
+      errorMessage: apiResult?.error || undefined,
+      batchId
+    }
+  })
 
   await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
@@ -283,18 +291,26 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
       WHERE id = $2
     `, [result.sent, notification.id])
 
-    // Store sent messages in database
+    // Store sent messages in database with external message IDs
     const batchId = generateBatchId()
-    const sentMessageData: SentMessageData[] = members.map((member: any) => ({
-      messageType: 'scheduled' as const,
-      templateId: undefined,
-      messageContent: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`),
-      recipientPhone: formatPhoneNumber(member.phone),
-      recipientName: member.name,
-      recipientMemberId: member.id,
-      status: result.sent > 0 ? 'sent' : 'failed',
-      batchId
-    }))
+    const sentMessageData: SentMessageData[] = members.map((member: any) => {
+      const phone = formatPhoneNumber(member.phone)
+      // Find the matching result by phone number
+      const apiResult = result.results.find(r => r.to === phone)
+      
+      return {
+        messageType: 'scheduled' as const,
+        templateId: undefined,
+        messageContent: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`),
+        recipientPhone: phone,
+        recipientName: member.name,
+        recipientMemberId: member.id,
+        status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+        externalMessageId: apiResult?.messageId || undefined,
+        errorMessage: apiResult?.error || undefined,
+        batchId
+      }
+    })
 
     await storeSentMessagesBatch(pool, sentMessageData, batchId)
 

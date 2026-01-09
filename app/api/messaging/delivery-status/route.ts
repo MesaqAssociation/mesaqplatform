@@ -26,39 +26,69 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     
-    console.log('📬 Delivery status webhook received:', JSON.stringify(body).substring(0, 500))
+    console.log('📬 Delivery status webhook received:', JSON.stringify(body))
 
-    const messageId = body.messageId || body.id || body.reference
+    // Mobile Message uses message_id (with underscore)
+    const messageId = body.message_id || body.messageId || body.id || body.reference
     const status = body.status || body.deliveryStatus
     const errorMessage = body.error || body.errorMessage || body.failureReason || null
+    const recipientPhone = body.to
 
     if (!messageId) {
-      console.log('⏭️ Ignoring: no message ID')
+      console.log('⏭️ No message_id in payload, trying to match by phone')
+      
+      // If no message ID, try to update the most recent message to this phone
+      if (recipientPhone) {
+        try {
+          const result = await pool.query(`
+            UPDATE sent_messages 
+            SET 
+              status = $1,
+              error_message = $2,
+              delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END,
+              failed_at = CASE WHEN $1 = 'failed' THEN NOW() ELSE failed_at END
+            WHERE recipient_phone LIKE '%' || $3
+            AND sent_at > NOW() - INTERVAL '1 hour'
+            AND (external_message_id IS NULL OR external_message_id = '')
+          `, [
+            status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : 'sent',
+            errorMessage,
+            recipientPhone.slice(-9)  // Match last 9 digits
+          ])
+          console.log(`✅ Updated ${result.rowCount} message(s) for phone ${recipientPhone}: ${status}`)
+        } catch (err) {
+          console.log('Could not update by phone:', err)
+        }
+      }
+      
       return NextResponse.json({ 
         success: true, 
-        message: 'Event ignored (no message ID)' 
+        message: 'Status update processed' 
       })
     }
 
-    // Update sent message status in database if we track it
-    // Note: We may need to store message IDs from Mobile Message response
-    // to match them back to our sent_messages table
+    // Update sent message status by message_id
     try {
-      await pool.query(`
+      const result = await pool.query(`
         UPDATE sent_messages 
         SET 
           status = $1,
           error_message = $2,
-          updated_at = NOW()
+          delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END,
+          failed_at = CASE WHEN $1 = 'failed' THEN NOW() ELSE failed_at END
         WHERE external_message_id = $3
       `, [
         status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : 'sent',
         errorMessage,
         messageId
       ])
-      console.log(`✅ Updated status for message ${messageId}: ${status}`)
+      
+      if (result.rowCount && result.rowCount > 0) {
+        console.log(`✅ Updated status for message ${messageId}: ${status}`)
+      } else {
+        console.log(`⚠️ Message ${messageId} not found in database`)
+      }
     } catch (updateErr) {
-      // Table might not have external_message_id column, or message not found
       console.log(`ℹ️ Could not update status for message ${messageId}:`, updateErr)
     }
 

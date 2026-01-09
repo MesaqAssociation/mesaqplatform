@@ -89,9 +89,15 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check credit balance (1 credit per message) - but don't fail if balance check fails
+    // Prepare SMS messages - replace variables for each member
+    const smsMessages: SMSMessage[] = membersWithPhone.map((member: any) => ({
+      to: member.phone,
+      message: replaceVariables(message.trim(), member)
+    }))
+
+    // Check credit balance based on actual message content
     try {
-      const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+      const creditCheck = await hasEnoughCredits(smsMessages)
       if (!creditCheck.hasEnough && creditCheck.currentCredits > 0) {
         return NextResponse.json({ 
           error: `Not enough credits to send ${membersWithPhone.length} messages. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up.`
@@ -104,29 +110,31 @@ export async function POST(req: NextRequest) {
 
     console.log(`📤 Sending SMS to ${membersWithPhone.length} members...`)
 
-    // Prepare SMS messages - replace variables for each member
-    const smsMessages: SMSMessage[] = membersWithPhone.map((member: any) => ({
-      to: member.phone,
-      message: replaceVariables(message.trim(), member)
-    }))
-
     const result = await sendBulkSMS(smsMessages)
 
-    console.log(`✅ SMS messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+    console.log(`✅ SMS messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped, cost: ${result.totalCost}`)
 
-    // Store sent messages in database
+    // Store sent messages in database with external message IDs
     const batchId = generateBatchId()
-    const sentMessageData: SentMessageData[] = membersWithPhone.map((member: any) => ({
-      messageType: 'admin_message' as const,
-      templateId: undefined,
-      messageContent: replaceVariables(message.trim(), member),
-      recipientPhone: formatPhoneNumber(member.phone),
-      recipientName: member.name,
-      recipientMemberId: member.id,
-      status: result.sent > 0 ? 'sent' : 'failed',
-      sentBy: userId,
-      batchId
-    }))
+    const sentMessageData: SentMessageData[] = membersWithPhone.map((member: any, index: number) => {
+      const phone = formatPhoneNumber(member.phone)
+      // Find the matching result by phone number
+      const apiResult = result.results.find(r => r.to === phone)
+      
+      return {
+        messageType: 'admin_message' as const,
+        templateId: undefined,
+        messageContent: replaceVariables(message.trim(), member),
+        recipientPhone: phone,
+        recipientName: member.name,
+        recipientMemberId: member.id,
+        status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+        externalMessageId: apiResult?.messageId || undefined,
+        errorMessage: apiResult?.error || undefined,
+        sentBy: userId,
+        batchId
+      }
+    })
 
     await storeSentMessagesBatch(pool, sentMessageData, batchId)
 

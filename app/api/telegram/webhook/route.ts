@@ -4,7 +4,7 @@ import { parseBankStatementPDF, validateTransactionDates } from '@/lib/parseBank
 import { batchMatchTransactions } from '@/lib/matchTransactionToMember'
 import { autoDetectMembershipPayment } from '@/lib/autoDetectMembershipPayment'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
-import { sendBulkSMS, formatPhoneNumber, buildEventNotificationMessage, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
+import { sendBulkSMS, formatPhoneNumber, buildEventNotificationMessage, hasEnoughCreditsSimple, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 import bcrypt from 'bcryptjs'
 
@@ -1150,9 +1150,9 @@ async function createEvent(chatId: number, data: any): Promise<void> {
           const membersWithPhone = groupMembers.filter((m: any) => m.phone)
           
           if (membersWithPhone.length > 0) {
-            // Check credit balance before sending (1 credit per message)
+            // Check credit balance before sending (estimate 2 credits per event notification)
             if (process.env.MOBILE_MESSAGE_USERNAME) {
-              const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+              const creditCheck = await hasEnoughCreditsSimple(membersWithPhone.length * 2)
               
               if (!creditCheck.hasEnough) {
                 await sendTelegramMessage(chatId, `⚠️ Event created but notifications NOT sent - insufficient credits. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up.`)
@@ -1203,10 +1203,14 @@ async function createEvent(chatId: number, data: any): Promise<void> {
             const notifyResult = await sendBulkSMS(smsMessages)
             console.log(`✅ Event SMS notifications from Telegram bot: ${notifyResult.sent} sent, ${notifyResult.failed} failed`)
 
-            // Store sent messages
+            // Store sent messages with external message IDs
             const batchId = generateBatchId()
             const sentMessageData: SentMessageData[] = membersWithPhone.map((m: any) => {
+              const phone = formatPhoneNumber(m.phone)
               const otherMembers = allMemberNames.filter((name: string) => name !== m.name).join(', ') || 'None'
+              // Find the matching result by phone number
+              const apiResult = notifyResult.results.find(r => r.to === phone)
+              
               return {
                 messageType: 'event_notification' as const,
                 templateId: undefined,
@@ -1217,10 +1221,12 @@ async function createEvent(chatId: number, data: any): Promise<void> {
                   data.organizing_group,
                   otherMembers
                 ),
-                recipientPhone: formatPhoneNumber(m.phone),
+                recipientPhone: phone,
                 recipientName: m.name,
                 recipientMemberId: m.id,
-                status: notifyResult.sent > 0 ? 'sent' : 'failed',
+                status: apiResult?.status === 'sent' ? 'sent' : apiResult?.status === 'failed' ? 'failed' : 'sent',
+                externalMessageId: apiResult?.messageId || undefined,
+                errorMessage: apiResult?.error || undefined,
                 batchId
               }
             })
