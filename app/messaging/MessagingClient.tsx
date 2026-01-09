@@ -6,14 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconSend, IconSearch, IconChevronUp, IconTemplate, IconMessage, IconRefresh, IconUsers, IconWallet, IconExternalLink, IconDownload, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import { IconSend, IconSearch, IconChevronUp, IconMessage, IconRefresh, IconUsers, IconWallet, IconExternalLink, IconDownload, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getInitials } from '@/lib/utils'
-import Image from 'next/image'
 
 type Conversation = {
   phoneKey: string
@@ -130,24 +129,10 @@ export default function MessagingClient() {
     }
   }, [conversationMessages, loadingMore])
 
-  // Check if can send free text (last incoming message within 24 hours)
+  // SMS doesn't have the 24h window limitation like WhatsApp
+  // Always allow sending messages
   useEffect(() => {
-    if (conversationMessages.length > 0) {
-      const lastIncoming = [...conversationMessages]
-        .reverse()
-        .find(m => m.direction === 'incoming')
-      
-      if (lastIncoming) {
-        const lastIncomingTime = new Date(lastIncoming.timestamp).getTime()
-        const now = Date.now()
-        const hoursDiff = (now - lastIncomingTime) / (1000 * 60 * 60)
-        setCanSendFreeText(hoursDiff <= 24)
-      } else {
-        setCanSendFreeText(false)
-      }
-    } else {
-      setCanSendFreeText(false)
-    }
+    setCanSendFreeText(true)
   }, [conversationMessages])
 
   const loadBalance = async () => {
@@ -341,9 +326,8 @@ export default function MessagingClient() {
       })
 
       if (res.ok) {
-        const displayMessage = canSendFreeText 
-          ? newMessage.trim()
-          : `Salam ${effectiveName},\n\n${newMessage.trim()}\n\nKind Regards - Mesaq Association`
+        // Just show the message as sent (no template wrapper for SMS)
+        const displayMessage = newMessage.trim()
         
         const optimisticMessage: Message = {
           id: `temp-${Date.now()}`,
@@ -418,10 +402,10 @@ export default function MessagingClient() {
       return
     }
 
-    // Check balance before sending ($0.10 per message)
-    const messageCost = selectedMembers.size * 0.10
-    if (balance !== null && balance < messageCost) {
-      showToast(`Balance too low to send ${selectedMembers.size} messages. Need $${messageCost.toFixed(2)}, have $${balance.toFixed(2)}. Please top up.`, 'error')
+    // Check balance before sending (2 credits per message)
+    const requiredCredits = selectedMembers.size * 2
+    if (balance !== null && balance < requiredCredits) {
+      showToast(`Not enough credits to send ${selectedMembers.size} messages. Need ${requiredCredits} credits, have ${balance} credits. Please top up.`, 'error')
       return
     }
 
@@ -521,11 +505,11 @@ export default function MessagingClient() {
   }
 
   const topupSteps = [
-    { image: '/process/1.png', text: <>Go to <a href="https://pickyassist.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">pickyassist.com</a> and click <strong>Login</strong></> },
-    { image: '/process/2.png', text: <>Click <strong>V 4.0 Login</strong></> },
-    { image: '/process/3.png', text: <>Login with your email and password</> },
-    { image: '/process/4.png', text: <>Now you should be on the <a href="https://app.pickyassist.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">dashboard</a>. Click <strong>+Add</strong></> },
-    { image: '/process/5.png', text: <>Choose amount (minimum $25 USD) and pay</> },
+    { image: '', text: <>Go to <a href="https://mobilemessage.com.au" target="_blank" rel="noopener noreferrer" className="text-primary underline">mobilemessage.com.au</a> and login to your account</> },
+    { image: '', text: <>Navigate to the <strong>Credits</strong> or <strong>Billing</strong> section</> },
+    { image: '', text: <>Choose the amount of credits you want to purchase</> },
+    { image: '', text: <>Complete the payment process</> },
+    { image: '', text: <>Credits will be added to your account immediately</> },
   ]
 
   return (
@@ -865,18 +849,6 @@ export default function MessagingClient() {
                   {/* Message Input */}
                   <div className="p-3 md:p-4 border-t bg-card">
                     <div className="max-w-3xl mx-auto">
-                      {!canSendFreeText && (
-                        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                          <IconTemplate className="size-3 flex-shrink-0" />
-                          <span className="truncate">Using template: Salam [Name]... Kind Regards - Mesaq</span>
-                        </div>
-                      )}
-                      {canSendFreeText && (
-                        <div className="flex items-center gap-2 mb-2 text-xs text-green-600">
-                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></span>
-                          <span>24h window active - Free text enabled</span>
-                        </div>
-                      )}
                       
                       <div className="flex gap-2">
                         <Input
@@ -1037,10 +1009,10 @@ export default function MessagingClient() {
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                   <IconWallet className="size-5" />
-                  Picky Assist Balance
+                  SMS Credits
                   </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Your current WhatsApp messaging credit balance
+                  Your current SMS messaging credits (2 credits per message)
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
@@ -1051,9 +1023,10 @@ export default function MessagingClient() {
                     ) : balance !== null ? (
                       <>
                         <p className="text-4xl md:text-5xl font-bold text-primary">
-                          ${balance.toFixed(2)}
+                          {Math.floor(balance)}
                         </p>
-                        <p className="text-sm text-muted-foreground mt-2">USD Balance</p>
+                        <p className="text-sm text-muted-foreground mt-2">Credits Available</p>
+                        <p className="text-xs text-muted-foreground mt-1">({Math.floor(balance / 2)} messages)</p>
                       </>
                     ) : (
                       <p className="text-muted-foreground">Unable to fetch balance</p>
@@ -1071,7 +1044,7 @@ export default function MessagingClient() {
                   Refresh
                 </Button>
                     <Button asChild className="flex-1">
-                      <a href="https://app.pickyassist.com/" target="_blank" rel="noopener noreferrer">
+                      <a href="https://mobilemessage.com.au" target="_blank" rel="noopener noreferrer">
                         <IconExternalLink className="size-4 mr-2" />
                         Topup
                       </a>
@@ -1093,7 +1066,7 @@ export default function MessagingClient() {
                     <div>
                       <CardTitle className="text-base md:text-lg">How to Topup</CardTitle>
                       <CardDescription className="text-xs md:text-sm">
-                        Step-by-step guide to add credit
+                        Step-by-step guide to add SMS credits
                       </CardDescription>
                 </div>
                     {showTopupGuide ? (
@@ -1107,7 +1080,7 @@ export default function MessagingClient() {
                   <div>
                     <CardTitle className="text-base md:text-lg">How to Topup</CardTitle>
                     <CardDescription className="text-xs md:text-sm">
-                      Step-by-step guide to add credit
+                      Step-by-step guide to add SMS credits
                     </CardDescription>
                   </div>
                 )}
@@ -1115,25 +1088,20 @@ export default function MessagingClient() {
               {/* Show content: always on desktop, conditionally on mobile */}
               {(!isMobile || showTopupGuide) && (
                 <CardContent className="p-4 md:p-6 pt-0">
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {topupSteps.map((step, index) => (
-                      <div key={index} className="space-y-2">
-                        <p className="text-sm font-medium">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs mr-2">
-                            {index + 1}
-                              </span>
-                          {step.text}
-                        </p>
-                        <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
-                          <Image
-                            src={step.image}
-                            alt={`Step ${index + 1}`}
-                            fill
-                            className="object-contain"
-                          />
-                      </div>
+                      <div key={index} className="flex items-start gap-3">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm">{step.text}</p>
                     </div>
                   ))}
+                    <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Note:</strong> Each SMS costs 2 credits. Contact Mobile Message support if you need help with your account.
+                      </p>
+                    </div>
                 </div>
                 </CardContent>
               )}

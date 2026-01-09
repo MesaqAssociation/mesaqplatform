@@ -9,16 +9,16 @@ const pool = new Pool({
 })
 
 /**
- * Picky Assist Delivery Status Webhook
+ * Mobile Message Outbound Status Webhook Endpoint
  * 
- * URL to configure in Picky Assist: https://www.mesaq.com.au/api/messaging/delivery-status
+ * URL to configure in Mobile Message: https://yourdomain.com/api/messaging/delivery-status
  * 
- * Expected payload format from Picky Assist:
+ * Expected payload format (may vary based on Mobile Message documentation):
  * {
- *   "number": "61426967982",
- *   "unique-id": "751403635",       // The message ID we stored
- *   "status": "delivered" | "read" | "failed",
- *   "timestamp": "2024-01-07T12:00:00Z",
+ *   "messageId": "abc123",
+ *   "status": "delivered" | "failed" | "sent",
+ *   "to": "61412345678",
+ *   "timestamp": "2026-01-09T12:00:00Z",
  *   "error": "Error message if failed"
  * }
  */
@@ -28,85 +28,46 @@ export async function POST(req: NextRequest) {
     
     console.log('📬 Delivery status webhook received:', JSON.stringify(body).substring(0, 500))
 
-    // Extract status info from Picky Assist payload
-    // Picky Assist may use different field names, so check various possibilities
-    const uniqueId = body['unique-id'] || body.unique_id || body.messageId || body.message_id
-    const phoneNumber = body.number || body.phone
-    const status = body.status?.toLowerCase()
-    const errorMessage = body.error || body.error_message || body.reason
+    const messageId = body.messageId || body.id || body.reference
+    const status = body.status || body.deliveryStatus
+    const errorMessage = body.error || body.errorMessage || body.failureReason || null
 
-    if (!uniqueId && !phoneNumber) {
-      console.log('⚠️ No identifier in delivery status webhook')
-      return NextResponse.json({ success: true, message: 'No identifier provided' })
+    if (!messageId) {
+      console.log('⏭️ Ignoring: no message ID')
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Event ignored (no message ID)' 
+      })
     }
 
-    // Map Picky Assist status to our status
-    let mappedStatus: 'delivered' | 'read' | 'failed' | null = null
-    
-    if (status === 'delivered' || status === 'sent' || status === 'server') {
-      mappedStatus = 'delivered'
-    } else if (status === 'read' || status === 'seen') {
-      mappedStatus = 'read'
-    } else if (status === 'failed' || status === 'undelivered' || status === 'error') {
-      mappedStatus = 'failed'
-    }
-
-    if (!mappedStatus) {
-      console.log(`⏭️ Unknown status: ${status}`)
-      return NextResponse.json({ success: true, message: 'Status not processed' })
-    }
-
-    // Update by picky_assist_id first
-    if (uniqueId) {
-      const timestampColumn = mappedStatus === 'delivered' ? 'delivered_at' 
-                            : mappedStatus === 'read' ? 'read_at' 
-                            : 'failed_at'
-      
-      const { rowCount } = await pool.query(`
+    // Update sent message status in database if we track it
+    // Note: We may need to store message IDs from Mobile Message response
+    // to match them back to our sent_messages table
+    try {
+      await pool.query(`
         UPDATE sent_messages 
         SET 
           status = $1,
-          ${timestampColumn} = NOW(),
-          error_message = COALESCE($2, error_message)
-        WHERE picky_assist_id = $3
-      `, [mappedStatus, errorMessage || null, uniqueId])
-
-      if (rowCount && rowCount > 0) {
-        console.log(`✅ Updated message ${uniqueId} status to ${mappedStatus}`)
-        return NextResponse.json({ success: true, updated: rowCount })
-      }
+          error_message = $2,
+          updated_at = NOW()
+        WHERE external_message_id = $3
+      `, [
+        status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : 'sent',
+        errorMessage,
+        messageId
+      ])
+      console.log(`✅ Updated status for message ${messageId}: ${status}`)
+    } catch (updateErr) {
+      // Table might not have external_message_id column, or message not found
+      console.log(`ℹ️ Could not update status for message ${messageId}:`, updateErr)
     }
 
-    // Fallback: Update most recent message to this phone number
-    if (phoneNumber) {
-      const formattedPhone = phoneNumber.replace(/\D/g, '')
-      const timestampColumn = mappedStatus === 'delivered' ? 'delivered_at' 
-                            : mappedStatus === 'read' ? 'read_at' 
-                            : 'failed_at'
-      
-      const { rowCount } = await pool.query(`
-        UPDATE sent_messages 
-        SET 
-          status = $1,
-          ${timestampColumn} = NOW(),
-          error_message = COALESCE($2, error_message)
-        WHERE id = (
-          SELECT id FROM sent_messages 
-          WHERE recipient_phone LIKE '%' || $3 || '%'
-            AND status = 'sent'
-          ORDER BY created_at DESC 
-          LIMIT 1
-        )
-      `, [mappedStatus, errorMessage || null, formattedPhone.slice(-9)])
-
-      if (rowCount && rowCount > 0) {
-        console.log(`✅ Updated message to ${phoneNumber} status to ${mappedStatus}`)
-        return NextResponse.json({ success: true, updated: rowCount })
-      }
-    }
-
-    console.log(`⚠️ No matching message found for status update`)
-    return NextResponse.json({ success: true, message: 'No matching message found' })
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Status update received',
+      messageId,
+      status
+    })
   } catch (err: any) {
     console.error('❌ Delivery status webhook error:', err)
     return NextResponse.json({ 
@@ -116,18 +77,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Handle GET for webhook verification
+// Handle GET requests (for webhook verification if needed)
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const challenge = searchParams.get('challenge') || searchParams.get('hub.challenge')
-  
-  if (challenge) {
-    return new Response(challenge, { status: 200 })
-  }
-  
   return NextResponse.json({ 
-    status: 'Delivery status webhook active',
-    endpoint: '/api/messaging/delivery-status'
+    status: 'Delivery status webhook endpoint active',
+    endpoint: '/api/messaging/delivery-status',
+    method: 'POST',
+    accepts: 'Outbound SMS delivery status updates from Mobile Message'
   })
 }
-

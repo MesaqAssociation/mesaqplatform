@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkAdminMessages, AdminMessageData } from '@/lib/picky-assist'
+import { sendBulkSMS, formatPhoneNumber, buildAdminMessage, SMSMessage } from '@/lib/mobile-message'
 
 export const runtime = 'nodejs'
 
@@ -44,19 +44,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Member IDs and message are required' }, { status: 400 })
     }
 
-    // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY) {
+    // Check if Mobile Message is configured
+    if (!process.env.MOBILE_MESSAGE_USERNAME || !process.env.MOBILE_MESSAGE_PASSWORD) {
       return NextResponse.json({ 
-        error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY must be set'
-      }, { status: 400 })
-    }
-
-    // Check if admin message template is configured
-    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
-      return NextResponse.json({ 
-        error: 'Admin message template not configured',
-        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
+        error: 'Mobile Message not configured',
+        message: 'MOBILE_MESSAGE_USERNAME and MOBILE_MESSAGE_PASSWORD must be set'
       }, { status: 400 })
     }
 
@@ -68,42 +60,32 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    console.log(`📤 Sending messages to ${members.length} members in bulk...`)
+    console.log(`📤 Sending SMS to ${members.length} members in bulk...`)
 
-    // Prepare admin message data for all members
-    const adminMessages: AdminMessageData[] = members
-      .filter(member => member.phone)
-      .map(member => ({
-        memberName: member.name,
-        message: message.trim(),
-        phone: member.phone
+    // Prepare SMS messages for all members
+    const smsMessages: SMSMessage[] = members
+      .filter((member: any) => member.phone)
+      .map((member: any) => ({
+        to: member.phone,
+        message: buildAdminMessage(member.name, message.trim())
       }))
 
-    if (adminMessages.length === 0) {
+    if (smsMessages.length === 0) {
       return NextResponse.json({ 
         error: 'No members with valid phone numbers found' 
       }, { status: 400 })
     }
 
-    // Check if we're in test mode
-    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
-
-    // Send all messages in bulk (single API call)
-    const result = await sendBulkAdminMessages(
-      adminMessages,
-      isTestMode,
-      testNumber
-    )
+    // Send all messages in bulk
+    const result = await sendBulkSMS(smsMessages)
 
     console.log(`✅ Bulk send complete: ${result.sent} sent, ${result.failed} failed`)
 
     return NextResponse.json({ 
-      success: result.success,
+      success: result.sent > 0,
       sent: result.sent,
       failed: result.failed,
-      skipped: result.skipped,
-      testMode: isTestMode
+      skipped: result.skipped
     })
   } catch (err: any) {
     console.error('Send messages error:', err)

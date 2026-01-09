@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { sendBulkAdminMessages, AdminMessageData } from '@/lib/picky-assist'
+import { sendBulkSMS, formatPhoneNumber, buildAdminMessage, SMSMessage } from '@/lib/mobile-message'
 
 export const runtime = 'nodejs'
 
@@ -32,10 +32,6 @@ export async function POST(req: NextRequest) {
     if (dueNotifications.length === 0) {
       return NextResponse.json({ message: 'No notifications to send', sent: 0 })
     }
-
-    // Check if we're in test mode
-    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
 
     let totalSent = 0
     const results: Array<{ id: string, title: string, sent: number, failed: number }> = []
@@ -70,24 +66,13 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Prepare admin messages for recipients
-      // Note: The template format is:
-      // "Salam {{1}},
-      // 
-      // {{2}}
-      // 
-      // Kind Regards - Mesaq"
-      const adminMessages: AdminMessageData[] = members.map(member => ({
-        memberName: member.name,
-        message: `📢 ${notification.title}\n\n${notification.message}`,
-        phone: member.phone
+      // Prepare SMS messages for recipients
+      const smsMessages: SMSMessage[] = members.map(member => ({
+        to: member.phone,
+        message: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`)
       }))
 
-      const result = await sendBulkAdminMessages(
-        adminMessages,
-        isTestMode,
-        testNumber
-      )
+      const result = await sendBulkSMS(smsMessages)
 
       // Update notification status
       await pool.query(`
@@ -114,7 +99,6 @@ export async function POST(req: NextRequest) {
       message: 'Notifications sent',
       total_sent: totalSent,
       notifications_processed: dueNotifications.length,
-      testMode: isTestMode,
       results
     })
   } catch (err: any) {

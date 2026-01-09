@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkAdminMessages, formatPhoneNumber, AdminMessageData } from '@/lib/picky-assist'
+import { sendBulkSMS, formatPhoneNumber, buildAdminMessage, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
@@ -54,44 +54,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Member IDs and message are required' }, { status: 400 })
     }
 
-    // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY) {
+    // Check if Mobile Message is configured
+    if (!process.env.MOBILE_MESSAGE_USERNAME || !process.env.MOBILE_MESSAGE_PASSWORD) {
       return NextResponse.json({ 
-        error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY must be set'
+        error: 'Mobile Message not configured',
+        message: 'MOBILE_MESSAGE_USERNAME and MOBILE_MESSAGE_PASSWORD must be set'
       }, { status: 400 })
-    }
-
-    // Check if admin message template is configured
-    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
-      return NextResponse.json({ 
-        error: 'Admin message template not configured',
-        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
-      }, { status: 400 })
-    }
-
-    // Check Picky Assist balance before sending ($0.10 per message)
-    try {
-      const balanceRes = await fetch('https://app.pickyassist.com/api/v2/check-balance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: process.env.PICKY_ASSIST_API_KEY })
-      })
-      
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json()
-        const currentBalance = balanceData.balance || 0
-        const requiredBalance = memberIds.length * 0.10
-        
-        if (currentBalance < requiredBalance) {
-          return NextResponse.json({ 
-            error: `Balance too low to send ${memberIds.length} messages. Need $${requiredBalance.toFixed(2)}, have $${currentBalance.toFixed(2)}. Please top up.`
-          }, { status: 400 })
-        }
-      }
-    } catch (balanceErr) {
-      console.error('Balance check failed:', balanceErr)
-      // Continue anyway if balance check fails
     }
 
     // Get member details
@@ -102,68 +70,56 @@ export async function POST(req: NextRequest) {
       WHERE id IN (${placeholders})
     `, memberIds)
 
-    console.log(`📤 Sending admin messages to ${members.length} members...`)
+    const membersWithPhone = members.filter((m: any) => m.phone)
 
-    // Prepare admin message data for each member
-    // Note: The template has the format:
-    // "Salam {{1}},
-    // 
-    // {{2}}
-    // 
-    // Kind Regards - Mesaq"
-    const adminMessages: AdminMessageData[] = members
-      .filter(member => member.phone)
-      .map(member => ({
-        memberName: member.name,
-        message: message.trim(),  // The admin's message content
-        phone: member.phone
-      }))
-
-    if (adminMessages.length === 0) {
+    if (membersWithPhone.length === 0) {
       return NextResponse.json({ 
         error: 'No members with valid phone numbers found' 
       }, { status: 400 })
-          }
+    }
 
-    // Check if we're in test mode
-    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+    // Check credit balance (2 credits per message)
+    const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+    if (!creditCheck.hasEnough) {
+      return NextResponse.json({ 
+        error: `Not enough credits to send ${membersWithPhone.length} messages. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up.`
+      }, { status: 400 })
+    }
 
-    const result = await sendBulkAdminMessages(
-      adminMessages,
-      isTestMode,
-      testNumber
-    )
+    console.log(`📤 Sending SMS to ${membersWithPhone.length} members...`)
 
-    console.log(`✅ Admin messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+    // Prepare SMS messages
+    const smsMessages: SMSMessage[] = membersWithPhone.map((member: any) => ({
+      to: member.phone,
+      message: buildAdminMessage(member.name, message.trim())
+    }))
 
-    // Store sent messages in database with FULL template content
+    const result = await sendBulkSMS(smsMessages)
+
+    console.log(`✅ SMS messages: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+
+    // Store sent messages in database
     const batchId = generateBatchId()
-    const sentMessageData: SentMessageData[] = members
-      .filter(member => member.phone)
-      .map(member => ({
-        messageType: 'admin_message' as const,
-        templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-        // Store the FULL message including template wrapper (English only - admin template has no Persian)
-        messageContent: `Salam ${member.name},\n\n${message.trim()}\n\nKind Regards - Mesaq Association`,
-        recipientPhone: formatPhoneNumber(member.phone),
-        recipientName: member.name,
-        recipientMemberId: member.id,
-        status: result.success ? 'sent' : 'failed',
-        sentBy: userId,
-        batchId
-      }))
+    const sentMessageData: SentMessageData[] = membersWithPhone.map((member: any) => ({
+      messageType: 'admin_message' as const,
+      templateId: undefined,
+      messageContent: buildAdminMessage(member.name, message.trim()),
+      recipientPhone: formatPhoneNumber(member.phone),
+      recipientName: member.name,
+      recipientMemberId: member.id,
+      status: result.sent > 0 ? 'sent' : 'failed',
+      sentBy: userId,
+      batchId
+    }))
 
     await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
     return NextResponse.json({ 
-      success: result.success,
+      success: result.sent > 0,
       queued: result.sent,
       failed: result.failed,
       skipped: result.skipped,
-      message: isTestMode 
-        ? `Test mode: ${result.sent} messages sent to test number`
-        : `${result.sent} messages sent successfully`
+      message: `${result.sent} messages sent successfully`
     })
   } catch (err: any) {
     console.error('Send batch error:', err)

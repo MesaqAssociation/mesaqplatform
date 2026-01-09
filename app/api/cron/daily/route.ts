@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
-import { sendBulkPaymentReminders, sendBulkAdminMessages, AdminMessageData, PaymentReminderData, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendBulkSMS, formatPhoneNumber, buildPaymentReminderMessage, buildAdminMessage, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
 
@@ -29,13 +29,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
-
-  // Check if test mode is enabled - if so, skip all operations
-  const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
   
   const results = {
     timestamp: new Date().toISOString(),
-    testMode: isTestMode,
     paymentReminders: { sent: 0, failed: 0, skipped: 0, processed: false },
     scheduledMessages: { sent: 0, failed: 0, notificationsProcessed: 0 },
     feeUpdate: { applied: false, newFee: null as string | null },
@@ -181,7 +177,6 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   const monthlyFee = parseFloat(feeRows[0]?.value || '40')
 
   // Get all members with their calculated balance
-  // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
   const { rows: members } = await pool.query(`
     SELECT 
       u.id, u.name, u.phone,
@@ -205,39 +200,38 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
     WHERE u.phone IS NOT NULL AND u.phone != ''
   `, [monthlyFee])
 
-  const memberData: PaymentReminderData[] = members
-    .filter((m: any) => parseFloat(m.balance) < 0)
-    .map((m: any) => ({
-      name: m.name,
-      balance: parseFloat(m.balance),
-      phone: m.phone
-    }))
+  // Filter to members with negative balance
+  const membersWithDebt = members.filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
 
-  if (memberData.length === 0) {
+  if (membersWithDebt.length === 0) {
     return { sent: 0, failed: 0, skipped: 0 }
   }
 
-  const result = await sendBulkPaymentReminders(
-    memberData,
-    bsb,
-    account_number,
-    false // Not test mode for cron
-  )
+  // Prepare SMS messages
+  const smsMessages: SMSMessage[] = membersWithDebt.map((m: any) => ({
+    to: m.phone,
+    message: buildPaymentReminderMessage(
+      m.name,
+      Math.abs(parseFloat(m.balance)),
+      bsb,
+      account_number
+    )
+  }))
 
-  // Store sent messages in database with FULL template content matching actual WhatsApp template
+  const result = await sendBulkSMS(smsMessages)
+
+  // Store sent messages in database
   const batchId = generateBatchId()
-  const sentMessageData: SentMessageData[] = members
-    .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
-    .map((m: any) => ({
-      messageType: 'payment_reminder' as const,
-      templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-      messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nشما فعلاً $${Math.abs(parseFloat(m.balance)).toFixed(0)} بابت حق العضویت انجمن میثاق عقب هستید.\n\nلطفاً هرچه زودتر پرداخت کنید و شماره تلفن خود را در توضیح بنویسید:\n\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nتشکر – انجمن میثاق`,
-      recipientPhone: formatPhoneNumber(m.phone),
-      recipientName: m.name,
-      recipientMemberId: m.id,
-      status: result.success ? 'sent' : 'failed',
-      batchId
-    }))
+  const sentMessageData: SentMessageData[] = membersWithDebt.map((m: any) => ({
+    messageType: 'payment_reminder' as const,
+    templateId: undefined,
+    messageContent: buildPaymentReminderMessage(m.name, Math.abs(parseFloat(m.balance)), bsb, account_number),
+    recipientPhone: formatPhoneNumber(m.phone),
+    recipientName: m.name,
+    recipientMemberId: m.id,
+    status: result.sent > 0 ? 'sent' : 'failed',
+    batchId
+  }))
 
   await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
@@ -274,13 +268,13 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
   let totalFailed = 0
 
   for (const notification of dueNotifications) {
-    const adminMessages: AdminMessageData[] = members.map((member: any) => ({
-      memberName: member.name,
-      message: `📢 ${notification.title}\n\n${notification.message}`,
-      phone: member.phone
+    // Prepare SMS messages
+    const smsMessages: SMSMessage[] = members.map((member: any) => ({
+      to: member.phone,
+      message: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`)
     }))
 
-    const result = await sendBulkAdminMessages(adminMessages)
+    const result = await sendBulkSMS(smsMessages)
 
     // Update notification status
     await pool.query(`
@@ -291,15 +285,14 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
 
     // Store sent messages in database
     const batchId = generateBatchId()
-    // Store FULL template message content
     const sentMessageData: SentMessageData[] = members.map((member: any) => ({
       messageType: 'scheduled' as const,
-      templateId: process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID,
-      messageContent: `Salam ${member.name},\n\n📢 ${notification.title}\n\n${notification.message}\n\nKind Regards - Mesaq Association`,
+      templateId: undefined,
+      messageContent: buildAdminMessage(member.name, `📢 ${notification.title}\n\n${notification.message}`),
       recipientPhone: formatPhoneNumber(member.phone),
       recipientName: member.name,
       recipientMemberId: member.id,
-      status: result.success ? 'sent' : 'failed',
+      status: result.sent > 0 ? 'sent' : 'failed',
       batchId
     }))
 
@@ -399,4 +392,3 @@ async function createMonthlyBackup(melbourneDate: Date): Promise<{ created: bool
 
   return { created: true, url }
 }
-

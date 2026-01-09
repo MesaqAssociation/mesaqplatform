@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkEventNotifications, formatPhoneNumber, EventNotificationData } from '@/lib/picky-assist'
+import { sendBulkSMS, formatPhoneNumber, buildEventNotificationMessage, hasEnoughCredits, SMSMessage } from '@/lib/mobile-message'
 import { storeSentMessagesBatch, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
@@ -96,9 +96,8 @@ export async function POST(req: NextRequest) {
         SET value = EXCLUDED.value
       `, [organizing_group])
 
-      // Only send WhatsApp notifications if notify_group is true
+      // Only send SMS notifications if notify_group is true
       if (notify_group) {
-        // Send WhatsApp notifications to group members using event template
         try {
           const { rows: groupMembers } = await pool.query(`
             SELECT id, name, phone 
@@ -106,35 +105,21 @@ export async function POST(req: NextRequest) {
             WHERE group_name = $1 AND phone IS NOT NULL
           `, [organizing_group])
 
-          // Check Picky Assist balance before sending ($0.10 per message)
-          if (groupMembers.length > 0 && process.env.PICKY_ASSIST_API_KEY) {
-            try {
-              const balanceRes = await fetch('https://app.pickyassist.com/api/v2/check-balance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: process.env.PICKY_ASSIST_API_KEY })
-              })
-              
-              if (balanceRes.ok) {
-                const balanceData = await balanceRes.json()
-                const currentBalance = balanceData.balance || 0
-                const requiredBalance = groupMembers.filter((m: any) => m.phone).length * 0.10
-                
-                if (currentBalance < requiredBalance) {
-                  // Return error - insufficient balance for event notifications
-                  return NextResponse.json({ 
-                    error: `Insufficient balance to notify group. Need $${requiredBalance.toFixed(2)}, have $${currentBalance.toFixed(2)}. Please top up or uncheck 'Notify Group Members'.`,
-                    event: result.rows[0] // Still return the event if created, but show the error
-                  }, { status: 400 })
-                }
-              }
-            } catch (balanceErr) {
-              console.error('Balance check failed:', balanceErr)
-              // Continue anyway if balance check fails
+          const membersWithPhone = groupMembers.filter((m: any) => m.phone)
+
+          // Check credit balance before sending (2 credits per message)
+          if (membersWithPhone.length > 0 && process.env.MOBILE_MESSAGE_USERNAME) {
+            const creditCheck = await hasEnoughCredits(membersWithPhone.length)
+            
+            if (!creditCheck.hasEnough) {
+              return NextResponse.json({ 
+                error: `Not enough credits to notify group. Need ${creditCheck.requiredCredits} credits, have ${creditCheck.currentCredits}. Please top up or uncheck 'Notify Group Members'.`,
+                event: result.rows[0]
+              }, { status: 400 })
             }
           }
 
-          if (groupMembers.length > 0) {
+          if (membersWithPhone.length > 0) {
             // Format the event date for display with time
             const eventDate = new Date(event_date)
             const formattedDateOnly = eventDate.toLocaleDateString('en-AU', { 
@@ -157,64 +142,56 @@ export async function POST(req: NextRequest) {
             const formattedDate = `${formattedDateOnly} ${startTime12} - ${endTime12}`
 
             // Get all member names for the "other members" field
-            const allMemberNames = groupMembers.map(m => m.name)
+            const allMemberNames = membersWithPhone.map((m: any) => m.name)
 
-            // Prepare event notification data for each member
-            const eventNotifications: EventNotificationData[] = groupMembers
-              .filter(member => member.phone)
-              .map(member => {
-                // Get other members (exclude current member)
-                const otherMembers = allMemberNames
-                  .filter(name => name !== member.name)
-                  .join(', ')
+            // Prepare SMS messages for each member
+            const smsMessages: SMSMessage[] = membersWithPhone.map((member: any) => {
+              const otherMembers = allMemberNames
+                .filter((name: string) => name !== member.name)
+                .join(', ') || 'None'
 
-                return {
-                  memberName: member.name,
-                  eventName: title,
-                  eventDate: formattedDate,
-                  groupName: organizing_group,
-                  otherGroupMembers: otherMembers || 'None',
-                  phone: member.phone
-                }
-              })
+              return {
+                to: member.phone,
+                message: buildEventNotificationMessage(
+                  member.name,
+                  title,
+                  formattedDate,
+                  organizing_group,
+                  otherMembers
+                )
+              }
+            })
 
-            if (eventNotifications.length > 0) {
-              // Check if we're in test mode
-              const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-              const testNumber = process.env.WHATSAPP_TEST_NUMBER
+            const smsResult = await sendBulkSMS(smsMessages)
 
-              const result = await sendBulkEventNotifications(
-                eventNotifications,
-                isTestMode,
-                testNumber
-              )
+            console.log(`✅ Event notifications: ${smsResult.sent} sent, ${smsResult.failed} failed, ${smsResult.skipped} skipped`)
 
-              console.log(`✅ Event notifications: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`)
+            // Store sent messages in database
+            const batchId = generateBatchId()
+            const sentMessageData: SentMessageData[] = membersWithPhone.map((m: any) => {
+              const otherMembers = allMemberNames.filter((name: string) => name !== m.name).join(', ') || 'None'
+              return {
+                messageType: 'event_notification' as const,
+                templateId: undefined,
+                messageContent: buildEventNotificationMessage(
+                  m.name,
+                  title,
+                  formattedDate,
+                  organizing_group,
+                  otherMembers
+                ),
+                recipientPhone: formatPhoneNumber(m.phone),
+                recipientName: m.name,
+                recipientMemberId: m.id,
+                status: smsResult.sent > 0 ? 'sent' : 'failed',
+                batchId
+              }
+            })
 
-              // Store sent messages in database with FULL template content
-              const batchId = generateBatchId()
-              const sentMessageData: SentMessageData[] = groupMembers
-                .filter((m: any) => m.phone)
-                .map((m: any) => {
-                  const otherMembers = allMemberNames.filter(name => name !== m.name).join(', ') || 'None'
-                  return {
-                    messageType: 'event_notification' as const,
-                    templateId: process.env.PICKY_ASSIST_EVENT_TEMPLATE_ID,
-                    // Store FULL template message content matching the actual WhatsApp template (English + Persian)
-                    messageContent: `Salam ${m.name},\nA new event has been created: ${title} - ${formattedDate}.\nYou're receiving this message because you're a member of ${organizing_group}, the group responsible for managing this event.\nOther group members: ${otherMembers}, Please coordinate with them\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nانجمن میثاق یک برنامه جدید را برگزار می کند: ${title} - ${formattedDate}.\n\nشما این پیام را دریافت کرده‌اید چون عضو ${organizing_group} هستید؛ گروه شما مسئول مدیریت این برنامه می‌باشد. لطفا با اعضای دیگر گروه در تماس شوید.\n\nاعضای دیگر گروه: ${otherMembers}\n\nتشکر – انجمن میثاق`,
-                    recipientPhone: formatPhoneNumber(m.phone),
-                    recipientName: m.name,
-                    recipientMemberId: m.id,
-                    status: result.success ? 'sent' : 'failed',
-                    batchId
-                  }
-                })
-
-              await storeSentMessagesBatch(pool, sentMessageData, batchId)
-            }
+            await storeSentMessagesBatch(pool, sentMessageData, batchId)
           }
-        } catch (whatsappErr) {
-          console.error('Failed to send WhatsApp notifications:', whatsappErr)
+        } catch (smsErr) {
+          console.error('Failed to send SMS notifications:', smsErr)
           // Don't fail the event creation if notifications fail
         }
       }

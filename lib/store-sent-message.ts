@@ -8,7 +8,7 @@ export type SentMessageData = {
   recipientName?: string
   recipientMemberId?: string
   status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
-  pickyAssistId?: string
+  externalMessageId?: string
   errorMessage?: string
   sentBy?: string
   batchId?: string
@@ -31,7 +31,7 @@ export async function storeSentMessage(
         recipient_name,
         recipient_member_id,
         status,
-        picky_assist_id,
+        external_message_id,
         error_message,
         sent_by,
         batch_id,
@@ -46,7 +46,7 @@ export async function storeSentMessage(
       data.recipientName || null,
       data.recipientMemberId || null,
       data.status || 'sent',
-      data.pickyAssistId || null,
+      data.externalMessageId || null,
       data.errorMessage || null,
       data.sentBy || null,
       data.batchId || null
@@ -81,11 +81,11 @@ export async function storeSentMessagesBatch(
 }
 
 /**
- * Update message status from Picky Assist webhook
+ * Update message status from SMS provider webhook
  */
 export async function updateMessageStatus(
   pool: Pool,
-  pickyAssistId: string,
+  externalMessageId: string,
   status: 'delivered' | 'read' | 'failed',
   errorMessage?: string
 ): Promise<boolean> {
@@ -100,8 +100,8 @@ export async function updateMessageStatus(
         status = $1,
         ${timestampColumn} = NOW(),
         error_message = COALESCE($2, error_message)
-      WHERE picky_assist_id = $3
-    `, [status, errorMessage || null, pickyAssistId])
+      WHERE external_message_id = $3
+    `, [status, errorMessage || null, externalMessageId])
     
     return (rowCount || 0) > 0
   } catch (error) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendBulkPaymentReminders, sendPaymentReminder, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendSMS, sendBulkSMS, formatPhoneNumber, buildPaymentReminderMessage, SMSMessage } from '@/lib/mobile-message'
 import { corsHeaders } from '@/lib/cors'
 import { storeSentMessagesBatch, storeSentMessage, generateBatchId, SentMessageData } from '@/lib/store-sent-message'
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { testMode = false, memberId } = body
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
+    const testNumber = process.env.SMS_TEST_NUMBER
 
     // Get main membership account BSB and account number
     const { rows: accountRows } = await pool.query(`
@@ -99,7 +99,6 @@ export async function POST(req: NextRequest) {
     // If specific member requested (test mode), send to just that member
     if (memberId) {
       // Get member with their balance
-      // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
       const { rows: memberRows } = await pool.query(`
         SELECT 
           u.id, u.name, u.phone,
@@ -135,39 +134,30 @@ export async function POST(req: NextRequest) {
         }, { status: 400, headers: corsHeaders })
       }
 
-      // In test mode, send this member's actual message to the test number
       const targetPhone = testMode && testNumber ? testNumber : member.phone
+      const balanceOwed = Math.abs(member.balance)
 
       console.log(`📤 Sending reminder for ${member.name} (balance: $${member.balance})`)
-      console.log(`   Target: ${formatPhoneNumber(targetPhone)}${testMode ? ' (TEST MODE)' : ''}`)
 
-      const success = await sendPaymentReminder(
-        {
-          name: member.name,
-          balance: parseFloat(member.balance),
-          phone: targetPhone
-        },
-        bsb,
-        account_number
-      )
+      const messageContent = buildPaymentReminderMessage(member.name, balanceOwed, bsb, account_number)
+      const result = await sendSMS(targetPhone, messageContent)
 
-      // Store the sent message with FULL template content matching actual WhatsApp template (English + Persian)
-      const balanceOwed = Math.abs(member.balance).toFixed(0)
+      // Store the sent message
       await storeSentMessage(pool, {
         messageType: 'payment_reminder',
-        templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        messageContent: `Salam ${member.name},\n\nYou are currently $${balanceOwed} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association\n----------\nسلام ${member.name}،\n\nشما فعلاً $${balanceOwed} بابت حق العضویت انجمن میثاق عقب هستید.\n\nلطفاً هرچه زودتر پرداخت کنید و شماره تلفن خود را در توضیح بنویسید:\n\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nتشکر – انجمن میثاق`,
+        templateId: undefined,
+        messageContent,
         recipientPhone: formatPhoneNumber(targetPhone),
         recipientName: member.name,
         recipientMemberId: member.id,
-        status: success ? 'sent' : 'failed'
+        status: result.success ? 'sent' : 'failed'
       })
 
-      if (success) {
+      if (result.success) {
         return NextResponse.json({ 
           success: true,
           message: testMode 
-            ? `Test message sent to ${testNumber} with ${member.name}'s reminder (Balance: $${Math.abs(member.balance).toFixed(0)})`
+            ? `Test message sent to ${testNumber} with ${member.name}'s reminder (Balance: $${balanceOwed.toFixed(0)})`
             : `Payment reminder sent to ${member.name}`,
           member: {
             name: member.name,
@@ -183,7 +173,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Get all members with their balances
-    // Only expect payment for previous months (not current month) since statements are uploaded on the 7th
     const { rows: members } = await pool.query(`
       SELECT 
         u.id, u.name, u.phone,
@@ -207,40 +196,49 @@ export async function POST(req: NextRequest) {
       WHERE u.phone IS NOT NULL AND u.phone != ''
     `, [monthlyFee])
 
-    const memberData = members.map(m => ({
-      name: m.name,
-      balance: parseFloat(m.balance),
-      phone: m.phone
+    // Filter to only members with negative balance
+    const membersWithDebt = members.filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
+
+    if (membersWithDebt.length === 0) {
+      return NextResponse.json({
+        success: true,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        message: 'No members with negative balance'
+      }, { headers: corsHeaders })
+    }
+
+    // Prepare SMS messages
+    const smsMessages: SMSMessage[] = membersWithDebt.map((m: any) => ({
+      to: testMode && testNumber ? testNumber : m.phone,
+      message: buildPaymentReminderMessage(
+        m.name, 
+        Math.abs(parseFloat(m.balance)), 
+        bsb, 
+        account_number
+      )
     }))
 
-    const result = await sendBulkPaymentReminders(
-      memberData,
-      bsb,
-      account_number,
-      testMode,
-      testNumber
-    )
+    const result = await sendBulkSMS(smsMessages)
 
     // Store sent messages in database
     const batchId = generateBatchId()
-    const sentMessageData: SentMessageData[] = members
-      .filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
-      .map((m: any) => ({
-        messageType: 'payment_reminder' as const,
-        templateId: process.env.PICKY_ASSIST_PAYMENT_TEMPLATE_ID,
-        // Store FULL template message content matching actual WhatsApp template
-        messageContent: `Salam ${m.name},\n\nYou are currently $${Math.abs(parseFloat(m.balance)).toFixed(0)} behind on your Mesaq Community Membership.\n\nPlease pay ASAP with your phone number in the description to:\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nKind Regards - Mesaq Association\n----------\nسلام ${m.name}،\n\nشما فعلاً $${Math.abs(parseFloat(m.balance)).toFixed(0)} بابت حق العضویت انجمن میثاق عقب هستید.\n\nلطفاً هرچه زودتر پرداخت کنید و شماره تلفن خود را در توضیح بنویسید:\n\nBSB: ${bsb}\nAccount Number: ${account_number}\n\nتشکر – انجمن میثاق`,
-        recipientPhone: formatPhoneNumber(m.phone),
-        recipientName: m.name,
-        recipientMemberId: m.id,
-        status: result.success ? 'sent' : 'failed',
-        batchId
-      }))
+    const sentMessageData: SentMessageData[] = membersWithDebt.map((m: any) => ({
+      messageType: 'payment_reminder' as const,
+      templateId: undefined,
+      messageContent: buildPaymentReminderMessage(m.name, Math.abs(parseFloat(m.balance)), bsb, account_number),
+      recipientPhone: formatPhoneNumber(m.phone),
+      recipientName: m.name,
+      recipientMemberId: m.id,
+      status: result.sent > 0 ? 'sent' : 'failed',
+      batchId
+    }))
 
     await storeSentMessagesBatch(pool, sentMessageData, batchId)
 
     return NextResponse.json({
-      success: result.success,
+      success: result.sent > 0,
       sent: result.sent,
       failed: result.failed,
       skipped: result.skipped,
@@ -327,7 +325,7 @@ export async function GET(req: NextRequest) {
       members: membersWithDebt,
       totalWithDebt: membersWithDebt.length,
       account: accountRows[0] || null,
-      testNumber: process.env.WHATSAPP_TEST_NUMBER || null
+      testNumber: process.env.SMS_TEST_NUMBER || null
     }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Get reminder preview error:', err)
@@ -337,4 +335,3 @@ export async function GET(req: NextRequest) {
     }, { status: 500, headers: corsHeaders })
   }
 }
-

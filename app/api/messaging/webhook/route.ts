@@ -9,69 +9,38 @@ const pool = new Pool({
 })
 
 /**
- * Picky Assist Webhook Endpoint
+ * Mobile Message Inbound Webhook Endpoint
  * 
- * URL to configure in Picky Assist: https://yourdomain.com/api/messaging/webhook
+ * URL to configure in Mobile Message: https://yourdomain.com/api/messaging/webhook
  * 
- * Actual Picky Assist payload format:
+ * Expected payload format (may vary based on Mobile Message documentation):
  * {
- *   "number": "61426967982",
- *   "message-in": "Hello",
- *   "message_in_raw": "Hello",
- *   "type": 1,
- *   "application": 121,
- *   "unique-id": "751403635",
- *   "project-id": 501326,
- *   "direction": 0,  // 0 = incoming, 1 = outgoing
- *   "name": "Elyas"
+ *   "from": "61412345678",
+ *   "to": "your-number",
+ *   "message": "Hello",
+ *   "messageId": "abc123",
+ *   "timestamp": "2026-01-09T12:00:00Z"
  * }
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     
-    console.log('📥 Webhook received:', JSON.stringify(body).substring(0, 500))
+    console.log('📥 Inbound SMS webhook received:', JSON.stringify(body).substring(0, 500))
 
-    // Check if this is an incoming message (direction: 0)
-    // Picky Assist doesn't use "event" field - it sends message data directly
-    // direction: 0 = incoming, direction: 1 = outgoing
-    const isIncoming = body.direction === 0 || body.direction === '0'
-    
-    // Also check if there's a message - "message-in" or "message_in_raw"
-    // Decode URL-encoded messages (Picky Assist sometimes sends them encoded)
-    let messageText = body['message-in'] || body.message_in_raw || body.message || ''
-    try {
-      // Decode URL encoding (+ becomes space, %XX becomes character)
-      messageText = decodeURIComponent(messageText.replace(/\+/g, ' '))
-    } catch {
-      // If decoding fails, use original text
-    }
-    
-    if (!isIncoming && !messageText) {
-      console.log(`⏭️ Ignoring: direction=${body.direction}, no message content`)
+    // Extract message details from Mobile Message format
+    const fromPhone = body.from || body.sender || body.number || 'unknown'
+    const messageText = body.message || body.text || body.body || ''
+    const messageId = body.messageId || body.id || body.reference || null
+    const timestamp = body.timestamp || body.receivedAt || new Date().toISOString()
+
+    if (!messageText) {
+      console.log('⏭️ Ignoring: no message content')
       return NextResponse.json({ 
         success: true, 
-        message: 'Event ignored (not an incoming message)' 
+        message: 'Event ignored (no message content)' 
       })
     }
-
-    // Extract message details from Picky Assist format
-    const fromPhone = body.number || 'unknown'
-    const contactName = body.name || null
-    const uniqueId = body['unique-id'] || body.unique_id || null
-    const applicationId = body.application || null
-    const projectId = body['project-id'] || body.project_id || null
-    const mediaUrl = body['media-url'] || body.media_url || null
-    
-    // Determine message type: 1 = text, 2 = image, 3 = audio, 4 = video, 5 = document
-    let messageType = 'text'
-    if (body.type === 2) messageType = 'image'
-    else if (body.type === 3) messageType = 'audio'
-    else if (body.type === 4) messageType = 'video'
-    else if (body.type === 5) messageType = 'document'
-    else if (mediaUrl) messageType = 'media' // Fallback if has media URL
-
-    // For media messages without text, leave message empty (UI will handle display)
 
     // Store in database
     const { rows } = await pool.query(`
@@ -89,19 +58,19 @@ export async function POST(req: NextRequest) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id
     `, [
-      uniqueId,  // Use unique-id as channel_id
+      messageId,  // Use messageId as channel_id
       fromPhone,
-      null,  // to_phone not provided in this format
-      messageType,
+      body.to || null,
+      'text',
       messageText,
-      mediaUrl,  // Store media URL
-      contactName,
-      fromPhone,  // contact_phone same as from
-      new Date().toISOString(),  // Current timestamp
+      null,  // No media URL for SMS
+      null,  // No contact name
+      fromPhone,
+      timestamp,
       JSON.stringify(body)
     ])
 
-    console.log(`✅ Message stored with ID: ${rows[0].id} from ${contactName || fromPhone}`)
+    console.log(`✅ Inbound SMS stored with ID: ${rows[0].id} from ${fromPhone}`)
 
     return NextResponse.json({ 
       success: true, 
@@ -109,7 +78,7 @@ export async function POST(req: NextRequest) {
       id: rows[0].id
     })
   } catch (err: any) {
-    console.error('❌ Webhook error:', err)
+    console.error('❌ Inbound webhook error:', err)
     return NextResponse.json({ 
       success: false, 
       error: err.message 
@@ -119,7 +88,6 @@ export async function POST(req: NextRequest) {
 
 // Handle GET requests (for webhook verification if needed)
 export async function GET(req: NextRequest) {
-  // Some webhook systems send a GET request to verify the endpoint
   const { searchParams } = new URL(req.url)
   const challenge = searchParams.get('challenge') || searchParams.get('hub.challenge')
   
@@ -128,10 +96,9 @@ export async function GET(req: NextRequest) {
   }
   
   return NextResponse.json({ 
-    status: 'Webhook endpoint active',
+    status: 'Inbound SMS webhook endpoint active',
     endpoint: '/api/messaging/webhook',
     method: 'POST',
-    accepts: 'message.received events from Picky Assist'
+    accepts: 'Inbound SMS messages from Mobile Message'
   })
 }
-

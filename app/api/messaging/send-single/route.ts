@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { sendAdminMessage, formatPhoneNumber } from '@/lib/picky-assist'
+import { sendSMS, formatPhoneNumber, buildAdminMessage } from '@/lib/mobile-message'
+import { storeSentMessage } from '@/lib/store-sent-message'
 
 export const runtime = 'nodejs'
 
@@ -11,6 +12,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 })
 
+/**
+ * POST /api/messaging/send-single
+ * Send a single SMS message to a member using admin message format
+ */
 export async function POST(req: NextRequest) {
   const token = cookies().get('auth_token')?.value
   if (!token || !process.env.AUTH_SECRET) {
@@ -24,92 +29,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Only admins/board can send messages
   const userId = decoded.userId || decoded.sub
   if (!userId) {
-    return NextResponse.json({ error: 'Invalid token - no user ID' }, { status: 401 })
-  }
-  
-  const { rows: userRows } = await pool.query(
-    'SELECT role FROM users WHERE id = $1',
-    [userId]
-  )
-  
-  if (userRows.length === 0) {
-    return NextResponse.json({ error: 'User not found' }, { status: 403 })
-  }
-  
-  const userRole = (userRows[0].role || '').toLowerCase()
-  if (!['admin', 'board', 'manager'].includes(userRole)) {
-    return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 })
+    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 
   try {
-    const body = await req.json()
-    const { memberId, message } = body
+    const { memberId, message } = await req.json()
 
-    if (!memberId || !message) {
-      return NextResponse.json({ error: 'Member ID and message are required' }, { status: 400 })
+    if (!memberId || !message?.trim()) {
+      return NextResponse.json({ error: 'Member ID and message required' }, { status: 400 })
     }
 
-    // Check if Picky Assist API is configured
-    if (!process.env.PICKY_ASSIST_API_KEY) {
-      return NextResponse.json({ 
-        error: 'Picky Assist API not configured',
-        message: 'PICKY_ASSIST_API_KEY must be set'
-      }, { status: 400 })
-    }
-
-    // Check if admin message template is configured
-    if (!process.env.PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID) {
-      return NextResponse.json({ 
-        error: 'Admin message template not configured',
-        message: 'PICKY_ASSIST_ADMIN_MESSAGE_TEMPLATE_ID must be set'
-      }, { status: 400 })
-    }
-
-    // Get member details
-    const { rows: members } = await pool.query(`
-      SELECT id, name, phone, email
-      FROM users
-      WHERE id = $1
-    `, [memberId])
-
-    if (members.length === 0) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
-    }
-
-    const member = members[0]
-
-    if (!member.phone) {
-      return NextResponse.json({ error: 'Member has no phone number' }, { status: 400 })
-    }
-
-    // Check if we're in test mode
-    const isTestMode = process.env.PICKY_ASSIST_TEST_MODE === 'true'
-    const testNumber = process.env.WHATSAPP_TEST_NUMBER
-
-    // Send using the admin message template
-    // Template format: "Salam {{1}}, {{2}} Kind Regards - Mesaq"
-    const success = await sendAdminMessage(
-      {
-        memberName: member.name,
-        message: message.trim(),
-        phone: member.phone
-      },
-      isTestMode ? testNumber : undefined
+    // Get member info
+    const { rows: memberRows } = await pool.query(
+      'SELECT id, name, phone FROM users WHERE id = $1',
+      [memberId]
     )
 
-    if (success) {
-      return NextResponse.json({ 
-        success: true,
-        testMode: isTestMode
-      })
+    if (memberRows.length === 0 || !memberRows[0].phone) {
+      return NextResponse.json({ error: 'Member not found or no phone number' }, { status: 404 })
+    }
+
+    const member = memberRows[0]
+    const phone = formatPhoneNumber(member.phone)
+
+    if (!process.env.MOBILE_MESSAGE_USERNAME || !process.env.MOBILE_MESSAGE_PASSWORD) {
+      return NextResponse.json({ error: 'Mobile Message not configured' }, { status: 400 })
+    }
+
+    // Build admin message with greeting and signature
+    const fullMessage = buildAdminMessage(member.name, message.trim())
+    const result = await sendSMS(phone, fullMessage)
+
+    console.log(`📤 Sent SMS to ${phone}:`, result.success ? 'OK' : 'FAILED')
+
+    // Store sent message
+    await storeSentMessage(pool, {
+      messageType: 'admin_message',
+      templateId: undefined,
+      messageContent: fullMessage,
+      recipientPhone: phone,
+      recipientName: member.name,
+      recipientMemberId: member.id,
+      status: result.success ? 'sent' : 'failed',
+      sentBy: userId
+    })
+
+    if (result.success) {
+      return NextResponse.json({ success: true })
     } else {
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
     }
   } catch (err: any) {
-    console.error('Send message error:', err)
+    console.error('Send single message error:', err)
     return NextResponse.json({ 
       error: 'Failed to send message',
       details: err.message 
