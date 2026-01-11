@@ -59,25 +59,62 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    console.log('📋 Listing backups from R2...')
-    const backups = await listR2Objects('backups')
-    console.log(`📋 Found ${backups.length} backup files:`, backups.map(b => b.name))
+    console.log('📋 Listing backups...')
     
-    // Parse backup info from filenames
-    const parsedBackups = backups.map(b => {
-      // Filename format: timestamp-MesaqBackup-MONTH-YEAR.json
-      const nameMatch = b.name.match(/(\d+)-MesaqBackup-(\w+)-(\d+)\.json/)
-      return {
-        key: b.key,
-        name: b.name,
-        size: b.size,
-        lastModified: b.lastModified,
-        url: b.url,
-        month: nameMatch ? nameMatch[2] : 'Unknown',
-        year: nameMatch ? parseInt(nameMatch[3]) : 0,
-        timestamp: nameMatch ? parseInt(nameMatch[1]) : 0,
+    // First try to get backups from database (more reliable than R2 listing)
+    let parsedBackups: any[] = []
+    
+    try {
+      const { rows: dbBackups } = await pool.query(`
+        SELECT key, filename as name, url, size, month, year, 
+               EXTRACT(EPOCH FROM created_at)::bigint * 1000 as timestamp,
+               created_at as "lastModified"
+        FROM backup_records 
+        ORDER BY created_at DESC
+        LIMIT 50
+      `)
+      
+      if (dbBackups.length > 0) {
+        console.log(`📋 Found ${dbBackups.length} backups in database`)
+        parsedBackups = dbBackups.map(b => ({
+          key: b.key,
+          name: b.name,
+          size: b.size || 0,
+          lastModified: b.lastModified,
+          url: b.url,
+          month: b.month || 'Unknown',
+          year: b.year || 0,
+          timestamp: parseInt(b.timestamp) || 0,
+        }))
       }
-    }).sort((a, b) => b.timestamp - a.timestamp) // Most recent first
+    } catch (dbErr: any) {
+      // Table might not exist yet
+      if (!dbErr.message?.includes('does not exist')) {
+        console.error('⚠️ Database backup query failed:', dbErr)
+      }
+    }
+    
+    // Fallback to R2 listing if no database records
+    if (parsedBackups.length === 0) {
+      console.log('📋 No database records, trying R2 listing...')
+      const backups = await listR2Objects('backups')
+      console.log(`📋 Found ${backups.length} backup files from R2`)
+      
+      parsedBackups = backups.map(b => {
+        // Filename format: timestamp-MesaqBackup-MONTH-YEAR.json
+        const nameMatch = b.name.match(/(\d+)-MesaqBackup-(\w+)-(\d+)\.json/)
+        return {
+          key: b.key,
+          name: b.name,
+          size: b.size,
+          lastModified: b.lastModified,
+          url: b.url,
+          month: nameMatch ? nameMatch[2] : 'Unknown',
+          year: nameMatch ? parseInt(nameMatch[3]) : 0,
+          timestamp: nameMatch ? parseInt(nameMatch[1]) : 0,
+        }
+      }).sort((a, b) => b.timestamp - a.timestamp)
+    }
 
     return NextResponse.json({ backups: parsedBackups })
   } catch (err: any) {
@@ -192,6 +229,37 @@ export async function POST(req: NextRequest) {
     const url = await uploadToR2(buffer, filename, 'application/json', 'backups')
 
     console.log(`✅ Backup uploaded to R2: ${url}`)
+
+    // Store backup metadata in database (so we don't rely on R2 listing)
+    try {
+      // Create backups table if it doesn't exist
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS backup_records (
+          id SERIAL PRIMARY KEY,
+          key TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          url TEXT NOT NULL,
+          size INTEGER DEFAULT 0,
+          month TEXT,
+          year INTEGER,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `)
+      
+      // Extract key from URL (the path after the bucket name)
+      const keyMatch = url.match(/backups\/[^/]+\.json/)
+      const key = keyMatch ? keyMatch[0] : `backups/${Date.now()}-${filename}`
+      
+      await pool.query(`
+        INSERT INTO backup_records (key, filename, url, size, month, year)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [key, filename, url, buffer.length, month, year])
+      
+      console.log(`📝 Backup record saved to database`)
+    } catch (dbErr) {
+      console.error('⚠️ Failed to save backup record to database:', dbErr)
+      // Don't fail the backup if DB record fails
+    }
 
     return NextResponse.json({ 
       success: true,

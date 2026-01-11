@@ -164,7 +164,13 @@ export async function listR2Objects(folder: string = 'backups'): Promise<Array<{
       lastModified: obj.LastModified || new Date(),
       url: getPublicUrl(obj.Key || ''),
     })).filter(obj => obj.name) // Filter out empty folder entries
-  } catch (error) {
+  } catch (error: any) {
+    // Cloudflare R2 may return NoSuchKey for empty prefixes instead of empty list
+    // This is a known R2 quirk - treat it as empty list
+    if (error?.Code === 'NoSuchKey' || error?.name === 'NoSuchKey') {
+      console.log(`📂 No objects found in "${folder}/" (R2 returned NoSuchKey)`)
+      return []
+    }
     console.error('❌ Failed to list R2 objects:', error)
     return []
   }

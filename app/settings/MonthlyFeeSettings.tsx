@@ -106,6 +106,8 @@ export default function MonthlyFeeSettings({ initialFee }: Props) {
       if (response.ok) {
         setPendingFee(null)
         setEffectiveDate(null)
+        setFee(initialFee) // Reset to current fee
+        setIsEditing(false)
         showToast('Pending fee change cancelled', 'success')
       } else {
         const error = await response.json()

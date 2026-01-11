@@ -2601,7 +2601,7 @@ export default function FinanceClient({
           <DialogHeader>
             <DialogTitle>Send Payment Reminders</DialogTitle>
             <DialogDescription>
-              Send WhatsApp payment reminders to all members with outstanding balances.
+              Send SMS payment reminders to all members with outstanding balances.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4">
@@ -2616,12 +2616,6 @@ export default function FinanceClient({
               </div>
             ) : (
               <>
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="text-sm">
-                    <span className="font-medium">{remindersPreview.length} members</span> have outstanding balances.
-                    Sending reminders will cost approximately <span className="font-medium">${(remindersPreview.length * 0.10).toFixed(2)}</span>.
-                  </p>
-                </div>
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted">
