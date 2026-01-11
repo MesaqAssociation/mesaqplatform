@@ -18,11 +18,12 @@ function replaceVariables(message: string, member: any): string {
 
 /**
  * Build scheduled message content with variable replacement
+ * Note: Title is NOT included - it's only for admin reference
  */
-function buildScheduledMessage(memberName: string, title: string, messageBody: string, member: any): string {
+function buildScheduledMessage(memberName: string, messageBody: string, member: any): string {
   // Replace variables in the message body
   const processedMessage = replaceVariables(messageBody, member)
-  return `Salam ${memberName},\n\n📢 ${title}\n\n${processedMessage}\n\nKind Regards - Mesaq Association`
+  return processedMessage
 }
 
 const pool = new Pool({
@@ -88,9 +89,10 @@ export async function POST(req: NextRequest) {
       }
 
       // Prepare SMS messages for recipients with variable replacement
+      // Note: Title is NOT sent - it's only for admin reference
       const smsMessages: SMSMessage[] = members.map(member => ({
         to: member.phone,
-        message: buildScheduledMessage(member.name, notification.title, notification.message, member)
+        message: buildScheduledMessage(member.name, notification.message, member)
       }))
 
       const result = await sendBulkSMS(smsMessages)
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
         return {
           messageType: 'scheduled' as const,
           templateId: undefined,
-          messageContent: buildScheduledMessage(member.name, notification.title, notification.message, member),
+          messageContent: buildScheduledMessage(member.name, notification.message, member),
           recipientPhone: phone,
           recipientName: member.name,
           recipientMemberId: member.id,

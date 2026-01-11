@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { deleteR2Object } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 
@@ -40,9 +41,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Get member info before deleting
+    // Get member info before deleting (including image for R2 cleanup)
     const { rows: memberRows } = await pool.query(
-      'SELECT id, name, email, phone FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, image FROM users WHERE id = $1',
       [memberId]
     )
 
@@ -52,10 +53,24 @@ export async function DELETE(
 
     const member = memberRows[0]
 
+    // Delete profile picture from R2 if it exists
+    if (member.image && member.image.includes(process.env.R2_PUBLIC_URL || 'r2.cloudflarestorage.com')) {
+      try {
+        // Extract the key from the URL (after the bucket URL)
+        const url = new URL(member.image)
+        const key = url.pathname.replace(/^\//, '') // Remove leading slash
+        if (key) {
+          console.log(`🗑️ Deleting profile picture from R2: ${key}`)
+          await deleteR2Object(key)
+        }
+      } catch (err) {
+        console.error('Failed to delete profile picture from R2:', err)
+        // Continue with member deletion even if R2 delete fails
+      }
+    }
+
     // Delete member (cascade will handle related records)
     await pool.query('DELETE FROM users WHERE id = $1', [memberId])
-
-    // Audit log removed - logs system no longer in use
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { deleteR2Object } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 
@@ -51,15 +52,39 @@ export async function DELETE(
     const resolvedParams = params instanceof Promise ? await params : params
     const documentId = resolvedParams.id
 
-    // Delete document
-    const { rowCount } = await pool.query(
-      'DELETE FROM community_documents WHERE id = $1',
+    // Get document info before deleting (including file_url for R2 cleanup)
+    const { rows: docRows } = await pool.query(
+      'SELECT id, file_url FROM community_documents WHERE id = $1',
       [documentId]
     )
 
-    if (rowCount === 0) {
+    if (docRows.length === 0) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
+
+    const document = docRows[0]
+
+    // Delete file from R2 if it exists
+    if (document.file_url && document.file_url.includes(process.env.R2_PUBLIC_URL || 'r2.cloudflarestorage.com')) {
+      try {
+        // Extract the key from the URL (after the bucket URL)
+        const url = new URL(document.file_url)
+        const key = url.pathname.replace(/^\//, '') // Remove leading slash
+        if (key) {
+          console.log(`🗑️ Deleting document from R2: ${key}`)
+          await deleteR2Object(key)
+        }
+      } catch (err) {
+        console.error('Failed to delete document from R2:', err)
+        // Continue with document deletion even if R2 delete fails
+      }
+    }
+
+    // Delete document from database
+    await pool.query(
+      'DELETE FROM community_documents WHERE id = $1',
+      [documentId]
+    )
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

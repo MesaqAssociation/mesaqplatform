@@ -594,8 +594,16 @@ export default function FinanceClient({
 
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
-    // Set category, defaulting to 'Event Payment' if empty/null
-    const category = txn.category?.trim() || 'Event Payment'
+    // Normalize category to valid dropdown options
+    let category = txn.category?.trim() || 'Event Payment'
+    // Convert legacy 'Special Payment' to 'Event Payment'
+    if (category === 'Special Payment' || category === 'Special Payment (Legacy)') {
+      category = 'Event Payment'
+    }
+    // Only allow valid categories
+    if (!['Membership Payment', 'Event Payment', 'Donation', 'Charges'].includes(category)) {
+      category = 'Event Payment'
+    }
     setDialogCategory(category)
     setShowTransactionDialog(true)
   }

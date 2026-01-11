@@ -246,6 +246,21 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  const handleDeletePastNotification = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this past message?')) return
+    try {
+      const res = await fetch(`/api/notifications?id=${id}&action=delete`, { method: 'DELETE' })
+      if (res.ok) {
+        showToast('Message deleted', 'success')
+        loadData()
+      } else {
+        showToast('Failed to delete message', 'error')
+      }
+    } catch (err) {
+      showToast('Failed to delete message', 'error')
+    }
+  }
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-AU', {
       weekday: 'short',
@@ -547,6 +562,62 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
               )}
             </CardContent>
           </Card>
+
+          {/* Past Messages (Sent + Cancelled) */}
+          {isAdmin && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <IconClock className="size-5" />
+                  Past Messages
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map(i => (
+                      <div key={i} className="h-16 bg-muted/50 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : notifications.filter(n => n.status === 'sent' || n.status === 'cancelled').length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No past messages</p>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.filter(n => n.status === 'sent' || n.status === 'cancelled').slice(0, 10).map((notif) => (
+                      <div 
+                        key={notif.id} 
+                        className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => setViewNotification(notif)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-sm truncate">{notif.title}</h4>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${notif.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                {notif.status === 'sent' ? 'Sent' : 'Cancelled'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.scheduled_date)}</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="size-7 text-muted-foreground hover:text-red-500" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeletePastNotification(notif.id)
+                            }}
+                          >
+                            <IconTrash className="size-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -676,6 +747,9 @@ export default function CalendarClient({ isAdmin }: { isAdmin: boolean }) {
                 placeholder="e.g., Monthly Meeting Reminder"
                 className="mt-1"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                📌 For your reference only - this is NOT sent to members
+              </p>
             </div>
 
             <div>

@@ -276,6 +276,15 @@ export async function POST(req: NextRequest) {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
 
+        // Get all payment keywords with their payment types
+        let keywords: Array<{ keyword: string, paymentType: string }> = []
+        try {
+          const { rows: keywordRows } = await pool.query("SELECT keyword, payment_type FROM payment_keywords")
+          keywords = keywordRows.map(r => ({ keyword: r.keyword.toLowerCase(), paymentType: r.payment_type }))
+        } catch (kwErr) {
+          console.log('⚠️ Keywords table not found, skipping keyword check')
+        }
+
         for (let idx = 0; idx < parsed.transactions.length; idx++) {
           const txn = parsed.transactions[idx]
           const match = memberMatches[idx]
@@ -324,10 +333,26 @@ export async function POST(req: NextRequest) {
               continue
             }
 
-            // Auto-classify based on monthly fee
-            const paymentAmount = Math.abs(amount)
-            const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
-            const category = isMultiple ? 'Membership Payment' : 'Special Payment'
+            // SMART CLASSIFICATION LOGIC
+            // Default: Event Payment (instead of Special Payment)
+            let category = 'Event Payment'
+            
+            // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY)
+            const descLower = (txn.description || '').toLowerCase()
+            const keywordMatch = keywords.find(kw => descLower.includes(kw.keyword))
+            
+            if (keywordMatch) {
+              category = keywordMatch.paymentType
+              console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in description → ${keywordMatch.paymentType}`)
+            } else {
+              // 2. If no keyword match, check if amount matches membership fee
+              const paymentAmount = Math.abs(amount)
+              const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
+              if (isMultiple) {
+                category = 'Membership Payment'
+                console.log(`✓ AMOUNT MATCH: $${paymentAmount} is multiple of $${monthlyFee} → Membership Payment`)
+              }
+            }
             
             const { rows: inserted } = await pool.query(
               `INSERT INTO transactions 
