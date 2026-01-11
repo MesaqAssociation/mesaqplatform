@@ -6,6 +6,7 @@ import { uploadToR2, isR2Configured } from '@/lib/cloudflare-r2'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes - requires Vercel Pro
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -364,6 +365,7 @@ async function sendScheduledNotifications(): Promise<{ sent: number; failed: num
 
 /**
  * Create monthly backup and upload to R2
+ * Optimized for speed - sequential queries to reduce memory, compact JSON
  */
 async function createMonthlyBackup(melbourneDate: Date): Promise<{ created: boolean; url: string | null }> {
   // Helper to safely query tables that might not exist
@@ -375,77 +377,105 @@ async function createMonthlyBackup(melbourneDate: Date): Promise<{ created: bool
     }
   }
 
-  // Fetch all tables data
-  const [
-    usersResult,
-    eventsResult,
-    memberEventsResult,
-    transactionsResult,
-    membershipPaymentsResult,
-    systemSettingsResult,
-    financialAccountsResult,
-    bankStatementsResult,
-    memberGroupsResult,
-    paymentKeywordsResult,
-    scheduledNotificationsResult,
-    communityDocumentsResult,
-  ] = await Promise.all([
-    pool.query('SELECT * FROM users'),
-    pool.query('SELECT * FROM events'),
-    safeQuery('SELECT * FROM member_events'),
-    pool.query('SELECT * FROM transactions'),
-    pool.query('SELECT * FROM membership_payments'),
-    pool.query('SELECT * FROM system_settings'),
-    pool.query('SELECT * FROM financial_accounts'),
-    pool.query('SELECT * FROM bank_statements'),
-    safeQuery('SELECT * FROM member_groups'),
-    safeQuery('SELECT * FROM payment_keywords'),
-    safeQuery('SELECT * FROM scheduled_notifications'),
-    safeQuery('SELECT * FROM community_documents'),
-  ])
+  // Sequential queries to reduce memory pressure and improve reliability
+  const tables: Record<string, any[]> = {}
+  const counts: Record<string, number> = {}
+
+  // Small tables first
+  const settingsResult = await pool.query('SELECT * FROM system_settings')
+  tables.system_settings = settingsResult.rows
+  counts.system_settings = settingsResult.rows.length
+
+  const accountsResult = await pool.query('SELECT * FROM financial_accounts')
+  tables.financial_accounts = accountsResult.rows
+  counts.financial_accounts = accountsResult.rows.length
+
+  const usersResult = await pool.query('SELECT * FROM users')
+  tables.users = usersResult.rows
+  counts.users = usersResult.rows.length
+
+  const eventsResult = await pool.query('SELECT * FROM events')
+  tables.events = eventsResult.rows
+  counts.events = eventsResult.rows.length
+
+  const memberEventsResult = await safeQuery('SELECT * FROM member_events')
+  tables.member_events = memberEventsResult.rows
+  counts.member_events = memberEventsResult.rows.length
+
+  const statementsResult = await pool.query('SELECT * FROM bank_statements')
+  tables.bank_statements = statementsResult.rows
+  counts.bank_statements = statementsResult.rows.length
+
+  const groupsResult = await safeQuery('SELECT * FROM member_groups')
+  tables.member_groups = groupsResult.rows
+  counts.member_groups = groupsResult.rows.length
+
+  const keywordsResult = await safeQuery('SELECT * FROM payment_keywords')
+  tables.payment_keywords = keywordsResult.rows
+  counts.payment_keywords = keywordsResult.rows.length
+
+  const notificationsResult = await safeQuery('SELECT * FROM scheduled_notifications')
+  tables.scheduled_notifications = notificationsResult.rows
+  counts.scheduled_notifications = notificationsResult.rows.length
+
+  const docsResult = await safeQuery('SELECT * FROM community_documents')
+  tables.community_documents = docsResult.rows
+  counts.community_documents = docsResult.rows.length
+
+  const paymentsResult = await pool.query('SELECT * FROM membership_payments')
+  tables.membership_payments = paymentsResult.rows
+  counts.membership_payments = paymentsResult.rows.length
+
+  // Transactions last (usually largest)
+  const transactionsResult = await pool.query('SELECT * FROM transactions')
+  tables.transactions = transactionsResult.rows
+  counts.transactions = transactionsResult.rows.length
 
   const backupData = {
     version: '2.0',
     created_at: new Date().toISOString(),
     created_by: 'cron',
-    tables: {
-      users: usersResult.rows,
-      events: eventsResult.rows,
-      member_events: memberEventsResult.rows,
-      transactions: transactionsResult.rows,
-      membership_payments: membershipPaymentsResult.rows,
-      system_settings: systemSettingsResult.rows,
-      financial_accounts: financialAccountsResult.rows,
-      bank_statements: bankStatementsResult.rows,
-      member_groups: memberGroupsResult.rows,
-      payment_keywords: paymentKeywordsResult.rows,
-      scheduled_notifications: scheduledNotificationsResult.rows,
-      community_documents: communityDocumentsResult.rows,
-    },
-    counts: {
-      users: usersResult.rows.length,
-      events: eventsResult.rows.length,
-      member_events: memberEventsResult.rows.length,
-      transactions: transactionsResult.rows.length,
-      membership_payments: membershipPaymentsResult.rows.length,
-      system_settings: systemSettingsResult.rows.length,
-      financial_accounts: financialAccountsResult.rows.length,
-      bank_statements: bankStatementsResult.rows.length,
-      member_groups: memberGroupsResult.rows.length,
-      payment_keywords: paymentKeywordsResult.rows.length,
-      scheduled_notifications: scheduledNotificationsResult.rows.length,
-      community_documents: communityDocumentsResult.rows.length,
-    }
+    tables,
+    counts
   }
 
   const month = melbourneDate.toLocaleString('en-US', { month: 'long' })
   const year = melbourneDate.getFullYear()
-  const jsonString = JSON.stringify(backupData, null, 2)
+  // Compact JSON (no pretty printing) to reduce size
+  const jsonString = JSON.stringify(backupData)
   const buffer = Buffer.from(jsonString, 'utf-8')
   const filename = `MesaqBackup-${month}-${year}.json`
 
+  console.log(`📦 Backup size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`)
+
   // Upload to R2
   const url = await uploadToR2(buffer, filename, 'application/json', 'backups')
+
+  // Store backup record in database for reliable listing
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS backup_records (
+        id SERIAL PRIMARY KEY,
+        key TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        url TEXT NOT NULL,
+        size INTEGER DEFAULT 0,
+        month TEXT,
+        year INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+    
+    const keyMatch = url.match(/backups\/[^/]+\.json/)
+    const key = keyMatch ? keyMatch[0] : `backups/${Date.now()}-${filename}`
+    
+    await pool.query(`
+      INSERT INTO backup_records (key, filename, url, size, month, year)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [key, filename, url, buffer.length, month, year])
+  } catch (dbErr) {
+    console.error('⚠️ Failed to save backup record:', dbErr)
+  }
 
   return { created: true, url }
 }
