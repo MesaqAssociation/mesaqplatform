@@ -24,8 +24,10 @@ export default function BackupRestore() {
   const [backups, setBackups] = useState<Backup[]>([])
   const [loading, setLoading] = useState(true)
   const [showRestoreDialog, setShowRestoreDialog] = useState(false)
+  const [showUrlRestoreDialog, setShowUrlRestoreDialog] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [confirmText, setConfirmText] = useState('')
+  const [backupUrl, setBackupUrl] = useState('')
   const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -93,24 +95,76 @@ export default function BackupRestore() {
     }
 
     setRestoring(true)
+    console.log('🔄 Starting restore from:', selectedBackup.url || selectedBackup.key)
+    
     try {
-      const res = await fetch('/api/backup/r2', {
-        method: 'PUT',
+      // Use the URL-based restore endpoint for reliability
+      const res = await fetch('/api/backup/restore-url', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          key: selectedBackup.key,
+          url: selectedBackup.url,
           confirmText
         })
       })
 
       const data = await res.json()
+      console.log('Restore response:', data)
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to restore backup')
       }
 
-      showToast('Backup restored successfully! Page will reload...', 'success')
+      showToast(`Backup restored successfully! ${data.restored} records restored. Page will reload...`, 'success')
       setShowRestoreDialog(false)
+      
+      // Reload the page after a short delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+    } catch (err: any) {
+      console.error('Restore error:', err)
+      showToast(err.message || 'Failed to restore backup', 'error')
+    } finally {
+      setRestoring(false)
+    }
+  }
+
+  const handleUrlRestore = async () => {
+    if (confirmText !== 'confirm') {
+      showToast('Please type "confirm" to proceed', 'error')
+      return
+    }
+
+    if (!backupUrl.trim()) {
+      showToast('Please enter a backup URL', 'error')
+      return
+    }
+
+    setRestoring(true)
+    console.log('🔄 Starting restore from URL:', backupUrl)
+    
+    try {
+      const res = await fetch('/api/backup/restore-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: backupUrl.trim(),
+          confirmText
+        })
+      })
+
+      const data = await res.json()
+      console.log('Restore response:', data)
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to restore backup')
+      }
+
+      showToast(`Backup restored successfully! ${data.restored} records restored. Page will reload...`, 'success')
+      setShowUrlRestoreDialog(false)
+      setBackupUrl('')
+      setConfirmText('')
       
       // Reload the page after a short delay
       setTimeout(() => {
@@ -148,10 +202,16 @@ export default function BackupRestore() {
       </p>
 
       {/* Create Backup Button */}
-      <Button onClick={handleCreateBackup} disabled={creating}>
-        <IconPlus className="size-4 mr-2" />
-        {creating ? 'Creating Backup...' : 'Create Backup Now'}
-      </Button>
+      <div className="flex gap-2 flex-wrap">
+        <Button onClick={handleCreateBackup} disabled={creating}>
+          <IconPlus className="size-4 mr-2" />
+          {creating ? 'Creating Backup...' : 'Create Backup Now'}
+        </Button>
+        <Button variant="outline" onClick={() => setShowUrlRestoreDialog(true)}>
+          <IconRefresh className="size-4 mr-2" />
+          Restore from URL
+        </Button>
+      </div>
 
       {/* My Backups - Collapsible */}
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -266,6 +326,71 @@ export default function BackupRestore() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore from URL Dialog */}
+      <Dialog open={showUrlRestoreDialog} onOpenChange={(open) => {
+        if (!open) {
+          setConfirmText('')
+          setBackupUrl('')
+        }
+        setShowUrlRestoreDialog(open)
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <IconAlertTriangle className="size-5" />
+              Restore from URL
+            </DialogTitle>
+            <DialogDescription>
+              Enter the URL of a backup file to restore. This will replace ALL current data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="backup-url">Backup URL:</Label>
+              <Input
+                id="backup-url"
+                value={backupUrl}
+                onChange={(e) => setBackupUrl(e.target.value)}
+                placeholder="https://...MesaqBackup-January-2026.json"
+                className="mt-2"
+              />
+            </div>
+
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <p className="text-sm text-destructive font-medium mb-2">⚠️ Warning</p>
+              <p className="text-sm text-muted-foreground">
+                All current data will be permanently replaced. Make sure you want to restore from this backup.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="confirm-url">Type "confirm" to proceed:</Label>
+              <Input
+                id="confirm-url"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="confirm"
+                className="mt-2"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowUrlRestoreDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleUrlRestore}
+                disabled={restoring || confirmText !== 'confirm' || !backupUrl.trim()}
+              >
+                {restoring ? 'Restoring...' : 'Restore Backup'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
