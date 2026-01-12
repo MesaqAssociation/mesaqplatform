@@ -95,27 +95,40 @@ export default function BackupRestore() {
     }
 
     setRestoring(true)
-    console.log('🔄 Starting restore from:', selectedBackup.url || selectedBackup.key)
+    console.log('🔄 Starting chunked restore from:', selectedBackup.url)
     
     try {
-      // Use the URL-based restore endpoint for reliability
-      const res = await fetch('/api/backup/restore-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: selectedBackup.url,
-          confirmText
+      // Use chunked restore - one table at a time
+      const steps = ['clear', 'system_settings', 'financial_accounts', 'users', 'bank_statements', 
+                     'events', 'payment_keywords', 'scheduled_notifications', 'community_documents', 
+                     'transactions', 'membership_payments']
+      
+      let totalRestored = 0
+      
+      for (const step of steps) {
+        console.log(`📦 Restoring: ${step}...`)
+        showToast(`Restoring ${step}...`, 'default')
+        
+        const res = await fetch('/api/backup/restore-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: selectedBackup.url,
+            step
+          })
         })
-      })
 
-      const data = await res.json()
-      console.log('Restore response:', data)
+        const data = await res.json()
+        console.log(`Step ${step} response:`, data)
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to restore backup')
+        if (!res.ok) {
+          throw new Error(data.error || `Failed at step: ${step}`)
+        }
+
+        totalRestored += data.restored || 0
       }
 
-      showToast(`Backup restored successfully! ${data.restored} records restored. Page will reload...`, 'success')
+      showToast(`Backup restored successfully! ${totalRestored} records restored. Page will reload...`, 'success')
       setShowRestoreDialog(false)
       
       // Reload the page after a short delay
@@ -142,26 +155,40 @@ export default function BackupRestore() {
     }
 
     setRestoring(true)
-    console.log('🔄 Starting restore from URL:', backupUrl)
+    console.log('🔄 Starting chunked restore from URL:', backupUrl)
     
     try {
-      const res = await fetch('/api/backup/restore-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: backupUrl.trim(),
-          confirmText
+      // Use chunked restore - one table at a time
+      const steps = ['clear', 'system_settings', 'financial_accounts', 'users', 'bank_statements', 
+                     'events', 'payment_keywords', 'scheduled_notifications', 'community_documents', 
+                     'transactions', 'membership_payments']
+      
+      let totalRestored = 0
+      
+      for (const step of steps) {
+        console.log(`📦 Restoring: ${step}...`)
+        showToast(`Restoring ${step}...`, 'default')
+        
+        const res = await fetch('/api/backup/restore-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: backupUrl.trim(),
+            step
+          })
         })
-      })
 
-      const data = await res.json()
-      console.log('Restore response:', data)
+        const data = await res.json()
+        console.log(`Step ${step} response:`, data)
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to restore backup')
+        if (!res.ok) {
+          throw new Error(data.error || `Failed at step: ${step}`)
+        }
+
+        totalRestored += data.restored || 0
       }
 
-      showToast(`Backup restored successfully! ${data.restored} records restored. Page will reload...`, 'success')
+      showToast(`Backup restored successfully! ${totalRestored} records restored. Page will reload...`, 'success')
       setShowUrlRestoreDialog(false)
       setBackupUrl('')
       setConfirmText('')
