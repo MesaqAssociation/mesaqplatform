@@ -135,6 +135,9 @@ export default function FinanceClient({
   const [addTxnMemberQuery, setAddTxnMemberQuery] = useState('')
   const [addTxnMemberResults, setAddTxnMemberResults] = useState<Member[]>([])
   const [addTxnSearching, setAddTxnSearching] = useState(false)
+  const [addTxnPopoverOpen, setAddTxnPopoverOpen] = useState(false)
+  const [chargeMemberPopoverOpen, setChargeMemberPopoverOpen] = useState(false)
+  const [dialogMemberPopoverOpen, setDialogMemberPopoverOpen] = useState(false)
   const [allMembers, setAllMembers] = useState<Member[]>([])
   
   // Multi-select transactions for bulk delete
@@ -1689,7 +1692,7 @@ export default function FinanceClient({
               <div>
                 <Label className="text-muted-foreground text-xs">Matched Member</Label>
                 <div className="mt-1">
-                  <Popover>
+                  <Popover open={dialogMemberPopoverOpen} onOpenChange={setDialogMemberPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-between">
                         {selectedTransaction.matched_member_name || 'No member matched'}
@@ -1718,6 +1721,7 @@ export default function FinanceClient({
                                 onSelect={() => {
                                   handleMatchMember(selectedTransaction.id, null)
                                   setDialogMemberSearchQuery('')
+                                  setDialogMemberPopoverOpen(false)
                                 }}
                               >
                                 <span className="text-muted-foreground">Remove match</span>
@@ -1728,6 +1732,7 @@ export default function FinanceClient({
                                   onSelect={() => {
                                     handleMatchMember(selectedTransaction.id, member.id)
                                     setDialogMemberSearchQuery('')
+                                    setDialogMemberPopoverOpen(false)
                                   }}
                                 >
                                   {member.name}
@@ -2146,7 +2151,7 @@ export default function FinanceClient({
 
             <div>
               <Label htmlFor="txn-member">Match to Member (Optional)</Label>
-              <Popover>
+              <Popover open={addTxnPopoverOpen} onOpenChange={setAddTxnPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -2183,6 +2188,7 @@ export default function FinanceClient({
                               setNewTransactionMemberName(member.name)
                               setAddTxnMemberQuery('')
                               setAddTxnMemberResults([])
+                              setAddTxnPopoverOpen(false)
                             }}
                             className="cursor-pointer"
                           >
@@ -2197,6 +2203,7 @@ export default function FinanceClient({
                             onSelect={() => {
                               setNewTransactionMemberId(null)
                               setNewTransactionMemberName('')
+                              setAddTxnPopoverOpen(false)
                             }}
                             className="cursor-pointer text-red-600"
                           >
@@ -2255,7 +2262,7 @@ export default function FinanceClient({
           <div className="space-y-4">
             <div>
               <Label htmlFor="charge-member">Member *</Label>
-              <Popover>
+              <Popover open={chargeMemberPopoverOpen} onOpenChange={setChargeMemberPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -2285,6 +2292,7 @@ export default function FinanceClient({
                               setChargeMemberId(member.id)
                               setChargeMemberName(member.name)
                               setChargeMemberQuery('')
+                              setChargeMemberPopoverOpen(false)
                             }}
                             className="cursor-pointer"
                           >

@@ -174,6 +174,15 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         
         if (lineAmounts.length > 0) {
           // This line has amounts - it's the last line of this transaction
+          // Check for DR marker to identify debits (before we remove it)
+          const hasDRMarker = /\bDR\b/i.test(nextLine)
+          const hasCRMarker = /\bCR\b/i.test(nextLine)
+          
+          // Mark amounts as debit if DR marker present
+          if (hasDRMarker && !hasCRMarker) {
+            lineAmounts.forEach(amt => { amt.isNegative = true })
+          }
+          
           amounts = lineAmounts
           
           // Extract description text (remove amounts and CR/DR)

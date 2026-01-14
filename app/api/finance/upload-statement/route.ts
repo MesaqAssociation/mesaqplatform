@@ -320,17 +320,19 @@ export async function POST(req: NextRequest) {
         let category = isDonationAccount ? 'Donation' : 'Event Payment'
 
         // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY - regardless of member match)
-        // Check description only for keywords (case-insensitive substring match)
+        // Check both name and description for keywords (case-insensitive substring match)
         let keywordMatch: { keyword: string, paymentType: string } | null = null
         if (!isDonationAccount) {
+          const nameLower = (txn.name || '').toLowerCase()
           const descLower = (txn.description || '').toLowerCase()
+          const combinedText = nameLower + ' ' + descLower
 
-          // Find keyword anywhere in description (substring match)
-          keywordMatch = keywords.find(kw => descLower.includes(kw.keyword)) || null
+          // Find keyword anywhere in name or description (substring match)
+          keywordMatch = keywords.find(kw => combinedText.includes(kw.keyword)) || null
 
           if (keywordMatch) {
             category = keywordMatch.paymentType
-            console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in description → ${keywordMatch.paymentType}`)
+            console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in name/description → ${keywordMatch.paymentType}`)
           }
         }
 
