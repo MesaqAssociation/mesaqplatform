@@ -69,13 +69,15 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     accountNumber = accountMatch[1].replace(/[\s-]/g, '')
   }
 
-  // Extract statement period
-  const periodMatch = text.match(/(\d{1,2}[\s\/-]\w{3}[\s\/-]\d{2,4})\s+to\s+(\d{1,2}[\s\/-]\w{3}[\s\/-]\d{2,4})/i)
+  // Extract statement period - look for "Statement Period X - Y" or "X to Y" format
+  // Handle variations: "Statement\nPeriod", "Statement Period:", spaces, dashes
+  const periodMatch = text.match(/Statement[\s\n]*Period[\s:\n]*(\d{1,2}\s*\w{3}\s*\d{2,4})\s*(?:to|-)\s*(\d{1,2}\s*\w{3}\s*\d{2,4})/i)
   if (periodMatch) {
     statementPeriod = {
-      from: parseAUDate(periodMatch[1]),
-      to: parseAUDate(periodMatch[2]),
+      from: parseAUDate(periodMatch[1].replace(/\s+/g, ' ').trim()),
+      to: parseAUDate(periodMatch[2].replace(/\s+/g, ' ').trim()),
     }
+    console.log(`📅 Extracted statement period from header: ${statementPeriod.from} to ${statementPeriod.to}`)
   }
 
   // Extract opening balance
@@ -210,24 +212,38 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         continue
       }
       
-      // Parse amounts: typically [transaction_amount, balance]
+      // Parse amounts: typically [transaction_amount, balance] or [debit, credit, balance]
       let debit: number | undefined
       let credit: number | undefined
       let balance: number | undefined
       
       if (amounts.length === 1) {
-        // Only balance (unusual, but handle it)
+        // Only one amount - likely just the balance
         balance = amounts[0].value
-        credit = amounts[0].value // Assume credit if only one amount
+        // Don't assume credit, let balance-based detection handle it
       } else if (amounts.length >= 2) {
-        // Standard format: transaction amount + balance
+        // Standard format: transaction amount + balance OR debit + credit + balance
         const txnAmount = amounts[0]
         balance = amounts[amounts.length - 1].value
         
-        // Determine if debit or credit based on context
-        // In CommBank statements, credits are positive, debits would be negative
-        if (txnAmount.isNegative) {
+        // Determine if debit or credit:
+        // 1. Check if marked as negative (has - sign or DR marker)
+        // 2. Check for common debit transaction name patterns
+        const nameLower = transactionName.toLowerCase()
+        const isDebitName = nameLower.includes('payment') || 
+                           nameLower.includes('transfer out') ||
+                           nameLower.includes('withdrawal') ||
+                           nameLower.includes('eftpos') ||
+                           nameLower.includes('direct debit') ||
+                           nameLower.includes('bpay') ||
+                           nameLower.includes('fee') ||
+                           nameLower.includes('atm') ||
+                           nameLower.includes('osko') ||
+                           nameLower.includes('pay anyone')
+        
+        if (txnAmount.isNegative || isDebitName) {
           debit = txnAmount.value
+          console.log(`   Detected as DEBIT: ${isDebitName ? 'by name pattern' : 'by marker'}`)
         } else {
           credit = txnAmount.value
         }

@@ -334,18 +334,27 @@ export async function POST(req: NextRequest) {
             }
 
             // SMART CLASSIFICATION LOGIC
-            // Default: Special Payment
-            let category = 'Special Payment'
+            // Default: Special Payment for credits, Expense for debits
+            let category = txnType === 'debit' ? 'Expense' : 'Special Payment'
             
             // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY)
-            const descLower = (txn.description || '').toLowerCase()
-            const keywordMatch = keywords.find(kw => descLower.includes(kw.keyword))
+            const textLower = ((txn.name || '') + ' ' + (txn.description || '')).toLowerCase()
+            const keywordMatch = keywords.find(kw => textLower.includes(kw.keyword))
             
             if (keywordMatch) {
               category = keywordMatch.paymentType
-              console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in description → ${keywordMatch.paymentType}`)
+              console.log(`✓ KEYWORD MATCH: "${keywordMatch.keyword}" found in text → ${keywordMatch.paymentType}`)
+            } else if (txnType === 'debit') {
+              // 2. If debit and no keyword match, check for cheque patterns
+              if (textLower.includes('cheque') || textLower.includes('check') || textLower.includes('chq')) {
+                category = 'Cheques'
+                console.log(`✓ DEBIT CATEGORY: "Cheques" detected`)
+              } else {
+                category = 'Expense'
+                console.log(`✓ DEBIT CATEGORY: "Expense" (default)`)
+              }
             } else {
-              // 2. If no keyword match, check if amount matches membership fee
+              // 3. For credits: If no keyword match, check if amount matches membership fee
               const paymentAmount = Math.abs(amount)
               const isMultiple = paymentAmount % monthlyFee === 0 && paymentAmount > 0
               if (isMultiple) {
