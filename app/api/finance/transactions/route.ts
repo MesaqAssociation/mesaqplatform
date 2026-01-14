@@ -524,7 +524,7 @@ export async function DELETE(req: NextRequest) {
 
     // Get transaction details before deletion (for balance recalculation)
     const { rows: txnRows } = await pool.query(
-      'SELECT account_id, amount, transaction_type, matched_member_id FROM transactions WHERE id = $1',
+      'SELECT account_id, amount, transaction_type, matched_member_id, category FROM transactions WHERE id = $1',
       [transactionId]
     )
 
@@ -546,25 +546,36 @@ export async function DELETE(req: NextRequest) {
     // Delete the transaction
     await pool.query('DELETE FROM transactions WHERE id = $1', [transactionId])
 
-    // Update account balance
-    // Reverse the transaction's effect on balance
-    const balanceAdjustment = transaction.transaction_type === 'credit' 
-      ? -Math.abs(transaction.amount) 
-      : Math.abs(transaction.amount)
+    // Update account balance (but NOT for Charges - they don't affect bank balance)
+    let newBalance = null
+    if (transaction.category !== 'Charges') {
+      // Reverse the transaction's effect on balance
+      const balanceAdjustment = transaction.transaction_type === 'credit' 
+        ? -Math.abs(transaction.amount) 
+        : Math.abs(transaction.amount)
 
-    const { rows: accountRows } = await pool.query(
-      `UPDATE financial_accounts 
-       SET current_balance = current_balance + $1, updated_at = NOW()
-       WHERE id = $2
-       RETURNING current_balance`,
-      [balanceAdjustment, transaction.account_id]
-    )
+      const { rows: accountRows } = await pool.query(
+        `UPDATE financial_accounts 
+         SET current_balance = current_balance + $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING current_balance`,
+        [balanceAdjustment, transaction.account_id]
+      )
+      newBalance = accountRows[0]?.current_balance
+    } else {
+      // For Charges, just get current balance without modifying it
+      const { rows: accountRows } = await pool.query(
+        'SELECT current_balance FROM financial_accounts WHERE id = $1',
+        [transaction.account_id]
+      )
+      newBalance = accountRows[0]?.current_balance
+    }
 
     console.log(`Transaction ${transactionId} deleted successfully`)
 
     return NextResponse.json({ 
       success: true,
-      newBalance: accountRows[0]?.current_balance
+      newBalance
     }, { headers: corsHeaders })
   } catch (err: any) {
     console.error('Delete transaction error:', err)

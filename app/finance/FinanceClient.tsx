@@ -1291,22 +1291,12 @@ export default function FinanceClient({
       {/* Actions */}
       <div className="flex flex-wrap gap-2 items-center">
         {/* Primary actions - Add/Upload */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button disabled={loading}>
-              <IconPlus className="mr-2 size-4" />
-              Add Transaction
-              <IconChevronDown className="ml-2 size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setShowAddTransactionDialog(true)}>
-              Add Transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button variant="outline" disabled={loading} onClick={() => setShowAddTransactionDialog(true)}>
+          <IconPlus className="mr-2 size-4" />
+          Add Transaction
+        </Button>
         <label htmlFor="statement-upload">
-          <Button asChild disabled={uploading}>
+          <Button variant="outline" asChild disabled={uploading}>
             <span>
               <IconUpload className="mr-2 size-4" />
               {uploading ? 'Uploading...' : 'Upload Statement'}
@@ -1330,7 +1320,7 @@ export default function FinanceClient({
         </Button>
         <Button variant="outline" onClick={() => setShowBankAccountDialog(true)}>
           <IconBuildingBank className="mr-2 size-4" />
-          Bank Account
+          Edit Bank Account
         </Button>
         
         {/* Destructive - at the end */}
@@ -1586,9 +1576,9 @@ export default function FinanceClient({
                         // Charges get black/neutral text with no +/-
                         txn.category === 'Charges'
                           ? 'text-foreground'
-                        // Mark membership payments under the fee in red
+                        // Mark membership payments under the fee in orange
                           : txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
-                          ? 'text-red-600 dark:text-red-400'
+                          ? 'text-orange-600 dark:text-orange-400'
                           : txn.transaction_type === 'credit' 
                           ? 'text-green-600 dark:text-green-400' 
                           : txn.transaction_type === 'debit'
