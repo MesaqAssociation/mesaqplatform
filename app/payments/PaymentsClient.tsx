@@ -223,8 +223,18 @@ export default function PaymentsClient({ transactions }: { transactions: Transac
           {selectedTransaction && (
             <div className="space-y-4">
               <div className="text-center py-4">
-                <p className={`text-3xl font-bold ${selectedTransaction.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                  {selectedTransaction.transaction_type === 'credit' ? '+' : '-'}${Math.abs(Number(selectedTransaction.amount) || 0).toFixed(2)}
+                <p
+                  className={`text-3xl font-bold ${
+                    selectedTransaction.category === 'Charges'
+                      ? 'text-foreground'
+                      : selectedTransaction.transaction_type === 'credit'
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {selectedTransaction.category === 'Charges'
+                    ? `$${Math.abs(Number(selectedTransaction.amount) || 0).toFixed(2)}`
+                    : `${selectedTransaction.transaction_type === 'credit' ? '+' : '-'}$${Math.abs(Number(selectedTransaction.amount) || 0).toFixed(2)}`}
                 </p>
               </div>
               
@@ -257,8 +267,20 @@ export default function PaymentsClient({ transactions }: { transactions: Transac
                 
                 <div className="flex justify-between py-2">
                   <span className="text-muted-foreground">Type</span>
-                  <span className={`font-medium ${selectedTransaction.transaction_type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                    {selectedTransaction.transaction_type === 'credit' ? 'Credit (Payment)' : 'Debit'}
+                  <span
+                    className={`font-medium ${
+                      selectedTransaction.category === 'Charges'
+                        ? 'text-foreground'
+                        : selectedTransaction.transaction_type === 'credit'
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {selectedTransaction.category === 'Charges'
+                      ? 'Charge'
+                      : selectedTransaction.transaction_type === 'credit'
+                      ? 'Credit (Payment)'
+                      : 'Debit'}
                   </span>
                 </div>
               </div>
