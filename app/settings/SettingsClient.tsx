@@ -56,7 +56,7 @@ export default function SettingsClient({
             <div className="border rounded-lg p-6 shadow-md">
               <h2 className="text-lg font-medium mb-4">Payment Keywords</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Manage keywords for automatic payment classification. Payments are categorized as: Membership Payment, Event Payment, or Donation (only if a donation keyword is found in description).
+                Manage keywords for automatic payment classification. Payments are categorized as: Membership Payment, Special Payment, or Donation (only if a donation keyword is found in description).
               </p>
               <PaymentKeywords />
             </div>

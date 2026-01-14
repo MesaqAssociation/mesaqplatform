@@ -316,8 +316,8 @@ export async function POST(req: NextRequest) {
         }
 
         // SMART CLASSIFICATION LOGIC
-        // Default: Event Payment (instead of Special Payment)
-        let category = isDonationAccount ? 'Donation' : 'Event Payment'
+        // Default: Special Payment
+        let category = isDonationAccount ? 'Donation' : 'Special Payment'
 
         // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY - regardless of member match)
         // Check both name and description for keywords (case-insensitive substring match)
@@ -384,22 +384,38 @@ export async function POST(req: NextRequest) {
                 category = 'Membership Payment'
                 console.log(`✓ Advance payment (multiple of fee) → Membership Payment`)
               } else {
-                category = 'Event Payment'
-                console.log(`✗ Payment doesn't match pattern → Event Payment`)
+                category = 'Special Payment'
+                console.log(`✗ Payment doesn't match pattern → Special Payment`)
               }
             } catch (balanceErr) {
               console.error('Failed to calculate member balance:', balanceErr)
               // Fallback: if multiple of fee, assume membership
-              category = isMultiple ? 'Membership Payment' : 'Event Payment'
+              category = isMultiple ? 'Membership Payment' : 'Special Payment'
             }
           } else {
             // Not a multiple of monthly fee
-            category = 'Event Payment'
-            console.log(`✗ Not a multiple of $${monthlyFee} → Event Payment`)
+            category = 'Special Payment'
+            console.log(`✗ Not a multiple of $${monthlyFee} → Special Payment`)
           }
         } else if (!keywordMatch && !isDonationAccount) {
           // No keyword match and no member match
-          console.log(`✗ No keyword or member match → Event Payment`)
+          console.log(`✗ No keyword or member match → Special Payment`)
+        }
+
+        // For DEBIT transactions (money going out), categorize based on transaction name
+        if (txnType === 'debit') {
+          const nameLower = (txn.name || '').toLowerCase()
+          const descLower = (txn.description || '').toLowerCase()
+          const combinedText = nameLower + ' ' + descLower
+          
+          // Check for cheques
+          if (combinedText.includes('cheque') || combinedText.includes('check') || /chq\s*\d+/i.test(combinedText)) {
+            category = 'Cheques'
+            console.log(`✓ Debit categorized as Cheques`)
+          } else {
+            category = 'Expense'
+            console.log(`✓ Debit categorized as Expense`)
+          }
         }
 
         const { rows: inserted } = await pool.query(

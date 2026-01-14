@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
+import { IconUsers, IconCash, IconCalendarEvent, IconArrowUp, IconArrowDown, IconArrowRight, IconAlertCircle, IconChevronDown, IconChevronUp } from '@tabler/icons-react'
 import Link from 'next/link'
 import { showToast } from '@/lib/toast'
 import { formatCurrency } from '@/lib/utils'
@@ -49,12 +49,24 @@ type UnpaidBalance = {
   current_balance: number
 }
 
+type StatementSummary = {
+  account_id: string
+  statement_date_from: string
+  statement_date_to: string
+  closing_balance: number
+  total_credits: number
+  total_debits: number
+  credit_breakdown: Array<{ category: string; total: number }> | null
+  debit_breakdown: Array<{ category: string; total: number }> | null
+}
+
 type Props = {
   memberStats: MemberStats
   recentTransactions: Transaction[]
   upcomingEvents: Event[]
   accounts: Account[]
   unpaidBalances: UnpaidBalance[]
+  statementSummaries: StatementSummary[]
 }
 
 type ReviewPayment = {
@@ -70,15 +82,28 @@ type ReviewPayment = {
   account_name: string
 }
 
-export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts, unpaidBalances }: Props) {
+type ReviewExpense = {
+  id: string
+  transaction_date: string
+  transaction_name: string
+  description: string
+  amount: number
+  category: string
+  account_name: string
+}
+
+export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts, unpaidBalances, statementSummaries }: Props) {
   const { t } = useI18n()
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
   const [reviewPayments, setReviewPayments] = useState<ReviewPayment[]>([])
+  const [reviewExpenses, setReviewExpenses] = useState<ReviewExpense[]>([])
   const [loadingReviewPayments, setLoadingReviewPayments] = useState(true)
   const [selectedReviewPayment, setSelectedReviewPayment] = useState<ReviewPayment | null>(null)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
   const [updatingCategory, setUpdatingCategory] = useState(false)
+  const [showDebitsBreakdown, setShowDebitsBreakdown] = useState(false)
+  const [showCreditsBreakdown, setShowCreditsBreakdown] = useState(false)
 
   useEffect(() => {
     // Filter transactions by selected account and limit to 3
@@ -91,13 +116,14 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
   }, [selectedAccountId, recentTransactions])
 
   useEffect(() => {
-    // Load payments needing review
+    // Load payments and expenses needing review
     const loadReviewPayments = async () => {
       try {
         const res = await fetch('/api/finance/review-payments')
         if (res.ok) {
           const data = await res.json()
           setReviewPayments(data.payments || [])
+          setReviewExpenses(data.expenses || [])
         }
       } catch (err) {
         console.error('Failed to load review payments:', err)
@@ -224,14 +250,14 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
           </div>
         </div>
 
-        {/* Recent Transactions Card with Account Switcher */}
+        {/* Summary Card with Account Switcher */}
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-3 rounded-lg">
                 <IconCash className="size-6 text-primary" />
               </div>
-              <h2 className="text-lg font-semibold">{t("recentTransactions")}</h2>
+              <h2 className="text-lg font-semibold">Summary</h2>
             </div>
           </div>
 
@@ -241,66 +267,132 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
               {accounts.map((acc) => (
                 <button
                   key={acc.id}
-                  onClick={() => setSelectedAccountId(acc.id)}
+                  onClick={() => {
+                    setSelectedAccountId(acc.id)
+                    setShowDebitsBreakdown(false)
+                    setShowCreditsBreakdown(false)
+                  }}
                   className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
                     selectedAccountId === acc.id
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted hover:bg-muted/80'
                   }`}
                 >
-                  {acc.account_name}
+                  {acc.account_name} {acc.account_number ? `(${acc.account_number.slice(-4)})` : ''}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Current Balance */}
-          {selectedAccountId && accounts.find(a => a.id === selectedAccountId) && (
-            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
-              <p className="text-lg font-bold">
-                {formatCurrency(accounts.find(a => a.id === selectedAccountId)!.current_balance)}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {accountTransactions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("noTransactions")}</p>
-            ) : (
-              <>
-                {accountTransactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {tx.transaction_type === 'debit' || tx.amount < 0 ? (
-                        <IconArrowDown className="size-4 text-red-500 flex-shrink-0" />
-                      ) : (
-                        <IconArrowUp className="size-4 text-green-500 flex-shrink-0" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{tx.transaction_name}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(tx.transaction_date)}</p>
-                      </div>
-                    </div>
-                    <div className="text-sm font-semibold ml-2 flex-shrink-0">
-                      {tx.transaction_type === 'debit' || tx.amount < 0 ? (
-                        <span className="text-red-500">-{formatCurrency(tx.amount)}</span>
-                      ) : (
-                        <span className="text-green-500">+{formatCurrency(tx.amount)}</span>
-                      )}
-                    </div>
+          {/* Statement Summary */}
+          {(() => {
+            const summary = statementSummaries.find(s => s.account_id === selectedAccountId)
+            const account = accounts.find(a => a.id === selectedAccountId)
+            
+            if (!summary && account) {
+              // No statement yet, show simple balance
+              return (
+                <div className="space-y-3">
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+                    <p className="text-lg font-bold">{formatCurrency(account.current_balance)}</p>
                   </div>
-                ))}
+                  <p className="text-xs text-muted-foreground text-center">Upload a bank statement to see detailed summary</p>
+                </div>
+              )
+            }
+            
+            if (!summary) return null
+            
+            const periodFrom = new Date(summary.statement_date_from)
+            const periodTo = new Date(summary.statement_date_to)
+            const periodLabel = `${periodFrom.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} - ${periodTo.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
+            const openingBalance = Number(summary.closing_balance) - Number(summary.total_credits) + Number(summary.total_debits)
+            
+            return (
+              <div className="space-y-3">
+                {/* Period Header */}
+                <div className="text-center py-2 bg-muted/30 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Statement Period</p>
+                  <p className="text-sm font-semibold">{periodLabel}</p>
+                </div>
+
+                {/* Opening Balance */}
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">Opening Balance</span>
+                  <span className="text-sm font-semibold">{formatCurrency(openingBalance)}</span>
+                </div>
+
+                {/* Debits (expandable) */}
+                <div>
+                  <button 
+                    onClick={() => setShowDebitsBreakdown(!showDebitsBreakdown)}
+                    className="flex justify-between items-center w-full py-2 hover:bg-muted/30 rounded transition-colors"
+                  >
+                    <span className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <IconArrowDown className="size-3" />
+                      Debits
+                    </span>
+                    <span className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                      -{formatCurrency(summary.total_debits)}
+                      {showDebitsBreakdown ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
+                    </span>
+                  </button>
+                  {showDebitsBreakdown && summary.debit_breakdown && (
+                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-red-200 pl-3">
+                      {summary.debit_breakdown.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">{item.category || 'Uncategorized'}</span>
+                          <span className="text-red-600 dark:text-red-400">{formatCurrency(item.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Credits (expandable) */}
+                <div>
+                  <button 
+                    onClick={() => setShowCreditsBreakdown(!showCreditsBreakdown)}
+                    className="flex justify-between items-center w-full py-2 hover:bg-muted/30 rounded transition-colors"
+                  >
+                    <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <IconArrowUp className="size-3" />
+                      Credits
+                    </span>
+                    <span className="text-sm font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
+                      +{formatCurrency(summary.total_credits)}
+                      {showCreditsBreakdown ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
+                    </span>
+                  </button>
+                  {showCreditsBreakdown && summary.credit_breakdown && (
+                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-green-200 pl-3">
+                      {summary.credit_breakdown.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">{item.category || 'Uncategorized'}</span>
+                          <span className="text-green-600 dark:text-green-400">{formatCurrency(item.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Closing Balance */}
+                <div className="flex justify-between items-center py-2 border-t border-border">
+                  <span className="text-sm font-medium">Closing Balance</span>
+                  <span className="text-lg font-bold">{formatCurrency(summary.closing_balance)}</span>
+                </div>
+
                 <Link 
                   href="/finance" 
                   className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground hover:text-primary transition-colors"
                 >
-                  <span>See all</span>
+                  <span>View all transactions</span>
                   <IconArrowRight className="size-3" />
                 </Link>
-              </>
-            )}
-          </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Upcoming Events Card */}
@@ -375,64 +467,50 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
       )}
 
-      {!loadingReviewPayments && reviewPayments.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-yellow-500/10 p-3 rounded-lg">
-                <IconAlertCircle className="size-6 text-yellow-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Payments Need Review</h2>
-                <p className="text-xs text-muted-foreground">Special payments that may need to be reclassified</p>
+      {/* NEED ACTION Section */}
+      {!loadingReviewPayments && (reviewPayments.length > 0 || reviewExpenses.length > 0) && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+            <IconAlertCircle className="size-5" />
+            NEED ACTION
+          </h2>
+          
+          {/* Review Payments Row */}
+          {reviewPayments.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {reviewPayments.length} payment{reviewPayments.length !== 1 ? 's' : ''} need review
+                  </span>
+                </div>
+                <Link 
+                  href="/review-payments"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Review All Payments
+                </Link>
               </div>
             </div>
-            <Link href="/review-payments" className="text-sm text-primary hover:underline">
-              Review All Payments
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {reviewPayments.slice(0, 10).map((payment) => (
-              <button 
-                key={payment.id}
-                onClick={() => {
-                  setSelectedReviewPayment(payment)
-                  setShowReviewDialog(true)
-                }}
-                className="flex items-center justify-between py-3 px-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left w-full"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{payment.member_name}</p>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                      Special Payment
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatDate(payment.transaction_date)} • {payment.transaction_name}
-                  </p>
-                  {payment.description && (
-                    <p className="text-xs text-muted-foreground mt-1 truncate max-w-md">
-                      {payment.description}
-                    </p>
-                  )}
+          )}
+
+          {/* Review Expenses Row */}
+          {reviewExpenses.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {reviewExpenses.length} expense{reviewExpenses.length !== 1 ? 's' : ''} need categorization
+                  </span>
                 </div>
-                <div className="text-sm font-bold ml-4 flex-shrink-0 text-green-500">
-                  +{formatCurrency(payment.amount)}
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {reviewPayments.length > 10 && (
-            <Link 
-              href="/review-payments" 
-              className="flex items-center justify-center gap-1 py-2 mt-3 text-xs text-muted-foreground hover:text-primary transition-colors"
-            >
-              <span>See all {reviewPayments.length} payments</span>
-              <IconArrowRight className="size-3" />
-            </Link>
+                <Link 
+                  href="/finance"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Review Expenses
+                </Link>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -482,6 +560,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                   <SelectContent>
                     <SelectItem value="Special Payment">Special Payment</SelectItem>
                     <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                    <SelectItem value="Donation">Donation</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">

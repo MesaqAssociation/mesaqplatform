@@ -228,22 +228,30 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                 </div>
                 <div className="flex gap-2 mt-4">
                   {doc.file_url ? (
-                    <a
-                      href={doc.file_url}
-                      download={doc.file_name}
-                      target="_blank"
-                      rel="noreferrer"
+                    <Button
+                      size="sm"
+                      variant="outline"
                       className="flex-1"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(doc.file_url)
+                          const blob = await response.blob()
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = doc.file_name
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
+                        } catch (err) {
+                          showToast('Failed to download file', 'error')
+                        }
+                      }}
                     >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                      >
-                        <IconDownload className="mr-2 size-4" />
-                        Download
-                      </Button>
-                    </a>
+                      <IconDownload className="mr-2 size-4" />
+                      Download
+                    </Button>
                   ) : (
                     <Button
                       size="sm"

@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Get all transactions with category = 'Special Payment' that need review
-    const { rows } = await pool.query(`
+    // Get all transactions with category = 'Special Payment' or 'Event Payment' that need review
+    const { rows: payments } = await pool.query(`
       SELECT 
         t.id,
         t.transaction_date,
@@ -39,14 +39,32 @@ export async function GET(req: NextRequest) {
       FROM transactions t
       LEFT JOIN users m ON t.matched_member_id = m.id
       LEFT JOIN financial_accounts fa ON t.account_id = fa.id
-      WHERE t.category = 'Special Payment'
+      WHERE t.category IN ('Special Payment', 'Event Payment')
         AND t.transaction_type = 'credit'
         AND t.matched_member_id IS NOT NULL
       ORDER BY t.transaction_date DESC
       LIMIT 50
     `)
 
-    return NextResponse.json({ payments: rows })
+    // Get all uncategorized debit transactions (expenses) that need review
+    const { rows: expenses } = await pool.query(`
+      SELECT 
+        t.id,
+        t.transaction_date,
+        t.transaction_name,
+        t.description,
+        t.amount,
+        t.category,
+        fa.account_name
+      FROM transactions t
+      LEFT JOIN financial_accounts fa ON t.account_id = fa.id
+      WHERE t.transaction_type = 'debit'
+        AND (t.category IS NULL OR t.category = '' OR t.category = 'Expense')
+      ORDER BY t.transaction_date DESC
+      LIMIT 50
+    `)
+
+    return NextResponse.json({ payments, expenses })
   } catch (err: any) {
     console.error('Get review payments error:', err)
     return NextResponse.json({ error: 'Failed to fetch payments for review' }, { status: 500 })

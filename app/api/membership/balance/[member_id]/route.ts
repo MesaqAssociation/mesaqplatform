@@ -126,7 +126,7 @@ export async function GET(
       status = 'behind'
     }
 
-    // Get all EVENT PAYMENT transactions (category = 'Event Payment' or 'Special Payment' but NOT 'Donation')
+    // Get all SPECIAL PAYMENT transactions (category = 'Special Payment' or legacy 'Event Payment' but NOT 'Donation')
     const { rows: eventTxns } = await pool.query(`
       SELECT 
         t.id,
@@ -137,12 +137,12 @@ export async function GET(
         t.category
       FROM transactions t
       WHERE t.matched_member_id = $1
-        AND t.category IN ('Event Payment', 'Special Payment')
+        AND t.category IN ('Special Payment', 'Event Payment')
         AND t.transaction_type = 'credit'
       ORDER BY t.transaction_date DESC
     `, [member.id])
 
-    const totalEventPayments = eventTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
+    const totalSpecialPayments = eventTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
 
     // Get all DONATION transactions
     const { rows: donationTxns } = await pool.query(`
@@ -202,7 +202,7 @@ export async function GET(
         charges: chargeDetails
       },
       eventPaymentBalance: {
-        totalEventPayments,
+        totalSpecialPayments,
         transactions: eventTxns
       },
       donationBalance: {
@@ -211,7 +211,7 @@ export async function GET(
       },
       // Keep for backwards compatibility
       specialPaymentBalance: {
-        totalSpecialPayments: totalEventPayments + totalDonations,
+        totalSpecialPaymentsAndDonations: totalSpecialPayments + totalDonations,
         transactions: [...eventTxns, ...donationTxns]
       }
     }, { headers: corsHeaders })

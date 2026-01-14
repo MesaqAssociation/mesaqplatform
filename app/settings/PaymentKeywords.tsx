@@ -11,7 +11,7 @@ import { showToast } from '@/lib/toast'
 type Keyword = {
   id: string
   keyword: string
-  payment_type: 'Event Payment' | 'Donation' | 'Membership Payment'
+  payment_type: 'Special Payment' | 'Donation' | 'Membership Payment'
   created_at: string
   created_by_name: string | null
 }
@@ -20,7 +20,7 @@ export default function PaymentKeywords() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [loading, setLoading] = useState(true)
   const [newKeyword, setNewKeyword] = useState('')
-  const [newPaymentType, setNewPaymentType] = useState<'Event Payment' | 'Donation' | 'Membership Payment'>('Event Payment')
+  const [newPaymentType, setNewPaymentType] = useState<'Special Payment' | 'Donation' | 'Membership Payment'>('Special Payment')
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function PaymentKeywords() {
         showToast('Keyword added successfully', 'success')
         setKeywords([...keywords, data.keyword])
         setNewKeyword('')
-        setNewPaymentType('Event Payment')
+        setNewPaymentType('Special Payment')
       } else {
         showToast(data.error || 'Failed to add keyword', 'error')
       }
@@ -108,7 +108,7 @@ export default function PaymentKeywords() {
         <p className="text-xs text-blue-700 dark:text-blue-200 mt-2">
           • <strong>Membership Payment:</strong> Counted toward membership fees (membership, monthly, dues)
           <br />
-          • <strong>Event Payment:</strong> Payments for events, meals, activities (not donations)
+          • <strong>Special Payment:</strong> Payments for events, meals, activities (not donations)
           <br />
           • <strong>Donation:</strong> Only used if description contains a donation keyword
         </p>
@@ -128,13 +128,13 @@ export default function PaymentKeywords() {
         </div>
         <div className="flex-1">
           <Label htmlFor="payment-type">Payment Type</Label>
-          <Select value={newPaymentType} onValueChange={(val) => setNewPaymentType(val as 'Event Payment' | 'Donation' | 'Membership Payment')}>
+          <Select value={newPaymentType} onValueChange={(val) => setNewPaymentType(val as 'Special Payment' | 'Donation' | 'Membership Payment')}>
             <SelectTrigger id="payment-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-              <SelectItem value="Event Payment">Event Payment</SelectItem>
+              <SelectItem value="Special Payment">Special Payment</SelectItem>
               <SelectItem value="Donation">Donation</SelectItem>
             </SelectContent>
           </Select>
@@ -163,7 +163,7 @@ export default function PaymentKeywords() {
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{kw.keyword}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    kw.payment_type === 'Event Payment' 
+                    kw.payment_type === 'Special Payment' || kw.payment_type === 'Event Payment' 
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : kw.payment_type === 'Donation'
                       ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'

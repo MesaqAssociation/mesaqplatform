@@ -54,6 +54,7 @@ export default async function DashboardPage() {
   let upcomingEvents: any[] = []
   let accounts: any[] = []
   let unpaidBalances: any[] = []
+  let statementSummaries: any[] = []
 
   try {
     // Get member stats: families (registered members) and total members (sum of household sizes)
@@ -95,7 +96,8 @@ export default async function DashboardPage() {
         transaction_name,
         description,
         amount,
-        transaction_type
+        transaction_type,
+        category
       FROM transactions
       ORDER BY transaction_date DESC, created_at DESC
       LIMIT 20
@@ -103,6 +105,64 @@ export default async function DashboardPage() {
     recentTransactions = rows
   } catch (error) {
     console.error('Error fetching transactions:', error)
+  }
+
+  try {
+    // Get latest statement summary per account
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (bs.account_id)
+        bs.account_id,
+        bs.statement_date_from,
+        bs.statement_date_to,
+        fa.current_balance as closing_balance,
+        (
+          SELECT COALESCE(SUM(ABS(t.amount)), 0)
+          FROM transactions t 
+          WHERE t.account_id = bs.account_id 
+            AND t.transaction_type = 'credit'
+            AND t.transaction_date >= bs.statement_date_from
+            AND t.transaction_date <= bs.statement_date_to
+        ) as total_credits,
+        (
+          SELECT COALESCE(SUM(ABS(t.amount)), 0)
+          FROM transactions t 
+          WHERE t.account_id = bs.account_id 
+            AND t.transaction_type = 'debit'
+            AND t.transaction_date >= bs.statement_date_from
+            AND t.transaction_date <= bs.statement_date_to
+        ) as total_debits,
+        (
+          SELECT json_agg(json_build_object('category', sub.category, 'total', sub.total))
+          FROM (
+            SELECT category, COALESCE(SUM(ABS(amount)), 0) as total
+            FROM transactions t
+            WHERE t.account_id = bs.account_id
+              AND t.transaction_type = 'credit'
+              AND t.transaction_date >= bs.statement_date_from
+              AND t.transaction_date <= bs.statement_date_to
+            GROUP BY category
+          ) sub
+        ) as credit_breakdown,
+        (
+          SELECT json_agg(json_build_object('category', sub.category, 'total', sub.total))
+          FROM (
+            SELECT category, COALESCE(SUM(ABS(amount)), 0) as total
+            FROM transactions t
+            WHERE t.account_id = bs.account_id
+              AND t.transaction_type = 'debit'
+              AND t.transaction_date >= bs.statement_date_from
+              AND t.transaction_date <= bs.statement_date_to
+            GROUP BY category
+          ) sub
+        ) as debit_breakdown
+      FROM bank_statements bs
+      JOIN financial_accounts fa ON fa.id = bs.account_id
+      WHERE bs.statement_date_from IS NOT NULL AND bs.statement_date_to IS NOT NULL
+      ORDER BY bs.account_id, bs.statement_date_to DESC
+    `)
+    statementSummaries = rows
+  } catch (error) {
+    console.error('Error fetching statement summaries:', error)
   }
 
   try {
@@ -152,6 +212,7 @@ export default async function DashboardPage() {
         upcomingEvents={upcomingEvents}
         accounts={accounts}
         unpaidBalances={unpaidBalances}
+        statementSummaries={statementSummaries}
       />
     </MainLayout>
   )

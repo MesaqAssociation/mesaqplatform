@@ -101,7 +101,7 @@ export default function FinanceClient({
   const [newTransactionDescription, setNewTransactionDescription] = useState('')
   const [newTransactionAmount, setNewTransactionAmount] = useState('')
   const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
-  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Event Payment' | 'Donation'>('Membership Payment')
+  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Special Payment' | 'Donation'>('Membership Payment')
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
@@ -552,14 +552,14 @@ export default function FinanceClient({
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
     // Normalize category to valid dropdown options
-    let category = txn.category?.trim() || 'Event Payment'
-    // Convert legacy 'Special Payment' to 'Event Payment'
-    if (category === 'Special Payment' || category === 'Special Payment (Legacy)') {
-      category = 'Event Payment'
+    let category = txn.category?.trim() || 'Special Payment'
+    // Convert legacy 'Event Payment' to 'Special Payment'
+    if (category === 'Event Payment') {
+      category = 'Special Payment'
     }
     // Only allow valid categories
-    if (!['Membership Payment', 'Event Payment', 'Donation', 'Charges'].includes(category)) {
-      category = 'Event Payment'
+    if (!['Membership Payment', 'Special Payment', 'Donation', 'Charges'].includes(category)) {
+      category = 'Special Payment'
     }
     setDialogCategory(category)
     setShowTransactionDialog(true)
@@ -1553,14 +1553,31 @@ export default function FinanceClient({
                           <div className="w-[150px] h-8 text-xs bg-background text-foreground border border-input rounded-md flex items-center justify-center">
                             Charges
                           </div>
+                        ) : txn.transaction_type === 'debit' ? (
+                          <Select 
+                            value={
+                              txn.category === 'Cheques' ? 'Cheques' :
+                              txn.category === 'Expense' ? 'Expense' :
+                              'Expense'
+                            }
+                            onValueChange={(value) => handleUpdateCategory(txn.id, value)}
+                          >
+                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input justify-center">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border-input">
+                              <SelectItem value="Expense" className="text-foreground cursor-pointer">Expense</SelectItem>
+                              <SelectItem value="Cheques" className="text-foreground cursor-pointer">Cheques</SelectItem>
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Select 
                             value={
                               // Normalize category to valid dropdown options
                               txn.category === 'Membership Payment' ? 'Membership Payment' :
                               txn.category === 'Donation' ? 'Donation' :
-                              txn.category === 'Event Payment' ? 'Event Payment' :
-                              'Event Payment' // Default fallback
+                              txn.category === 'Special Payment' || txn.category === 'Event Payment' ? 'Special Payment' :
+                              'Special Payment' // Default fallback
                             }
                             onValueChange={(value) => handleUpdateCategory(txn.id, value)}
                           >
@@ -1569,7 +1586,7 @@ export default function FinanceClient({
                             </SelectTrigger>
                             <SelectContent className="bg-background border-input">
                               <SelectItem value="Membership Payment" className="text-foreground cursor-pointer">Membership Payment</SelectItem>
-                              <SelectItem value="Event Payment" className="text-foreground cursor-pointer">Event Payment</SelectItem>
+                              <SelectItem value="Special Payment" className="text-foreground cursor-pointer">Special Payment</SelectItem>
                               <SelectItem value="Donation" className="text-foreground cursor-pointer">Donation</SelectItem>
                             </SelectContent>
                           </Select>
@@ -1682,7 +1699,7 @@ export default function FinanceClient({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                      <SelectItem value="Event Payment">Event Payment</SelectItem>
+                      <SelectItem value="Special Payment">Special Payment</SelectItem>
                       <SelectItem value="Donation">Donation</SelectItem>
                     </SelectContent>
                   </Select>
@@ -2100,7 +2117,7 @@ export default function FinanceClient({
 
           <div>
             <Label htmlFor="txn-category">Category *</Label>
-            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Event Payment' | 'Donation') => setNewTransactionCategory(value)}>
+            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Special Payment' | 'Donation') => setNewTransactionCategory(value)}>
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>

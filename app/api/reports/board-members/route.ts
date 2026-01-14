@@ -118,16 +118,16 @@ async function getMembershipPaymentsInRange(userId: string, startDate: string, e
     }
 }
 
-// Helper function to get total event payments (NOT donations) for a member in date range
-async function getEventPaymentsInRange(userId: string, startDate: string, endDate: string): Promise<number> {
+// Helper function to get total special payments (NOT donations) for a member in date range
+async function getSpecialPaymentsInRange(userId: string, startDate: string, endDate: string): Promise<number> {
     try {
-        // Get event payments - this is the "Special" category that excludes donations
-        // It includes 'Event Payment' and also legacy 'Special Payment' that aren't donations
+        // Get special payments - excludes donations
+        // Includes 'Special Payment' and legacy 'Event Payment'
         const { rows } = await pool.query(`
             SELECT COALESCE(SUM(t.amount), 0) as total
             FROM transactions t
             WHERE t.matched_member_id = $1
-              AND t.category IN ('Event Payment', 'Special Payment')
+              AND t.category IN ('Special Payment', 'Event Payment')
               AND t.category != 'Donation'
               AND t.transaction_type = 'credit'
               AND t.transaction_date >= $2::date
@@ -136,7 +136,7 @@ async function getEventPaymentsInRange(userId: string, startDate: string, endDat
 
         return parseFloat(rows[0]?.total || '0')
     } catch (err) {
-        console.error('Error getting event payments for user:', userId, err)
+        console.error('Error getting special payments for user:', userId, err)
         return 0
     }
 }
@@ -174,16 +174,16 @@ export async function GET(req: NextRequest) {
         const memberData = await Promise.all(
             members.map(async (member: any, index: number) => {
                 const membershipPayments = await getMembershipPaymentsInRange(member.id, startDate, endDate)
-                const eventPayments = await getEventPaymentsInRange(member.id, startDate, endDate)
+                const specialPayments = await getSpecialPaymentsInRange(member.id, startDate, endDate)
                 const currentBalance = await getMemberBalance(member.id)
-                const sum = membershipPayments + eventPayments
+                const sum = membershipPayments + specialPayments
                 
                 return {
                     rowNum: index + 1,
                     memberId: member.member_id || '-',
                     name: member.name || 'Unknown',
                     membershipPayments: membershipPayments.toFixed(2),
-                    eventPayments: eventPayments.toFixed(2),
+                    specialPayments: specialPayments.toFixed(2),
                     sum: sum.toFixed(2),
                     currentBalance: currentBalance.toFixed(2)
                 }
@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
 
         // Calculate totals
         const totalMembershipPayments = memberData.reduce((sum, m) => sum + parseFloat(m.membershipPayments), 0)
-        const totalEventPayments = memberData.reduce((sum, m) => sum + parseFloat(m.eventPayments), 0)
+        const totalSpecialPayments = memberData.reduce((sum, m) => sum + parseFloat(m.specialPayments), 0)
         const totalSum = memberData.reduce((sum, m) => sum + parseFloat(m.sum), 0)
         const totalBalance = memberData.reduce((sum, m) => sum + parseFloat(m.currentBalance), 0)
 
@@ -284,7 +284,7 @@ export async function GET(req: NextRequest) {
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
-                            text: `$${parseFloat(member.eventPayments).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
+                            text: `$${parseFloat(member.specialPayments).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
                             color: '2563EB',
                             size: 18,
                         })],
@@ -342,7 +342,7 @@ export async function GET(req: NextRequest) {
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
-                            text: `$${totalEventPayments.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
+                            text: `$${totalSpecialPayments.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
                             bold: true,
                             color: '2563EB',
                             size: 20,
@@ -465,7 +465,7 @@ export async function GET(req: NextRequest) {
                         children: [
                             new TextRun({ text: `Total Membership Payments: $${totalMembershipPayments.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: '16A34A' }),
                             new TextRun({ text: '   |   ', size: 22, color: '94A3B8' }),
-                            new TextRun({ text: `Total Event Payments: $${totalEventPayments.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: '2563EB' }),
+                            new TextRun({ text: `Total Special Payments: $${totalSpecialPayments.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: '2563EB' }),
                         ],
                         spacing: { after: 300 },
                     }),

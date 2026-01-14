@@ -334,8 +334,8 @@ export async function POST(req: NextRequest) {
             }
 
             // SMART CLASSIFICATION LOGIC
-            // Default: Event Payment (instead of Special Payment)
-            let category = 'Event Payment'
+            // Default: Special Payment
+            let category = 'Special Payment'
             
             // 1. FIRST: Check for payment keywords (HIGHEST PRIORITY)
             const descLower = (txn.description || '').toLowerCase()
