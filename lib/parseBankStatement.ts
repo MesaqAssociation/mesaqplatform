@@ -137,76 +137,104 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     
     if (dateMatch) {
       const dateStr = dateMatch[1]
-      const transactionName = dateMatch[2].trim()
+      let transactionName = dateMatch[2].trim()
       
       // Look ahead for description lines (until we find amounts or next date)
       let descriptionLines: string[] = []
       let j = i + 1
-      let amounts: { value: number; isNegative: boolean }[] = []
+      let amounts: { value: number; isNegative: boolean; isDebitFormat: boolean }[] = []
       
-      while (j < lines.length) {
-        const nextLine = lines[j].trim()
-        
-        // Stop if empty or next transaction
-        if (!nextLine || /^\d{1,2}\s+\w{3}/.test(nextLine)) {
-          break
-        }
-        
-        // Stop if we hit page markers or technical codes
-        if (nextLine.startsWith('Statement ') || 
-            nextLine.startsWith('Account Number') ||
-            nextLine.startsWith('4326.') ||
-            nextLine.startsWith('#*') ||
-            nextLine.match(/^Page \d+ of \d+/) ||
-            nextLine.match(/^\d+\.\d+\.\d+\.\d+/) ||  // Matches "17181.39880.2.3..."
-            nextLine.match(/^[A-Z0-9]{2,}\s+\d{4}\s+[A-Z]/)) {  // Matches "ZZ258R3 0303 SL..."
-          break
-        }
-        
-        // Check if this line has amounts (transaction complete)
-        // CommBank format for debits: "2,500.00 $" (amount followed by $)
-        // CommBank format for credits: "$40.00" ($ before amount)
+      // Helper function to extract amounts from text
+      const extractAmounts = (text: string): { value: number; isNegative: boolean; isDebitFormat: boolean }[] => {
         const amountPattern = /\$?([\d,]+\.\d{2})\s*\$?/g
-        const lineAmounts: { value: number; isNegative: boolean; isDebitFormat: boolean }[] = []
+        const found: { value: number; isNegative: boolean; isDebitFormat: boolean }[] = []
         let match
-        
-        while ((match = amountPattern.exec(nextLine)) !== null) {
+        while ((match = amountPattern.exec(text)) !== null) {
           const value = parseFloat(match[1].replace(/,/g, ''))
           const isNegative = match[0].startsWith('-')
-          // CommBank debit format: amount followed by $ (e.g., "2,500.00 $")
+          // CommBank debit format: amount followed by $ (e.g., "2,500.00$")
           const isDebitFormat = !match[0].startsWith('$') && match[0].includes('$')
-          lineAmounts.push({ value, isNegative, isDebitFormat })
+          found.push({ value, isNegative, isDebitFormat })
+        }
+        return found
+      }
+      
+      // FIRST: Check if the transaction name line itself contains amounts
+      // This happens for some transactions like cheques where everything is on one line
+      // e.g., "Chq 000078 presented DANDENONG PLAZA2,500.00$$51,062.83CR"
+      const txnNameAmounts = extractAmounts(transactionName)
+      if (txnNameAmounts.length >= 2) {
+        // Amounts found in transaction name - single line transaction
+        amounts = txnNameAmounts
+        
+        // Check for DR marker
+        const hasDRMarker = /\bDR\b/i.test(transactionName)
+        const hasCRMarker = /\bCR\b/i.test(transactionName)
+        if (hasDRMarker && !hasCRMarker) {
+          amounts.forEach(amt => { amt.isNegative = true })
         }
         
-        if (lineAmounts.length > 0) {
-          // This line has amounts - it's the last line of this transaction
-          // Check for DR marker to identify debits (before we remove it)
-          const hasDRMarker = /\bDR\b/i.test(nextLine)
-          const hasCRMarker = /\bCR\b/i.test(nextLine)
+        // Clean the transaction name by removing amounts and CR/DR
+        transactionName = transactionName
+          .replace(/\$?[\d,]+\.\d{2}\s*\$?/g, '') // Remove amounts
+          .replace(/\bCR\b|\bDR\b/gi, '') // Remove CR/DR
+          .trim()
+        
+        console.log(`   Single-line transaction detected: ${transactionName}`)
+      } else {
+        // Look for amounts in following lines
+        while (j < lines.length) {
+          const nextLine = lines[j].trim()
           
-          // Mark amounts as debit if DR marker present
-          if (hasDRMarker && !hasCRMarker) {
-            lineAmounts.forEach(amt => { amt.isNegative = true })
+          // Stop if empty or next transaction
+          if (!nextLine || /^\d{1,2}\s+\w{3}/.test(nextLine)) {
+            break
           }
           
-          amounts = lineAmounts
-          
-          // Extract description text (remove amounts and CR/DR)
-          let descText = nextLine
-            .replace(/\$?[\d,]+\.\d{2}/g, '') // Remove amounts
-            .replace(/\bCR\b|\bDR\b/gi, '') // Remove CR/DR
-            .trim()
-          
-          if (descText) {
-            descriptionLines.push(descText)
+          // Stop if we hit page markers or technical codes
+          if (nextLine.startsWith('Statement ') || 
+              nextLine.startsWith('Account Number') ||
+              nextLine.startsWith('4326.') ||
+              nextLine.startsWith('#*') ||
+              nextLine.match(/^Page \d+ of \d+/) ||
+              nextLine.match(/^\d+\.\d+\.\d+\.\d+/) ||  // Matches "17181.39880.2.3..."
+              nextLine.match(/^[A-Z0-9]{2,}\s+\d{4}\s+[A-Z]/)) {  // Matches "ZZ258R3 0303 SL..."
+            break
           }
           
-          j++
-          break
-        } else {
-          // No amounts yet, this is a description line
-          descriptionLines.push(nextLine)
-          j++
+          // Check if this line has amounts (transaction complete)
+          const lineAmounts = extractAmounts(nextLine)
+          
+          if (lineAmounts.length > 0) {
+            // This line has amounts - it's the last line of this transaction
+            // Check for DR marker to identify debits (before we remove it)
+            const hasDRMarker = /\bDR\b/i.test(nextLine)
+            const hasCRMarker = /\bCR\b/i.test(nextLine)
+            
+            // Mark amounts as debit if DR marker present
+            if (hasDRMarker && !hasCRMarker) {
+              lineAmounts.forEach(amt => { amt.isNegative = true })
+            }
+            
+            amounts = lineAmounts
+            
+            // Extract description text (remove amounts and CR/DR)
+            let descText = nextLine
+              .replace(/\$?[\d,]+\.\d{2}\s*\$?/g, '') // Remove amounts
+              .replace(/\bCR\b|\bDR\b/gi, '') // Remove CR/DR
+              .trim()
+            
+            if (descText) {
+              descriptionLines.push(descText)
+            }
+            
+            j++
+            break
+          } else {
+            // No amounts yet, this is a description line
+            descriptionLines.push(nextLine)
+            j++
+          }
         }
       }
       
