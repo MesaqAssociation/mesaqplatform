@@ -1475,6 +1475,11 @@ export default function FinanceClient({
                         </p>
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
+                        {txn.transaction_type === 'debit' ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                            N/A
+                          </span>
+                        ) : (
                         <Popover 
                           open={openPopoverId === txn.id} 
                           onOpenChange={(open) => {
@@ -1547,6 +1552,7 @@ export default function FinanceClient({
                             </Command>
                           </PopoverContent>
                         </Popover>
+                        )}
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         {txn.category === 'Charges' ? (
@@ -1554,22 +1560,9 @@ export default function FinanceClient({
                             Charges
                           </div>
                         ) : txn.transaction_type === 'debit' ? (
-                          <Select 
-                            value={
-                              txn.category === 'Cheques' ? 'Cheques' :
-                              txn.category === 'Expense' ? 'Expense' :
-                              'Expense'
-                            }
-                            onValueChange={(value) => handleUpdateCategory(txn.id, value)}
-                          >
-                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input justify-center">
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border-input">
-                              <SelectItem value="Expense" className="text-foreground cursor-pointer">Expense</SelectItem>
-                              <SelectItem value="Cheques" className="text-foreground cursor-pointer">Cheques</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="w-[150px] h-8 text-xs bg-muted text-muted-foreground border border-input rounded-md flex items-center justify-center">
+                            N/A
+                          </div>
                         ) : (
                           <Select 
                             value={
@@ -1689,6 +1682,10 @@ export default function FinanceClient({
                   <div className="w-48 h-10 mt-1 bg-background text-foreground border border-input rounded-md flex items-center justify-center">
                     Charges
                   </div>
+                ) : selectedTransaction?.transaction_type === 'debit' ? (
+                  <div className="w-48 h-10 mt-1 bg-muted text-muted-foreground border border-input rounded-md flex items-center justify-center">
+                    N/A
+                  </div>
                 ) : (
                   <Select 
                     value={dialogCategory} 
@@ -1706,6 +1703,8 @@ export default function FinanceClient({
                 )}
               </div>
 
+              {/* Only show Matched Member for credits, not debits */}
+              {selectedTransaction?.transaction_type !== 'debit' && (
               <div>
                 <Label className="text-muted-foreground text-xs">Matched Member</Label>
                 <div className="mt-1">
@@ -1763,6 +1762,7 @@ export default function FinanceClient({
                   </Popover>
                 </div>
               </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

@@ -133,7 +133,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
     // Check if this line starts with a date (DD Mon or DD Mon YYYY)
     // Note: There may be no space between month and transaction name
     // Capture the full date including year if present
-    const dateMatch = line.match(/^(\d{1,2}\s+\w{3}(?:\s+\d{2,4})?)\s*(.+)/)
+    // IMPORTANT: Only match valid month abbreviations to avoid false positives like "07 membership"
+    const dateMatch = line.match(/^(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:\s+\d{2,4})?)\s*(.+)/i)
     
     if (dateMatch) {
       const dateStr = dateMatch[1]
@@ -177,7 +178,8 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         // Clean the transaction name by removing amounts and CR/DR
         transactionName = transactionName
           .replace(/\$?[\d,]+\.\d{2}\s*\$?/g, '') // Remove amounts
-          .replace(/\bCR\b|\bDR\b/gi, '') // Remove CR/DR
+          .replace(/\s*(?:CR|DR)\s*$/gi, '') // Remove CR/DR at end
+          .replace(/\bCR\b|\bDR\b/gi, '') // Remove standalone CR/DR
           .trim()
         
         console.log(`   Single-line transaction detected: ${transactionName}`)
@@ -187,7 +189,7 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
           const nextLine = lines[j].trim()
           
           // Stop if empty or next transaction
-          if (!nextLine || /^\d{1,2}\s+\w{3}/.test(nextLine)) {
+          if (!nextLine || /^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(nextLine)) {
             break
           }
           
