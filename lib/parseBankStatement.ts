@@ -147,16 +147,87 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
       
       // Helper function to extract amounts from text
       const extractAmounts = (text: string): { value: number; isNegative: boolean; isDebitFormat: boolean }[] => {
-        const amountPattern = /\$?([\d,]+\.\d{2})\s*\$?/g
         const found: { value: number; isNegative: boolean; isDebitFormat: boolean }[] = []
+        
+        // Pattern 1: Amounts starting with $ (e.g., "$40.00", "$42,823.83")
+        // Use proper currency format: 1-3 leading digits, then optional ,XXX groups
+        const dollarStartPattern = /\$(\d{1,3}(?:,\d{3})*\.\d{2})/g
         let match
-        while ((match = amountPattern.exec(text)) !== null) {
+        while ((match = dollarStartPattern.exec(text)) !== null) {
           const value = parseFloat(match[1].replace(/,/g, ''))
-          const isNegative = match[0].startsWith('-')
-          // CommBank debit format: amount followed by $ (e.g., "2,500.00$")
-          const isDebitFormat = !match[0].startsWith('$') && match[0].includes('$')
-          found.push({ value, isNegative, isDebitFormat })
+          found.push({ value, isNegative: false, isDebitFormat: false })
         }
+        
+        // Pattern 2: Debit format - amounts before $$ (debit column marker + balance column marker)
+        // In CommBank PDFs, debits show as [amount]$$[balance] due to concatenation
+        const doubleDollarIdx = text.indexOf('$$')
+        if (doubleDollarIdx > 0) {
+          const beforeDoubleDollar = text.substring(0, doubleDollarIdx)
+          
+          // Find any digits/commas ending with .XX at the end of the string
+          const amountMatch = beforeDoubleDollar.match(/(\d[\d,]*\.\d{2})$/)
+          if (amountMatch) {
+            const amountStr = amountMatch[1]
+            
+            // Find ALL valid currency formats by trimming from left
+            // Valid format: 1-3 leading digits, then ,XXX groups, then .XX
+            interface ValidAmount {
+              amount: string
+              value: number
+              combinedLeading: string
+              isCleanBoundary: boolean
+            }
+            const validAmounts: ValidAmount[] = []
+            let checkStr = amountStr
+            
+            while (checkStr.length > 0) {
+              if (/^\d{1,3}(?:,\d{3})*\.\d{2}$/.test(checkStr)) {
+                const offset = amountStr.length - checkStr.length
+                const checkStartInBefore = amountMatch.index! + offset
+                const charBefore = checkStartInBefore > 0 ? beforeDoubleDollar[checkStartInBefore - 1] : ''
+                
+                // Count consecutive digits immediately before this amount
+                let digitsBefore = ''
+                for (let i = checkStartInBefore - 1; i >= 0 && beforeDoubleDollar[i] >= '0' && beforeDoubleDollar[i] <= '9'; i--) {
+                  digitsBefore = beforeDoubleDollar[i] + digitsBefore
+                }
+                
+                const leadingDigits = (checkStr.match(/^(\d+)/) || ['', ''])[1]
+                const combinedLeading = digitsBefore + leadingDigits
+                
+                validAmounts.push({
+                  amount: checkStr,
+                  value: parseFloat(checkStr.replace(/,/g, '')),
+                  combinedLeading: combinedLeading,
+                  isCleanBoundary: charBefore === '' || (!(charBefore >= '0' && charBefore <= '9') && charBefore !== ',')
+                })
+              }
+              checkStr = checkStr.substring(1)
+              if (checkStr.startsWith(',')) checkStr = checkStr.substring(1)
+            }
+            
+            // Prefer clean boundary (no digit/comma before)
+            const cleanBoundary = validAmounts.find(v => v.isCleanBoundary)
+            if (cleanBoundary) {
+              found.push({ value: cleanBoundary.value, isNegative: false, isDebitFormat: true })
+            } else {
+              // Find amounts where digits before BREAK the currency pattern (combined leading > 3)
+              // Among these, pick the smallest (most reasonable transaction amount)
+              const brokenBoundaryAmounts = validAmounts
+                .filter(v => v.combinedLeading.length > 3)
+                .sort((a, b) => a.value - b.value)
+              
+              if (brokenBoundaryAmounts.length > 0) {
+                found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
+              } else if (validAmounts.length > 0) {
+                // Fallback: smallest valid amount
+                const smallest = validAmounts.reduce((a, b) => a.value < b.value ? a : b)
+                found.push({ value: smallest.value, isNegative: false, isDebitFormat: true })
+              }
+            }
+          }
+        }
+        
         return found
       }
       
