@@ -189,77 +189,6 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">{t("dashboard")}</h1>
 
-      {/* NEED ACTION Section - Placed at top for visibility */}
-      {loadingReviewPayments && (
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <Skeleton className="h-12 w-12 rounded-lg" />
-            <div className="flex-1">
-              <Skeleton className="h-5 w-48 mb-2" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between py-3 px-4 border border-border rounded-lg">
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-32 mb-2" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-                <Skeleton className="h-4 w-16" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!loadingReviewPayments && (reviewPayments.length > 0 || reviewExpenses.length > 0) && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
-            <IconAlertCircle className="size-5" />
-            NEED ACTION
-          </h2>
-          
-          {/* Review Payments Row */}
-          {reviewPayments.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">
-                    {reviewPayments.length} payment{reviewPayments.length !== 1 ? 's' : ''} need review
-                  </span>
-                </div>
-                <Link 
-                  href="/review-payments"
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Review All Payments
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* Review Expenses Row */}
-          {reviewExpenses.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">
-                    {reviewExpenses.length} expense{reviewExpenses.length !== 1 ? 's' : ''} need categorization
-                  </span>
-                </div>
-                <Link 
-                  href="/finance"
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Review Expenses
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
@@ -406,10 +335,10 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                     </span>
                     <span className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
                       -{formatCurrency(summary.total_debits)}
-                      {(showDebitsBreakdown || Number(summary.total_debits) === 0) ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
+                      {showDebitsBreakdown ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
                     </span>
                   </button>
-                  {(showDebitsBreakdown || Number(summary.total_debits) === 0) && (
+                  {showDebitsBreakdown && (
                     <div className="ml-4 mt-1 space-y-1 border-l-2 border-red-200 pl-3">
                       {summary.debit_breakdown && summary.debit_breakdown.length > 0 ? (
                         summary.debit_breakdown.map((item, idx) => (
@@ -440,10 +369,10 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                     </span>
                     <span className="text-sm font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
                       +{formatCurrency(summary.total_credits)}
-                      {(showCreditsBreakdown || Number(summary.total_credits) === 0) ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
+                      {showCreditsBreakdown ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
                     </span>
                   </button>
-                  {(showCreditsBreakdown || Number(summary.total_credits) === 0) && (
+                  {showCreditsBreakdown && (
                     <div className="ml-4 mt-1 space-y-1 border-l-2 border-green-200 pl-3">
                       {summary.credit_breakdown && summary.credit_breakdown.length > 0 ? (
                         summary.credit_breakdown.map((item, idx) => (
@@ -537,6 +466,77 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
 
       </div>
+
+      {/* NEED ACTION Section */}
+      {loadingReviewPayments && (
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <Skeleton className="h-12 w-12 rounded-lg" />
+            <div className="flex-1">
+              <Skeleton className="h-5 w-48 mb-2" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between py-3 px-4 border border-border rounded-lg">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loadingReviewPayments && (reviewPayments.length > 0 || reviewExpenses.length > 0) && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+            <IconAlertCircle className="size-5" />
+            NEED ACTION
+          </h2>
+          
+          {/* Review Payments Row */}
+          {reviewPayments.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {reviewPayments.length} payment{reviewPayments.length !== 1 ? 's' : ''} need review
+                  </span>
+                </div>
+                <Link 
+                  href="/review-payments"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Review All Payments
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Review Expenses Row */}
+          {reviewExpenses.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {reviewExpenses.length} expense{reviewExpenses.length !== 1 ? 's' : ''} need categorization
+                  </span>
+                </div>
+                <Link 
+                  href="/finance"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Review Expenses
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Review Payment Dialog */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>

@@ -164,14 +164,18 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         }
         
         // Check if this line has amounts (transaction complete)
-        const amountPattern = /\$?([\d,]+\.\d{2})/g
-        const lineAmounts: { value: number; isNegative: boolean }[] = []
+        // CommBank format for debits: "2,500.00 $" (amount followed by $)
+        // CommBank format for credits: "$40.00" ($ before amount)
+        const amountPattern = /\$?([\d,]+\.\d{2})\s*\$?/g
+        const lineAmounts: { value: number; isNegative: boolean; isDebitFormat: boolean }[] = []
         let match
         
         while ((match = amountPattern.exec(nextLine)) !== null) {
           const value = parseFloat(match[1].replace(/,/g, ''))
           const isNegative = match[0].startsWith('-')
-          lineAmounts.push({ value, isNegative })
+          // CommBank debit format: amount followed by $ (e.g., "2,500.00 $")
+          const isDebitFormat = !match[0].startsWith('$') && match[0].includes('$')
+          lineAmounts.push({ value, isNegative, isDebitFormat })
         }
         
         if (lineAmounts.length > 0) {
@@ -227,10 +231,13 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         balance = amounts[amounts.length - 1].value
         
         // Determine if debit or credit:
-        // 1. Check if marked as negative (has - sign or DR marker)
-        // 2. Check for common debit transaction name patterns
+        // 1. Check if CommBank debit format (amount followed by $, e.g., "2,500.00 $")
+        // 2. Check if marked as negative (has - sign or DR marker)
+        // 3. Check for common debit transaction name patterns (Chq, cheque, etc.)
         const nameLower = transactionName.toLowerCase()
-        const isDebitName = nameLower.includes('payment') || 
+        const isDebitName = nameLower.includes('chq') || 
+                           nameLower.includes('cheque') ||
+                           nameLower.includes('payment') || 
                            nameLower.includes('transfer out') ||
                            nameLower.includes('withdrawal') ||
                            nameLower.includes('eftpos') ||
@@ -241,9 +248,14 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
                            nameLower.includes('osko') ||
                            nameLower.includes('pay anyone')
         
-        if (txnAmount.isNegative || isDebitName) {
+        // CommBank shows debits as "2,500.00 $" ($ after amount)
+        const isDebitFormat = (txnAmount as any).isDebitFormat === true
+        
+        if (txnAmount.isNegative || isDebitFormat || isDebitName) {
           debit = txnAmount.value
-          console.log(`   Detected as DEBIT: ${isDebitName ? 'by name pattern' : 'by marker'}`)
+          const reason = isDebitFormat ? 'CommBank debit format ($ after amount)' : 
+                        isDebitName ? 'by name pattern' : 'by marker'
+          console.log(`   Detected as DEBIT: ${reason} - ${transactionName}`)
         } else {
           credit = txnAmount.value
         }
