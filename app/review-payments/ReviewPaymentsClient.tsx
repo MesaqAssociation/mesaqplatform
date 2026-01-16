@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
-import { IconAlertCircle, IconCheck, IconArrowUp, IconChecks } from '@tabler/icons-react'
+import { IconAlertCircle, IconCheck, IconArrowUp, IconChecks, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Payment = {
@@ -20,12 +20,20 @@ type Payment = {
   account_name: string
 }
 
+const ITEMS_PER_PAGE = 20
+
 export default function ReviewPaymentsClient() {
-  const [payments, setPayments] = useState<Payment[]>([])
+  const [allPayments, setAllPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set())
   const [bulkUpdating, setBulkUpdating] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Calculate paginated payments
+  const totalPages = Math.ceil(allPayments.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const payments = allPayments.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   useEffect(() => {
     loadPayments()
@@ -33,10 +41,10 @@ export default function ReviewPaymentsClient() {
 
   const loadPayments = async () => {
     try {
-      const res = await fetch('/api/finance/review-payments')
+      const res = await fetch('/api/finance/review-payments?limit=1000')
       if (res.ok) {
         const data = await res.json()
-        setPayments(data.payments || [])
+        setAllPayments(data.payments || [])
       }
     } catch (err) {
       console.error('Failed to load payments:', err)
@@ -48,19 +56,24 @@ export default function ReviewPaymentsClient() {
   const handleReclassify = async (paymentId: string) => {
     setUpdating(paymentId)
     try {
-      const res = await fetch('/api/finance/transactions', {
-        method: 'PATCH',
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactionId: paymentId,
-          category: 'Membership Payment',
+          transactionIds: [paymentId],
+          action: 'mark_as_membership',
         }),
       })
 
       if (res.ok) {
         showToast('✅ Reclassified as Membership Payment', 'success')
         // Remove from list
-        setPayments(prev => prev.filter(p => p.id !== paymentId))
+        setAllPayments(prev => prev.filter(p => p.id !== paymentId))
+        setSelectedPayments(prev => {
+          const next = new Set(prev)
+          next.delete(paymentId)
+          return next
+        })
       } else {
         const data = await res.json()
         console.error('Reclassify error:', data)
@@ -77,18 +90,19 @@ export default function ReviewPaymentsClient() {
   const handleMarkAsSpecial = async (paymentId: string) => {
     setUpdating(paymentId)
     try {
-      const res = await fetch('/api/finance/review-payments', {
+      const res = await fetch('/api/finance/bulk-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactionId: paymentId,
+          transactionIds: [paymentId],
+          action: 'mark_as_special',
         }),
       })
 
       if (res.ok) {
         showToast('✅ Confirmed as Special Payment', 'success')
         // Remove from list
-        setPayments(prev => prev.filter(p => p.id !== paymentId))
+        setAllPayments(prev => prev.filter(p => p.id !== paymentId))
         setSelectedPayments(prev => {
           const next = new Set(prev)
           next.delete(paymentId)
@@ -107,11 +121,32 @@ export default function ReviewPaymentsClient() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedPayments.size === payments.length) {
-      setSelectedPayments(new Set())
+    const currentPageIds = payments.map(p => p.id)
+    const allCurrentPageSelected = currentPageIds.every(id => selectedPayments.has(id))
+    
+    if (allCurrentPageSelected) {
+      // Deselect all on current page
+      setSelectedPayments(prev => {
+        const next = new Set(prev)
+        currentPageIds.forEach(id => next.delete(id))
+        return next
+      })
     } else {
-      setSelectedPayments(new Set(payments.map(p => p.id)))
+      // Select all on current page
+      setSelectedPayments(prev => {
+        const next = new Set(prev)
+        currentPageIds.forEach(id => next.add(id))
+        return next
+      })
     }
+  }
+
+  const selectAllPages = () => {
+    setSelectedPayments(new Set(allPayments.map(p => p.id)))
+  }
+
+  const clearSelection = () => {
+    setSelectedPayments(new Set())
   }
 
   const toggleSelectPayment = (paymentId: string) => {
@@ -130,36 +165,32 @@ export default function ReviewPaymentsClient() {
     if (selectedPayments.size === 0) return
     setBulkUpdating(true)
     
-    let success = 0
-    let failed = 0
-    
-    for (const paymentId of selectedPayments) {
-      try {
-        const res = await fetch('/api/finance/transactions', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transactionId: paymentId,
-            category: 'Membership Payment',
-          }),
-        })
-        if (res.ok) {
-          success++
-        } else {
-          failed++
+    try {
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionIds: Array.from(selectedPayments),
+          action: 'mark_as_membership',
+        }),
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        showToast(`✅ ${data.updatedCount} payment${data.updatedCount > 1 ? 's' : ''} reclassified as Membership`, 'success')
+        setAllPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
+        setSelectedPayments(new Set())
+        // Reset to page 1 if current page would be empty
+        if (currentPage > 1 && allPayments.length - selectedPayments.size <= (currentPage - 1) * ITEMS_PER_PAGE) {
+          setCurrentPage(1)
         }
-      } catch {
-        failed++
+      } else {
+        showToast(data.error || 'Failed to update payments', 'error')
       }
-    }
-    
-    if (success > 0) {
-      showToast(`✅ ${success} payment${success > 1 ? 's' : ''} reclassified as Membership`, 'success')
-      setPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
-      setSelectedPayments(new Set())
-    }
-    if (failed > 0) {
-      showToast(`❌ ${failed} payment${failed > 1 ? 's' : ''} failed`, 'error')
+    } catch (err) {
+      console.error('Bulk membership error:', err)
+      showToast('Failed to update payments', 'error')
     }
     
     setBulkUpdating(false)
@@ -169,35 +200,32 @@ export default function ReviewPaymentsClient() {
     if (selectedPayments.size === 0) return
     setBulkUpdating(true)
     
-    let success = 0
-    let failed = 0
-    
-    for (const paymentId of selectedPayments) {
-      try {
-        const res = await fetch('/api/finance/review-payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transactionId: paymentId,
-          }),
-        })
-        if (res.ok) {
-          success++
-        } else {
-          failed++
+    try {
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionIds: Array.from(selectedPayments),
+          action: 'mark_as_special',
+        }),
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        showToast(`✅ ${data.updatedCount} payment${data.updatedCount > 1 ? 's' : ''} confirmed as Special`, 'success')
+        setAllPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
+        setSelectedPayments(new Set())
+        // Reset to page 1 if current page would be empty
+        if (currentPage > 1 && allPayments.length - selectedPayments.size <= (currentPage - 1) * ITEMS_PER_PAGE) {
+          setCurrentPage(1)
         }
-      } catch {
-        failed++
+      } else {
+        showToast(data.error || 'Failed to update payments', 'error')
       }
-    }
-    
-    if (success > 0) {
-      showToast(`✅ ${success} payment${success > 1 ? 's' : ''} confirmed as Special`, 'success')
-      setPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
-      setSelectedPayments(new Set())
-    }
-    if (failed > 0) {
-      showToast(`❌ ${failed} payment${failed > 1 ? 's' : ''} failed`, 'error')
+    } catch (err) {
+      console.error('Bulk special error:', err)
+      showToast('Failed to update payments', 'error')
     }
     
     setBulkUpdating(false)
@@ -241,13 +269,28 @@ export default function ReviewPaymentsClient() {
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <IconAlertCircle className="size-5 text-yellow-500" />
-                {loading ? '...' : payments.length} Payment{payments.length !== 1 ? 's' : ''} Need Review
+                {loading ? '...' : allPayments.length} Payment{allPayments.length !== 1 ? 's' : ''} Need Review
               </h2>
+              {totalPages > 1 && (
+                <span className="text-sm text-muted-foreground">
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
             </div>
             {/* Bulk Actions */}
-            {payments.length > 0 && selectedPayments.size > 0 && (
-              <div className="flex items-center gap-2">
+            {allPayments.length > 0 && selectedPayments.size > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm text-muted-foreground">{selectedPayments.size} selected</span>
+                {selectedPayments.size < allPayments.length && (
+                  <Button onClick={selectAllPages} variant="ghost" size="sm" className="text-xs">
+                    Select all {allPayments.length}
+                  </Button>
+                )}
+                {selectedPayments.size > 0 && (
+                  <Button onClick={clearSelection} variant="ghost" size="sm" className="text-xs">
+                    Clear
+                  </Button>
+                )}
                 <Button
                   onClick={handleBulkMembership}
                   disabled={bulkUpdating}
@@ -255,7 +298,7 @@ export default function ReviewPaymentsClient() {
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <IconChecks className="size-4 mr-1" />
-                  {bulkUpdating ? 'Processing...' : 'Mark All as Membership'}
+                  {bulkUpdating ? 'Processing...' : 'Mark as Membership'}
                 </Button>
                 <Button
                   onClick={handleBulkSpecial}
@@ -263,7 +306,7 @@ export default function ReviewPaymentsClient() {
                   variant="outline"
                   size="sm"
                 >
-                  {bulkUpdating ? 'Processing...' : 'Keep All Special'}
+                  {bulkUpdating ? 'Processing...' : 'Keep Special'}
                 </Button>
               </div>
             )}
@@ -274,7 +317,7 @@ export default function ReviewPaymentsClient() {
                 <tr className="border-b">
                   <th className="text-left py-3 px-2 w-10">
                     <Checkbox
-                      checked={payments.length > 0 && selectedPayments.size === payments.length}
+                      checked={payments.length > 0 && payments.every(p => selectedPayments.has(p.id))}
                       onCheckedChange={toggleSelectAll}
                       disabled={loading || payments.length === 0}
                     />
@@ -283,7 +326,6 @@ export default function ReviewPaymentsClient() {
                   <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
                   <th className="text-left py-3 px-2">Member</th>
-                  <th className="text-left py-3 px-2">Category</th>
                   <th className="text-right py-3 px-2">Amount</th>
                   <th className="text-center py-3 px-2">Action</th>
                 </tr>
@@ -308,9 +350,6 @@ export default function ReviewPaymentsClient() {
                       <td className="py-3 px-2">
                         <Skeleton className="h-6 w-24 rounded-full" />
                       </td>
-                      <td className="py-3 px-2">
-                        <Skeleton className="h-6 w-28" />
-                      </td>
                       <td className="py-3 px-2 text-right">
                         <Skeleton className="h-4 w-16 ml-auto" />
                       </td>
@@ -321,7 +360,7 @@ export default function ReviewPaymentsClient() {
                   ))
                 ) : payments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12">
+                    <td colSpan={7} className="text-center py-12">
                       <IconCheck className="size-12 text-green-500 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
                       <p className="text-muted-foreground">No special payments need review</p>
@@ -352,11 +391,6 @@ export default function ReviewPaymentsClient() {
                       <td className="py-3 px-2">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                           {payment.member_name}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                          {payment.category || 'Special Payment'}
                         </span>
                       </td>
                       <td className="py-3 px-2 text-right font-medium text-green-600 dark:text-green-400">
@@ -392,6 +426,60 @@ export default function ReviewPaymentsClient() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <span className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, allPayments.length)} of {allPayments.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <IconChevronLeft className="size-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <IconChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

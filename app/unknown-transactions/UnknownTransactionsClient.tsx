@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { IconAlertCircle, IconArrowUp, IconChevronDown, IconX, IconCheck } from '@tabler/icons-react'
+import { IconAlertCircle, IconArrowUp, IconChevronDown, IconX, IconCheck, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Transaction = {
@@ -30,10 +30,18 @@ type Member = {
   banking_name?: string
 }
 
+const ITEMS_PER_PAGE = 20
+
 export default function UnknownTransactionsClient() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  
+  // Pagination calculations
+  const totalPages = Math.ceil(allTransactions.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const transactions = allTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
   
   // Member search
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
@@ -75,7 +83,7 @@ export default function UnknownTransactionsClient() {
       const res = await fetch('/api/finance/unknown-transactions')
       if (res.ok) {
         const data = await res.json()
-        setTransactions(data.transactions || [])
+        setAllTransactions(data.transactions || [])
       }
     } catch (err) {
       console.error('Failed to load transactions:', err)
@@ -87,11 +95,12 @@ export default function UnknownTransactionsClient() {
   const handleMatchMember = async (transactionId: string, memberId: string) => {
     setUpdating(transactionId)
     try {
-      const res = await fetch('/api/finance/transactions', {
-        method: 'PATCH',
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactionId,
+          transactionIds: [transactionId],
+          action: 'match_member',
           matchedMemberId: memberId,
         }),
       })
@@ -99,8 +108,12 @@ export default function UnknownTransactionsClient() {
       if (res.ok) {
         showToast('✅ Transaction matched to member', 'success')
         // Remove from list
-        setTransactions(prev => prev.filter(t => t.id !== transactionId))
+        setAllTransactions(prev => prev.filter(t => t.id !== transactionId))
         setOpenPopoverId(null)
+        // Reset page if needed
+        if (currentPage > 1 && allTransactions.length - 1 <= (currentPage - 1) * ITEMS_PER_PAGE) {
+          setCurrentPage(1)
+        }
       } else {
         const data = await res.json()
         showToast(data.error || 'Failed to match member', 'error')
@@ -116,18 +129,19 @@ export default function UnknownTransactionsClient() {
   const handleUpdateCategory = async (transactionId: string, category: string) => {
     setUpdating(transactionId)
     try {
-      const res = await fetch('/api/finance/transactions', {
-        method: 'PATCH',
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactionId,
+          transactionIds: [transactionId],
+          action: 'update_category',
           category,
         }),
       })
 
       if (res.ok) {
         showToast('Category updated', 'success')
-        setTransactions(prev => prev.map(t => 
+        setAllTransactions(prev => prev.map(t => 
           t.id === transactionId ? { ...t, category } : t
         ))
       } else {
@@ -137,6 +151,38 @@ export default function UnknownTransactionsClient() {
     } catch (err) {
       console.error('Failed to update category:', err)
       showToast('Failed to update category', 'error')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleKeepAsUnknown = async (transactionId: string) => {
+    setUpdating(transactionId)
+    try {
+      const res = await fetch('/api/finance/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionIds: [transactionId],
+          action: 'mark_as_reviewed',
+        }),
+      })
+
+      if (res.ok) {
+        showToast('✅ Marked as reviewed', 'success')
+        // Remove from list
+        setAllTransactions(prev => prev.filter(t => t.id !== transactionId))
+        // Reset page if needed
+        if (currentPage > 1 && allTransactions.length - 1 <= (currentPage - 1) * ITEMS_PER_PAGE) {
+          setCurrentPage(1)
+        }
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Failed to mark as reviewed', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to mark as reviewed:', err)
+      showToast('Failed to mark as reviewed', 'error')
     } finally {
       setUpdating(null)
     }
@@ -180,8 +226,13 @@ export default function UnknownTransactionsClient() {
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <IconAlertCircle className="size-5 text-orange-500" />
-                {loading ? '...' : transactions.length} Unknown Transaction{transactions.length !== 1 ? 's' : ''}
+                {loading ? '...' : allTransactions.length} Unknown Transaction{allTransactions.length !== 1 ? 's' : ''}
               </h2>
+              {totalPages > 1 && (
+                <span className="text-sm text-muted-foreground">
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
             </div>
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
@@ -194,6 +245,7 @@ export default function UnknownTransactionsClient() {
                   <th className="text-left py-3 px-2">Member</th>
                   <th className="text-left py-3 px-2">Category</th>
                   <th className="text-right py-3 px-2">Amount</th>
+                  <th className="text-center py-3 px-2">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -219,11 +271,14 @@ export default function UnknownTransactionsClient() {
                       <td className="py-3 px-2 text-right">
                         <Skeleton className="h-4 w-16 ml-auto" />
                       </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-8 w-24" />
+                      </td>
                     </tr>
                   ))
                 ) : transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-12">
+                    <td colSpan={7} className="text-center py-12">
                       <IconCheck className="size-12 text-green-500 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
                       <p className="text-muted-foreground">No unknown transactions</p>
@@ -322,12 +377,76 @@ export default function UnknownTransactionsClient() {
                           {formatCurrency(Math.abs(txn.amount))}
                         </div>
                       </td>
+                      <td className="py-3 px-2">
+                        <Button
+                          onClick={() => handleKeepAsUnknown(txn.id)}
+                          disabled={updating === txn.id}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {updating === txn.id ? '...' : 'Keep Unknown'}
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <span className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, allTransactions.length)} of {allTransactions.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <IconChevronLeft className="size-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <IconChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

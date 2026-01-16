@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
       WHERE t.transaction_type = 'credit'
         AND t.matched_member_id IS NULL
         AND t.category != 'Charges'
+        AND t.reviewed_at IS NULL
       ORDER BY t.transaction_date DESC
-      LIMIT 200
     `)
 
     return NextResponse.json({ transactions: rows })

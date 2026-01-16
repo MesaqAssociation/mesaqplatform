@@ -45,7 +45,6 @@ export async function GET(req: NextRequest) {
         AND t.matched_member_id IS NOT NULL
         AND t.reviewed_at IS NULL
       ORDER BY t.transaction_date DESC
-      LIMIT 50
     `)
 
     // Get all uncategorized debit transactions (expenses) that need review
@@ -63,7 +62,6 @@ export async function GET(req: NextRequest) {
       WHERE t.transaction_type = 'debit'
         AND (t.category IS NULL OR t.category = '' OR t.category = 'Expense')
       ORDER BY t.transaction_date DESC
-      LIMIT 50
     `)
 
     return NextResponse.json({ payments, expenses })
