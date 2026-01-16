@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertCircle, IconCheck, IconArrowUp, IconChecks, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
@@ -29,6 +30,7 @@ export default function ReviewPaymentsClient() {
   const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set())
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
 
   // Calculate paginated payments
   const totalPages = Math.ceil(allPayments.length / ITEMS_PER_PAGE)
@@ -331,7 +333,7 @@ export default function ReviewPaymentsClient() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+      {loading ? (
                   // Grey shimmers while loading
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`skeleton-${i}`} className="border-b">
@@ -345,7 +347,7 @@ export default function ReviewPaymentsClient() {
                         <Skeleton className="h-4 w-32" />
                       </td>
                       <td className="py-3 px-2">
-                        <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-48" />
                       </td>
                       <td className="py-3 px-2">
                         <Skeleton className="h-6 w-24 rounded-full" />
@@ -370,9 +372,10 @@ export default function ReviewPaymentsClient() {
                   payments.map((payment) => (
                     <tr 
                       key={payment.id} 
-                      className={`border-b hover:bg-muted/50 transition-colors ${selectedPayments.has(payment.id) ? 'bg-primary/5' : ''}`}
+                      className={`border-b hover:bg-muted/50 transition-colors cursor-pointer ${selectedPayments.has(payment.id) ? 'bg-primary/5' : ''}`}
+                      onClick={() => setSelectedPayment(payment)}
                     >
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedPayments.has(payment.id)}
                           onCheckedChange={() => toggleSelectPayment(payment.id)}
@@ -399,7 +402,7 @@ export default function ReviewPaymentsClient() {
                           {formatCurrency(Math.abs(payment.amount))}
                         </div>
                       </td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handleReclassify(payment.id)}
@@ -480,8 +483,69 @@ export default function ReviewPaymentsClient() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+      {/* Payment Detail Dialog */}
+      <Dialog open={!!selectedPayment} onOpenChange={() => setSelectedPayment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Details</DialogTitle>
+          </DialogHeader>
+          {selectedPayment && (
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <p className="text-3xl font-bold text-green-600">
+                  +{formatCurrency(Math.abs(selectedPayment.amount))}
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium">{formatDate(selectedPayment.transaction_date)}</span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="font-medium text-right max-w-[60%]">
+                    {selectedPayment.transaction_name}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Description</span>
+                  <span className="font-medium text-right max-w-[60%]">
+                    {selectedPayment.description || '-'}
+                    </span>
+                  </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Category</span>
+                  <span className="font-medium">{selectedPayment.category}</span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Member</span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    {selectedPayment.member_name}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Account</span>
+                  <span className="font-medium">{selectedPayment.account_name}</span>
+                  </div>
+                
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="font-medium text-green-600">Credit (Income)</span>
+                </div>
+              </div>
+            </div>
+      )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

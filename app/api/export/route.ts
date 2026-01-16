@@ -126,17 +126,19 @@ export async function GET(req: NextRequest) {
           try {
             const totalPaid = paymentMap.get(m.id) || 0
             
-            // Parse date_joined safely
+            // Parse date_joined safely - use date_joined string (YYYY-MM-DD format)
             let expectedMonths = 0
-            if (m.date_joined_raw) {
-              const dateJoined = new Date(m.date_joined_raw)
-              const now = new Date()
+            const dateJoinedStr = m.date_joined || '2025-05-01'
+            
+            // Parse YYYY-MM-DD format
+            const dateParts = dateJoinedStr.split('-')
+            if (dateParts.length === 3) {
+              const startYear = parseInt(dateParts[0], 10)
+              const startMonth = parseInt(dateParts[1], 10) - 1 // 0-indexed
               
-              // Calculate months using simple date math
-              const startYear = dateJoined.getFullYear()
-              const startMonth = dateJoined.getMonth()
+              const now = new Date()
               const endYear = now.getFullYear()
-              const endMonth = now.getMonth() - 1 // Last month
+              const endMonth = now.getMonth() - 1 // Previous month (0-indexed)
               
               // Calculate total months between start and end
               expectedMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1

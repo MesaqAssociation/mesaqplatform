@@ -1199,6 +1199,9 @@ export default function FinanceClient({
                 <IconEdit className="size-6 text-muted-foreground" />
               </div>
             )}
+            <p className="text-xs text-muted-foreground/70 mt-2">
+              As of {new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
           </div>
         </CardContent>
       </Card>

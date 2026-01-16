@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertCircle, IconArrowUp, IconChevronDown, IconX, IconCheck, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
@@ -37,6 +38,7 @@ export default function UnknownTransactionsClient() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   
   // Pagination calculations
   const totalPages = Math.ceil(allTransactions.length / ITEMS_PER_PAGE)
@@ -286,7 +288,11 @@ export default function UnknownTransactionsClient() {
                   </tr>
                 ) : (
                   transactions.map((txn) => (
-                    <tr key={txn.id} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr 
+                      key={txn.id} 
+                      className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => setSelectedTransaction(txn)}
+                    >
                       <td className="py-3 px-2 whitespace-nowrap">
                         {formatDate(txn.transaction_date)}
                       </td>
@@ -296,7 +302,7 @@ export default function UnknownTransactionsClient() {
                       <td className="py-3 px-2 text-muted-foreground max-w-[250px] truncate">
                         {txn.description || '-'}
                       </td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Popover 
                           open={openPopoverId === txn.id} 
                           onOpenChange={(open) => {
@@ -355,7 +361,7 @@ export default function UnknownTransactionsClient() {
                           </PopoverContent>
                         </Popover>
                       </td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Select 
                           value={txn.category || 'Special Payment'}
                           onValueChange={(value) => handleUpdateCategory(txn.id, value)}
@@ -377,7 +383,7 @@ export default function UnknownTransactionsClient() {
                           {formatCurrency(Math.abs(txn.amount))}
                         </div>
                       </td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           onClick={() => handleKeepAsUnknown(txn.id)}
                           disabled={updating === txn.id}
@@ -449,6 +455,60 @@ export default function UnknownTransactionsClient() {
           )}
         </CardContent>
       </Card>
+
+      {/* Transaction Detail Dialog */}
+      <Dialog open={!!selectedTransaction} onOpenChange={() => setSelectedTransaction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <p className="text-3xl font-bold text-green-600">
+                  +{formatCurrency(Math.abs(selectedTransaction.amount))}
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium">{formatDate(selectedTransaction.transaction_date)}</span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="font-medium text-right max-w-[60%]">
+                    {selectedTransaction.transaction_name}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Description</span>
+                  <span className="font-medium text-right max-w-[60%]">
+                    {selectedTransaction.description || '-'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Category</span>
+                  <span className="font-medium">{selectedTransaction.category || 'Special Payment'}</span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Account</span>
+                  <span className="font-medium">{selectedTransaction.account_name}</span>
+                </div>
+                
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="font-medium text-green-600">Credit (Income)</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

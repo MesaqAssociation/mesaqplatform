@@ -310,8 +310,9 @@ export async function GET(req: NextRequest) {
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
-                            text: `$${parseFloat(member.currentBalance).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
-                            color: parseFloat(member.currentBalance) > 0 ? 'DC2626' : '16A34A',
+                            // Negative balance = owes money = red, Positive/zero = paid up = green
+                            text: `$${Math.abs(parseFloat(member.currentBalance)).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
+                            color: parseFloat(member.currentBalance) < 0 ? 'DC2626' : '16A34A',
                             size: 18,
                         })],
                         alignment: AlignmentType.RIGHT,
@@ -369,9 +370,10 @@ export async function GET(req: NextRequest) {
                 new TableCell({
                     children: [new Paragraph({ 
                         children: [new TextRun({ 
-                            text: `$${totalBalance.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
+                            // Negative balance = owes money = red, Positive/zero = paid up = green
+                            text: `$${Math.abs(totalBalance).toLocaleString('en-AU', { minimumFractionDigits: 2 })}`,
                             bold: true,
-                            color: totalBalance > 0 ? 'DC2626' : '16A34A',
+                            color: totalBalance < 0 ? 'DC2626' : '16A34A',
                             size: 20,
                         })],
                         alignment: AlignmentType.RIGHT,
@@ -381,8 +383,10 @@ export async function GET(req: NextRequest) {
             ],
         })
 
-        // Count members with outstanding balance
-        const membersWithBalance = memberData.filter(m => parseFloat(m.currentBalance) > 0).length
+        // Count members with outstanding balance (negative balance = owes money)
+        const membersWithBalance = memberData.filter(m => parseFloat(m.currentBalance) < 0).length
+        // Calculate total owed (sum of negative balances, shown as positive number)
+        const totalOwed = Math.abs(memberData.filter(m => parseFloat(m.currentBalance) < 0).reduce((sum, m) => sum + parseFloat(m.currentBalance), 0))
 
         // Create the document
         const doc = new Document({
@@ -461,7 +465,7 @@ export async function GET(req: NextRequest) {
                             new TextRun({ text: '   |   ', size: 22, color: '94A3B8' }),
                             new TextRun({ text: `With Outstanding Balance: ${membersWithBalance}`, size: 22 }),
                             new TextRun({ text: '   |   ', size: 22, color: '94A3B8' }),
-                            new TextRun({ text: `Total Owed: $${totalBalance.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: totalBalance > 0 ? 'DC2626' : '16A34A', bold: true }),
+                            new TextRun({ text: `Total Owed: $${totalOwed.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, size: 22, color: totalOwed > 0 ? 'DC2626' : '16A34A', bold: true }),
                         ],
                         spacing: { after: 100 },
                     }),

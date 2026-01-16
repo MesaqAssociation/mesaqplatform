@@ -30,7 +30,7 @@ type Member = {
   is_active?: boolean
 }
 
-type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first' | 'id-asc' | 'id-desc'
+type SortOption = 'name-asc' | 'paid-first' | 'unpaid-first' | 'id-asc' | 'id-desc'
 
 export default function MembersClient({ initial, isAdmin = true }: { initial: Member[], isAdmin?: boolean }) {
   const { t } = useI18n()
@@ -82,32 +82,27 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
       case 'name-asc':
         return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       
-      case 'most-paid':
+      case 'paid-first':
+        // Sort by payment status - PAID first, then UNPAID
         return filtered.sort((a, b) => {
-          const aTotal = a.total_paid || 0
-          const bTotal = b.total_paid || 0
-          return bTotal - aTotal // Highest first
-        })
-      
-      case 'least-paid':
-        return filtered.sort((a, b) => {
-          const aTotal = a.total_paid || 0
-          const bTotal = b.total_paid || 0
-          return aTotal - bTotal // Lowest first
+          const aBalance = a.balance ?? a.current_balance ?? 0
+          const bBalance = b.balance ?? b.current_balance ?? 0
+          const aIsPaid = aBalance >= 0
+          const bIsPaid = bBalance >= 0
+          
+          if (aIsPaid && !bIsPaid) return -1 // a comes first
+          if (!aIsPaid && bIsPaid) return 1  // b comes first
+          return (a.name || '').localeCompare(b.name || '') // Same status, sort by name
         })
       
       case 'unpaid-first':
+        // Sort by payment status - UNPAID first (most owed), then PAID
         return filtered.sort((a, b) => {
-          const aFee = a.monthly_fee || 0
-          const aPaid = a.total_paid || 0
-          const bFee = b.monthly_fee || 0
-          const bPaid = b.total_paid || 0
+          const aBalance = a.balance ?? a.current_balance ?? 0
+          const bBalance = b.balance ?? b.current_balance ?? 0
           
-          const aOwes = aFee - aPaid
-          const bOwes = bFee - bPaid
-          
-          // Show those who owe the most first
-          return bOwes - aOwes
+          // Sort by balance ascending (most negative first)
+          return aBalance - bBalance
         })
       
       case 'id-asc':
@@ -150,8 +145,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
                 <SelectItem value="name-asc">Name (A-Z)</SelectItem>
                 <SelectItem value="id-asc">Member ID (A-Z)</SelectItem>
                 <SelectItem value="id-desc">Member ID (Z-A)</SelectItem>
-                <SelectItem value="most-paid">Most Paid</SelectItem>
-                <SelectItem value="least-paid">Least Paid</SelectItem>
+                <SelectItem value="paid-first">Paid First</SelectItem>
                 <SelectItem value="unpaid-first">Unpaid First</SelectItem>
               </SelectContent>
             </Select>
