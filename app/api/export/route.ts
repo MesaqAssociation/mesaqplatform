@@ -95,7 +95,6 @@ export async function GET(req: NextRequest) {
             household_members,
             banking_name,
             group_name,
-            telegram_id,
             payment_plan,
             is_active,
             date_joined,
@@ -105,7 +104,7 @@ export async function GET(req: NextRequest) {
         `)
         
         data = members
-        headers = ['id', 'member_id', 'name', 'email', 'phone', 'address', 'role', 'household_members', 'banking_name', 'group_name', 'telegram_id', 'payment_plan', 'is_active', 'date_joined', 'created_at']
+        headers = ['id', 'member_id', 'name', 'email', 'phone', 'address', 'role', 'household_members', 'banking_name', 'group_name', 'payment_plan', 'is_active', 'date_joined', 'created_at']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`
         break
 
