@@ -234,6 +234,20 @@ export async function GET(
       ORDER BY t.transaction_date DESC
     `, [member.id])
 
+    // Get the date of the last membership payment transaction
+    const { rows: lastPaymentRows } = await pool.query(`
+      SELECT MAX(t.transaction_date) as last_payment_date
+      FROM membership_payments mp
+      LEFT JOIN transactions t ON t.id = mp.transaction_id
+      WHERE mp.user_id = $1
+    `, [member.id])
+    
+    // Use the last payment date or start of current month
+    const lastPaymentDate = lastPaymentRows[0]?.last_payment_date
+    const lastUpdated = lastPaymentDate 
+      ? new Date(lastPaymentDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+      : new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+
     return NextResponse.json({
       membershipBalance: {
         currentBalance: runningBalance,
@@ -246,7 +260,8 @@ export async function GET(
         status,
         monthsBreakdown,
         charges: chargeDetails,
-        paymentPlan: paymentPlanInfo
+        paymentPlan: paymentPlanInfo,
+        lastUpdated
       },
       eventPaymentBalance: {
         totalSpecialPayments,

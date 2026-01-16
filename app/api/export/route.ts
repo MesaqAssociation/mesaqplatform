@@ -105,14 +105,7 @@ export async function GET(req: NextRequest) {
             to_char(u.date_joined, 'YYYY-MM-DD') as date_joined,
             to_char(u.created_at, 'YYYY-MM-DD') as created_at,
             COALESCE(mp.total_paid, 0) as total_paid,
-            (
-              SELECT GREATEST(0, COUNT(*)::int)
-              FROM generate_series(
-                date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-                date_trunc('month', CURRENT_DATE) - interval '1 month',
-                interval '1 month'
-              ) gs
-            ) as expected_months
+            months.expected_months
           FROM users u
           LEFT JOIN (
             SELECT mp.user_id, SUM(mp.amount) as total_paid
@@ -121,14 +114,22 @@ export async function GET(req: NextRequest) {
             WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
             GROUP BY mp.user_id
           ) mp ON mp.user_id = u.id
+          CROSS JOIN LATERAL (
+            SELECT GREATEST(0, COUNT(*)::int) AS expected_months
+            FROM generate_series(
+              date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
+              date_trunc('month', CURRENT_DATE) - interval '1 month',
+              interval '1 month'
+            ) gs
+          ) months
           ORDER BY u.name ASC
         `)
         
         // Calculate balance for each member
         data = members.map(m => ({
           ...m,
-          balance: (m.total_paid || 0) - (m.expected_months * monthlyFee),
-          payment_status: (m.total_paid || 0) - (m.expected_months * monthlyFee) >= 0 ? 'PAID' : 'UNPAID'
+          balance: (parseFloat(m.total_paid) || 0) - ((m.expected_months || 0) * monthlyFee),
+          payment_status: (parseFloat(m.total_paid) || 0) - ((m.expected_months || 0) * monthlyFee) >= 0 ? 'PAID' : 'UNPAID'
         }))
         headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'group_name', 'household_members', 'banking_name', 'payment_plan', 'is_active', 'date_joined', 'created_at', 'total_paid', 'expected_months', 'balance', 'payment_status']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`

@@ -84,7 +84,8 @@ export async function GET(req: NextRequest) {
         u.id as member_id,
         u.name as member_name,
         u.member_id as member_code,
-        u.image as member_image
+        u.image as member_image,
+        COALESCE(u.is_active, true) as member_is_active
       FROM ranked_messages rm
       JOIN conversation_stats cs ON cs.phone_key = rm.phone_key
       LEFT JOIN users u ON (
@@ -107,7 +108,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      conversations: conversations.map(c => ({
+      conversations: conversations.map((c: any) => ({
         phoneKey: c.phone_key,
         displayPhone: c.display_phone,
         // Priority: member_name (if matched) > contact_name from message
@@ -116,6 +117,7 @@ export async function GET(req: NextRequest) {
         memberName: c.member_name,
         memberCode: c.member_code,
         memberImage: c.member_image,
+        isDeactivated: c.member_id ? c.member_is_active === false : false,
         lastMessage: cleanMessage(c.last_message),
         lastTimestamp: c.timestamp,
         lastDirection: c.last_direction,

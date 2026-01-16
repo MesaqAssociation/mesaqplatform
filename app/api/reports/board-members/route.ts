@@ -67,13 +67,14 @@ async function getMemberBalanceAtDate(userId: string, endDate: string): Promise<
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
 
         // Calculate months expected up to end date (exclusive of the end date month)
+        // Uses date_trunc for consistency with members page calculation
         const { rows: balanceRows } = await pool.query(`
       WITH months_expected AS (
         SELECT 
-          COUNT(DISTINCT DATE_TRUNC('month', gs::date)) as months
+          GREATEST(0, COUNT(*)::int) as months
         FROM users u
         CROSS JOIN generate_series(
-          GREATEST(u.date_joined::date, '2024-01-01'::date),
+          date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
           DATE_TRUNC('month', $2::date) - interval '1 month',
           '1 month'::interval
         ) gs

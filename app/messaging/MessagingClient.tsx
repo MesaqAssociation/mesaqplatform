@@ -23,6 +23,7 @@ type Conversation = {
   memberName: string | null
   memberCode: string | null
   memberImage: string | null
+  isDeactivated?: boolean
   lastMessage: string
   lastTimestamp: string
   lastDirection: 'incoming' | 'outgoing'
@@ -508,11 +509,11 @@ export default function MessagingClient() {
   }
 
   const topupSteps = [
-    { image: '', text: <>Go to <a href="https://mobilemessage.com.au" target="_blank" rel="noopener noreferrer" className="text-primary underline">mobilemessage.com.au</a> and login to your account</> },
-    { image: '', text: <>Navigate to the <strong>Credits</strong> or <strong>Billing</strong> section</> },
-    { image: '', text: <>Choose the amount of credits you want to purchase</> },
-    { image: '', text: <>Complete the payment process</> },
-    { image: '', text: <>Credits will be added to your account immediately</> },
+    { image: '/step-1.png', text: <>Go to <a href="https://mobilemessage.com.au" target="_blank" rel="noopener noreferrer" className="text-primary underline">mobilemessage.com.au</a> and click <strong>Login</strong></> },
+    { image: '/step-2.png', text: <>Login with your email and password</> },
+    { image: '/step-3.png', text: <>If asked, enter the verification code sent to your phone and click <strong>Verify</strong></> },
+    { image: '/step-4.png', text: <>Click <strong>Add Credits</strong></> },
+    { image: '/step-5.png', text: <>Choose how many credits you want (each message is 1-2 credits), proceed to payment and pay</> },
   ]
 
   return (
@@ -634,13 +635,18 @@ export default function MessagingClient() {
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-0.5">
-                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
                                 <span className={`font-medium truncate text-sm ${conv.unreadCount > 0 ? 'text-foreground' : 'text-foreground/80'}`}>
                                   {displayName}
                                 </span>
-                                {isMember && (
+                                {isMember && !conv.isDeactivated && (
                                   <span className="text-[10px] bg-primary/10 text-primary px-1 rounded flex-shrink-0">
                                     Member
+                                  </span>
+                                )}
+                                {conv.isDeactivated && (
+                                  <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1 rounded flex-shrink-0">
+                                    Deactivated
                                   </span>
                                 )}
                               </div>

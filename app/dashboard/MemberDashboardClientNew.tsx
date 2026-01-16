@@ -168,6 +168,11 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
                 <p className="text-sm text-muted-foreground">
                   {(Number(balance?.membershipBalance?.currentBalance ?? 0)) < 0 ? 'Outstanding balance' : 'Credit balance'}
                 </p>
+                {balance?.membershipBalance?.lastUpdated && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    As of {balance.membershipBalance.lastUpdated}
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
@@ -392,11 +397,6 @@ export default function MemberDashboardClient({ initialData, isAdmin = false }: 
                     </Badge>
                   </div>
                 )}
-                
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-muted-foreground">Source</span>
-                  <span className="font-medium">{selectedTransaction.source || 'Bank Transfer'}</span>
-                </div>
                 
                 <div className="flex justify-between py-2">
                   <span className="text-muted-foreground">Type</span>
