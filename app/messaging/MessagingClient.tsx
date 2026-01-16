@@ -1094,12 +1094,21 @@ export default function MessagingClient() {
                 <CardContent className="p-4 md:p-6 pt-0">
                   <div className="space-y-4">
                     {topupSteps.map((step, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex-shrink-0">
-                          {index + 1}
-                        </span>
-                        <p className="text-sm">{step.text}</p>
-                    </div>
+                      <div key={index} className="space-y-2">
+                        <div className="flex items-start gap-3">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <p className="text-sm">{step.text}</p>
+                        </div>
+                        {step.image && (
+                          <img 
+                            src={step.image} 
+                            alt={`Step ${index + 1}`} 
+                            className="rounded-lg border ml-9 max-w-full md:max-w-md"
+                          />
+                        )}
+                      </div>
                   ))}
                 </div>
                 </CardContent>

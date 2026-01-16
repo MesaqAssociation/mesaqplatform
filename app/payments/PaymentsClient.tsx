@@ -260,11 +260,6 @@ export default function PaymentsClient({ transactions }: { transactions: Transac
                   </div>
                 )}
                 
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-muted-foreground">Source</span>
-                  <span className="font-medium">{selectedTransaction.source || 'Bank Transfer'}</span>
-                </div>
-                
                 <div className="flex justify-between py-2">
                   <span className="text-muted-foreground">Type</span>
                   <span

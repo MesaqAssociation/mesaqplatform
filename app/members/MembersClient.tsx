@@ -27,6 +27,7 @@ type Member = {
   payment_status: string | null
   total_paid: number | null
   monthly_fee: number | null
+  is_active?: boolean
 }
 
 type SortOption = 'name-asc' | 'most-paid' | 'least-paid' | 'unpaid-first' | 'id-asc' | 'id-desc'
@@ -194,11 +195,18 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             >
               <td className="py-3 px-2">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={m.image || undefined} alt={m.name || 'User'} />
-                    <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
+                  <Avatar className={`h-10 w-10 ${m.is_active === false ? 'ring-2 ring-red-500' : ''}`}>
+                    <AvatarImage src={m.image || undefined} alt={m.name || 'User'} className={m.is_active === false ? 'opacity-50 grayscale' : ''} />
+                    <AvatarFallback className={m.is_active === false ? 'bg-red-100 text-red-700' : ''}>{getInitials(m.name)}</AvatarFallback>
                   </Avatar>
-                  <span className="font-medium">{m.name || '-'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{m.name || '-'}</span>
+                    {m.is_active === false && (
+                      <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1 rounded">
+                        Deactivated
+                      </span>
+                    )}
+                  </div>
                 </div>
               </td>
               {isAdmin && (
@@ -237,12 +245,19 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
             className={`border rounded-lg p-4 ${isAdmin ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
           >
             <div className="flex items-center gap-3 mb-3">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={m.image || undefined} alt={m.name || 'User'} />
-                <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
+              <Avatar className={`h-12 w-12 ${m.is_active === false ? 'ring-2 ring-red-500' : ''}`}>
+                <AvatarImage src={m.image || undefined} alt={m.name || 'User'} className={m.is_active === false ? 'opacity-50 grayscale' : ''} />
+                <AvatarFallback className={m.is_active === false ? 'bg-red-100 text-red-700' : ''}>{getInitials(m.name)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{m.name || '-'}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium truncate">{m.name || '-'}</p>
+                  {m.is_active === false && (
+                    <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1 rounded flex-shrink-0">
+                      Deactivated
+                    </span>
+                  )}
+                </div>
                 {isAdmin && <p className="text-sm text-muted-foreground truncate">{m.phone}</p>}
               </div>
               {isAdmin && getPaymentStatusBadge(m)}

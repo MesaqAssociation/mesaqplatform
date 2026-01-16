@@ -102,6 +102,8 @@ Use the **Supabase transaction pooler** URL for serverless deployments (Vercel),
 
 The system is centered around:
 - **`users`**: members + admins (auth, role, contact, banking_name, group assignment)
+  - `is_active`: boolean (default true) - deactivated members can't log in, don't show in lists, but still receive matched payments
+  - `payment_plan`: 'monthly' | 'quarterly' | 'semi_annually' | 'yearly' - affects balance calculation and reminder schedule
 - **`events`**: calendar events / meetings
 - **`member_events`**: attendance/junction
 - **`financial_accounts`**: bank accounts (supports donation vs membership accounts)
@@ -293,13 +295,22 @@ Notes:
 
 ### Scheduled Jobs / Cron
 
-Mesaq includes an endpoint designed for cron:
-- `POST /api/notifications/send-due`
+Mesaq includes a unified daily cron endpoint:
+- `GET/POST /api/cron/daily`
   - Optional auth: set `CRON_SECRET` and call with `Authorization: Bearer <CRON_SECRET>`
-  - Sends due scheduled notifications using the Picky Assist admin template
+  - Runs at 1pm AEST (configure via Vercel Cron or external scheduler)
+  
+**What it does:**
+1. **1st of month - Payment Reminders**: Sends SMS reminders to members with negative balance
+   - Includes current month in expected payments (no -1 month offset)
+   - Respects payment plans: Monthly (every month), Quarterly (Jan/Apr/Jul/Oct), Semi-annually (Jan/Jul), Yearly (Jan only)
+2. **1st of month - Fee Updates**: Applies any pending fee changes from `system_settings`
+3. **Every day - Scheduled Notifications**: Sends due scheduled notifications
+4. **Last day of month - Backup**: Creates automated backup to R2 (if configured)
 
-Payment reminder automation endpoint is currently disabled:
-- `POST /api/payment-reminders/run` returns a “disabled” response by design
+Legacy endpoints:
+- `POST /api/notifications/send-due` - Sends due scheduled notifications (still works)
+- `POST /api/payment-reminders/run` returns a "disabled" response by design
 
 ## API Routes Catalog (Authoritative)
 
@@ -391,6 +402,9 @@ Below is the inventory of API route files and the HTTP methods they export. In N
 - **`/api/members/[member_id]/password`**: PATCH — set member password (`app/api/members/[member_id]/password/route.ts`)
 - **`/api/members/[member_id]/role`**: PATCH — set member role (`app/api/members/[member_id]/role/route.ts`)
 - **`/api/members/[member_id]/set-leader`**: POST — mark member as group leader (`app/api/members/[member_id]/set-leader/route.ts`)
+- **`/api/members/[member_id]/deactivate`**: POST — toggle member active status (`app/api/members/[member_id]/deactivate/route.ts`)
+  - Deactivating: Sets `is_active = false`; member can't log in, hidden from lists, but payments still match
+  - Reactivating: Deletes all membership_payments, resets date_joined to today, balance becomes $0
 - **`/api/members/events`**: POST, DELETE — manage member event attendance (`app/api/members/events/route.ts`)
 
 ### Groups

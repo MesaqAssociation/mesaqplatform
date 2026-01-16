@@ -16,7 +16,7 @@ const pool = new Pool({
 /**
  * Unified Daily Cron Job - Runs at 1pm AEST
  * 
- * 1. On 7th of month: Send payment reminders to members with negative balance
+ * 1. On 1st of month: Send payment reminders to members with negative balance (includes current month expected)
  * 2. Every day: Send scheduled notifications that are due
  */
 export async function GET(req: NextRequest) {
@@ -88,10 +88,10 @@ export async function GET(req: NextRequest) {
     }
 
     // ============================================
-    // 1. PAYMENT REMINDERS (7th of the month only)
+    // 1. PAYMENT REMINDERS (1st of the month)
     // ============================================
-    if (dayOfMonth === 7) {
-      console.log('📅 7th of month - Sending payment reminders')
+    if (dayOfMonth === 1) {
+      console.log('📅 1st of month - Sending payment reminders')
       results.paymentReminders.processed = true
       
       try {
@@ -157,11 +157,13 @@ export async function POST(req: NextRequest) {
  * Send payment reminders to members with negative balance
  * Respects payment plans: monthly, quarterly, semi_annually, yearly
  * 
- * Payment plan reminder schedule:
- * - Monthly: Every month (7th)
- * - Quarterly: April, August, December (7th)
- * - Semi-annually: July, January (7th)
- * - Yearly: January only (7th)
+ * Payment plan reminder schedule (1st of month):
+ * - Monthly: Every month
+ * - Quarterly: January, April, July, October
+ * - Semi-annually: January, July
+ * - Yearly: January only
+ * 
+ * Note: On the 1st, balance includes current month as expected (no -1 month offset)
  */
 async function sendPaymentReminders(): Promise<{ sent: number; failed: number; skipped: number }> {
   // Get main membership account
@@ -212,6 +214,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
 
   // Get all members with their calculated balance, filtered by eligible payment plans
   // Balance calculation varies by payment plan
+  // On 1st of month, include CURRENT month in expected payments (no -1 month offset)
   const { rows: members } = await pool.query(`
     SELECT 
       u.id, u.name, u.phone, 
@@ -236,7 +239,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(
         date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-        date_trunc('month', CURRENT_DATE) - interval '1 month',
+        date_trunc('month', CURRENT_DATE),
         interval '1 month'
       ) gs
     ) months

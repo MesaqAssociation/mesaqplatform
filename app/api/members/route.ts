@@ -75,9 +75,20 @@ export async function GET(req: NextRequest) {
         u.household_members,
         u.banking_name,
         COALESCE(u.is_active, true) as is_active,
-        COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
+        COALESCE(u.payment_plan, 'monthly') as payment_plan,
+        CASE COALESCE(u.payment_plan, 'monthly')
+          WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12)
+          WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6)
+          WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3)
+          ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0))
+        END AS balance,
         CASE 
-          WHEN COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) >= 0 THEN 'PAID'
+          WHEN (CASE COALESCE(u.payment_plan, 'monthly')
+            WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12)
+            WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6)
+            WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3)
+            ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0))
+          END) >= 0 THEN 'PAID'
           ELSE 'UNPAID'
         END AS payment_status,
         mp.total_paid,

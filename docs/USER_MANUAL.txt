@@ -128,8 +128,8 @@ To deactivate:
 ### Reactivating Members
 When reactivating a member:
 - Their date joined is reset to today
-- Their balance is cleared to $0
-- A "Reactivation Balance Adjustment" transaction is created
+- Their membership payment history is cleared
+- Their balance becomes $0 (no transaction created)
 - They can sign in again
 
 ### Changing Member Passwords

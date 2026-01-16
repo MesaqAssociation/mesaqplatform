@@ -67,67 +67,14 @@ export async function POST(
     const newStatus = !currentlyActive
 
     if (newStatus) {
-      // REACTIVATING: Clear their balance and reset date_joined
-      // Get their current balance first
-      const { rows: feeRows } = await pool.query(
-        "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
-      )
-      const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
-
-      // Calculate current balance
-      const { rows: balanceRows } = await pool.query(`
-        SELECT 
-          COALESCE(mp.total_paid, 0) - (months.expected_months * $2) as balance
-        FROM users u
-        LEFT JOIN (
-          SELECT mp.user_id, SUM(mp.amount) as total_paid
-          FROM membership_payments mp
-          LEFT JOIN transactions t ON t.id = mp.transaction_id
-          WHERE (mp.transaction_id IS NULL OR t.category = 'Membership Payment')
-          GROUP BY mp.user_id
-        ) mp ON mp.user_id = u.id
-        CROSS JOIN LATERAL (
-          SELECT GREATEST(0, COUNT(*)::int) AS expected_months
-          FROM generate_series(
-            date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-            date_trunc('month', CURRENT_DATE) - interval '1 month',
-            interval '1 month'
-          ) gs
-        ) months
-        WHERE u.id = $1
-      `, [memberId, monthlyFee])
-
-      const currentBalance = parseFloat(balanceRows[0]?.balance || '0')
+      // REACTIVATING: Clear their balance by deleting payments and resetting date_joined
+      // This effectively sets balance to $0 without creating any transactions
       
-      // Delete their old membership payments
+      // Delete their old membership payments - this resets total_paid to 0
       await pool.query('DELETE FROM membership_payments WHERE user_id = $1', [memberId])
 
-      // Get the main membership account
-      const { rows: accountRows } = await pool.query(
-        'SELECT id FROM financial_accounts WHERE is_main_membership_account = true LIMIT 1'
-      )
-      const accountId = accountRows[0]?.id
-
-      // Create a reactivation transaction if they had a balance
-      if (accountId && currentBalance !== 0) {
-        const today = new Date().toISOString().split('T')[0]
-        const adjustmentAmount = -currentBalance // Negate to clear the balance
-        await pool.query(
-          `INSERT INTO transactions 
-           (account_id, transaction_date, transaction_name, description, amount, transaction_type, category, matched_member_id, source) 
-           VALUES ($1, $2, $3, $4, $5, 'credit', 'Special Payment', $6, 'manual')`,
-          [
-            accountId, 
-            today, 
-            `Reactivation Balance Adjustment - ${existing[0].name}`,
-            `Balance cleared due to account reactivation. Previous balance: $${currentBalance.toFixed(2)}`,
-            Math.abs(adjustmentAmount),
-            memberId
-          ]
-        )
-      }
-
       // Update user: set is_active = true and reset date_joined to current month
+      // With date_joined = today and total_paid = 0, balance becomes $0
       await pool.query(
         'UPDATE users SET is_active = $1, date_joined = CURRENT_DATE WHERE id = $2',
         [newStatus, memberId]

@@ -88,8 +88,10 @@ export async function GET(req: NextRequest) {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
 
+        // Get members with basic info
         const { rows: members } = await pool.query(`
           SELECT 
+            u.id,
             u.member_id,
             u.name,
             u.email,
@@ -104,33 +106,73 @@ export async function GET(req: NextRequest) {
             COALESCE(u.is_active, true) as is_active,
             to_char(u.date_joined, 'YYYY-MM-DD') as date_joined,
             to_char(u.created_at, 'YYYY-MM-DD') as created_at,
-            COALESCE(mp.total_paid, 0) as total_paid,
-            months.expected_months
+            u.date_joined as date_joined_raw
           FROM users u
-          LEFT JOIN (
-            SELECT mp.user_id, SUM(mp.amount) as total_paid
-            FROM membership_payments mp
-            LEFT JOIN transactions t ON t.id = mp.transaction_id
-            WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
-            GROUP BY mp.user_id
-          ) mp ON mp.user_id = u.id
-          CROSS JOIN LATERAL (
-            SELECT GREATEST(0, COUNT(*)::int) AS expected_months
-            FROM generate_series(
-              date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-              date_trunc('month', CURRENT_DATE) - interval '1 month',
-              interval '1 month'
-            ) gs
-          ) months
           ORDER BY u.name ASC
         `)
-        
-        // Calculate balance for each member
-        data = members.map(m => ({
-          ...m,
-          balance: (parseFloat(m.total_paid) || 0) - ((m.expected_months || 0) * monthlyFee),
-          payment_status: (parseFloat(m.total_paid) || 0) - ((m.expected_months || 0) * monthlyFee) >= 0 ? 'PAID' : 'UNPAID'
-        }))
+
+        // Get total paid for all members
+        const { rows: payments } = await pool.query(`
+          SELECT mp.user_id, SUM(mp.amount) as total_paid
+          FROM membership_payments mp
+          LEFT JOIN transactions t ON t.id = mp.transaction_id
+          WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
+          GROUP BY mp.user_id
+        `)
+        const paymentMap = new Map(payments.map((p: any) => [p.user_id, parseFloat(p.total_paid || 0)]))
+
+        // Calculate balance for each member based on payment_plan
+        data = members.map((m: any) => {
+          const totalPaid = paymentMap.get(m.id) || 0
+          const dateJoined = m.date_joined_raw ? new Date(m.date_joined_raw) : new Date('2025-05-01')
+          const now = new Date()
+          
+          // Calculate months from date_joined to last month
+          let expectedMonths = 0
+          const startMonth = new Date(dateJoined.getFullYear(), dateJoined.getMonth(), 1)
+          const endMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1) // Last month
+          
+          if (endMonth >= startMonth) {
+            let current = new Date(startMonth)
+            while (current <= endMonth) {
+              expectedMonths++
+              current.setMonth(current.getMonth() + 1)
+            }
+          }
+          
+          // Calculate balance based on payment plan
+          let balance = 0
+          const plan = m.payment_plan || 'monthly'
+          if (plan === 'yearly') {
+            balance = totalPaid - (Math.floor(expectedMonths / 12) * monthlyFee * 12)
+          } else if (plan === 'semi_annually') {
+            balance = totalPaid - (Math.floor(expectedMonths / 6) * monthlyFee * 6)
+          } else if (plan === 'quarterly') {
+            balance = totalPaid - (Math.floor(expectedMonths / 3) * monthlyFee * 3)
+          } else {
+            balance = totalPaid - (expectedMonths * monthlyFee)
+          }
+          
+          return {
+            member_id: m.member_id,
+            name: m.name,
+            email: m.email,
+            phone: m.phone,
+            address: m.address,
+            role: m.role,
+            group_name: m.group_name,
+            household_members: m.household_members,
+            banking_name: m.banking_name,
+            payment_plan: m.payment_plan,
+            is_active: m.is_active,
+            date_joined: m.date_joined,
+            created_at: m.created_at,
+            total_paid: totalPaid,
+            expected_months: expectedMonths,
+            balance: balance.toFixed(2),
+            payment_status: balance >= 0 ? 'PAID' : 'UNPAID'
+          }
+        })
         headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'group_name', 'household_members', 'banking_name', 'payment_plan', 'is_active', 'date_joined', 'created_at', 'total_paid', 'expected_months', 'balance', 'payment_status']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`
         break

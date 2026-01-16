@@ -26,7 +26,15 @@ type Props = {
 export default function MemberDashboardClient({ initialData, isAdmin = false }: Props) {
   const { t } = useI18n()
   const [memberData, setMemberData] = useState(initialData)
-  const [balance, setBalance] = useState<{ membershipBalance: number; specialPaymentBalance: number } | null>(null)
+  const [balance, setBalance] = useState<{ 
+    membershipBalance: {
+      currentBalance: number;
+      lastUpdated?: string;
+      [key: string]: any;
+    };
+    specialPaymentBalance?: any;
+    [key: string]: any;
+  } | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
