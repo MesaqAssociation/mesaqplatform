@@ -82,6 +82,12 @@ export async function GET(req: NextRequest) {
 
     switch (type) {
       case 'members':
+        // Get monthly fee for balance calculation
+        const { rows: feeRows } = await pool.query(
+          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+        )
+        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+
         const { rows: members } = await pool.query(`
           SELECT 
             u.member_id,
@@ -92,13 +98,39 @@ export async function GET(req: NextRequest) {
             u.role,
             u.household_members,
             u.banking_name,
+            u.group_name,
+            u.telegram_id,
+            COALESCE(u.payment_plan, 'monthly') as payment_plan,
+            COALESCE(u.is_active, true) as is_active,
             to_char(u.date_joined, 'YYYY-MM-DD') as date_joined,
-            to_char(u.created_at, 'YYYY-MM-DD') as created_at
+            to_char(u.created_at, 'YYYY-MM-DD') as created_at,
+            COALESCE(mp.total_paid, 0) as total_paid,
+            (
+              SELECT GREATEST(0, COUNT(*)::int)
+              FROM generate_series(
+                date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
+                date_trunc('month', CURRENT_DATE) - interval '1 month',
+                interval '1 month'
+              ) gs
+            ) as expected_months
           FROM users u
+          LEFT JOIN (
+            SELECT mp.user_id, SUM(mp.amount) as total_paid
+            FROM membership_payments mp
+            LEFT JOIN transactions t ON t.id = mp.transaction_id
+            WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
+            GROUP BY mp.user_id
+          ) mp ON mp.user_id = u.id
           ORDER BY u.name ASC
         `)
-        data = members
-        headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'household_members', 'banking_name', 'date_joined', 'created_at']
+        
+        // Calculate balance for each member
+        data = members.map(m => ({
+          ...m,
+          balance: (m.total_paid || 0) - (m.expected_months * monthlyFee),
+          payment_status: (m.total_paid || 0) - (m.expected_months * monthlyFee) >= 0 ? 'PAID' : 'UNPAID'
+        }))
+        headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'group_name', 'household_members', 'banking_name', 'payment_plan', 'is_active', 'date_joined', 'created_at', 'total_paid', 'expected_months', 'balance', 'payment_status']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`
         break
 
@@ -136,17 +168,19 @@ export async function GET(req: NextRequest) {
             t.transaction_type,
             t.balance_after,
             t.source,
+            m.name as matched_member,
             u.name as created_by,
             bs.file_name as statement_file
           FROM transactions t
           LEFT JOIN financial_accounts fa ON t.account_id = fa.id
           LEFT JOIN users u ON t.created_by = u.id
+          LEFT JOIN users m ON t.matched_member_id = m.id
           LEFT JOIN bank_statements bs ON t.statement_id = bs.id
           ORDER BY t.transaction_date DESC
           LIMIT 10000
         `)
         data = transactions
-        headers = ['id', 'account_name', 'transaction_date', 'transaction_name', 'description', 'category', 'amount', 'transaction_type', 'balance_after', 'source', 'created_by', 'statement_file']
+        headers = ['id', 'account_name', 'transaction_date', 'transaction_name', 'description', 'category', 'amount', 'transaction_type', 'balance_after', 'source', 'matched_member', 'created_by', 'statement_file']
         filename = `finance_export_${new Date().toISOString().split('T')[0]}`
         break
 

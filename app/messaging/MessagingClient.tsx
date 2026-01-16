@@ -80,6 +80,7 @@ export default function MessagingClient() {
   
   // Members for search and bulk messaging
   const [allMembers, setAllMembers] = useState<Member[]>([])
+  const [allMembersIncludingInactive, setAllMembersIncludingInactive] = useState<Member[]>([])
   
   // Bulk messaging state
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
@@ -154,9 +155,14 @@ export default function MessagingClient() {
   const loadMembers = async () => {
     setLoadingMembers(true)
     try {
+      // Load active members for bulk messaging
       const res = await fetch('/api/members')
-      if (res.ok) {
+      // Load all members including inactive for individual conversations
+      const resAll = await fetch('/api/members?includeInactive=true')
+      if (res.ok && resAll.ok) {
         const data = await res.json()
+        const dataAll = await resAll.json()
+        setAllMembersIncludingInactive(dataAll.members || [])
         setAllMembers(data.members.filter((m: Member) => m.phone))
       }
     } catch (err) {
@@ -447,8 +453,9 @@ export default function MessagingClient() {
     )
   })
 
+  // For individual conversations, include deactivated members so admins can still message them
   const searchResults = searchQuery.length >= 2 
-    ? allMembers.filter(m => 
+    ? allMembersIncludingInactive.filter(m => 
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !conversations.some(c => c.phoneKey === m.phone?.replace(/\D/g, '').slice(-9))
       ).slice(0, 5)

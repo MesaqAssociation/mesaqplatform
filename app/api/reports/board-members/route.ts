@@ -57,8 +57,8 @@ function getCurrentYear(): number {
     return melbourneTime.getFullYear()
 }
 
-// Helper function to calculate member balance (amount owed)
-async function getMemberBalance(userId: string): Promise<number> {
+// Helper function to calculate member balance up to a specific end date
+async function getMemberBalanceAtDate(userId: string, endDate: string): Promise<number> {
     try {
         // Get monthly fee
         const { rows: feeRows } = await pool.query(
@@ -66,32 +66,34 @@ async function getMemberBalance(userId: string): Promise<number> {
         )
         const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
 
-        // Calculate months owed
+        // Calculate months expected up to end date (exclusive of the end date month)
         const { rows: balanceRows } = await pool.query(`
-      WITH months_owed AS (
+      WITH months_expected AS (
         SELECT 
           COUNT(DISTINCT DATE_TRUNC('month', gs::date)) as months
         FROM users u
         CROSS JOIN generate_series(
           GREATEST(u.date_joined::date, '2024-01-01'::date),
-          CURRENT_DATE,
+          DATE_TRUNC('month', $2::date) - interval '1 month',
           '1 month'::interval
         ) gs
         WHERE u.id = $1
       ),
-      months_paid AS (
-        SELECT COUNT(*) as months
-        FROM membership_payments
-        WHERE user_id = $1 AND status = 'paid'
+      total_paid AS (
+        SELECT COALESCE(SUM(mp.amount), 0) as total
+        FROM membership_payments mp
+        LEFT JOIN transactions t ON t.id = mp.transaction_id
+        WHERE mp.user_id = $1 
+          AND (mp.transaction_id IS NULL OR t.category = 'Membership Payment')
+          AND (t.transaction_date IS NULL OR t.transaction_date <= $2::date)
       )
       SELECT 
-        (mo.months - COALESCE(mp.months, 0)) as months_behind
-      FROM months_owed mo
-      LEFT JOIN months_paid mp ON true
-    `, [userId])
+        COALESCE(tp.total, 0) - (COALESCE(me.months, 0) * $3) as balance
+      FROM months_expected me
+      CROSS JOIN total_paid tp
+    `, [userId, endDate, monthlyFee])
 
-        const monthsBehind = balanceRows[0]?.months_behind || 0
-        return monthsBehind * monthlyFee
+        return parseFloat(balanceRows[0]?.balance || '0')
     } catch (err) {
         console.error('Error calculating balance for user:', userId, err)
         return 0
@@ -175,7 +177,8 @@ export async function GET(req: NextRequest) {
             members.map(async (member: any, index: number) => {
                 const membershipPayments = await getMembershipPaymentsInRange(member.id, startDate, endDate)
                 const specialPayments = await getSpecialPaymentsInRange(member.id, startDate, endDate)
-                const currentBalance = await getMemberBalance(member.id)
+                // Calculate balance as of the report end date, not current balance
+                const balanceAtEndDate = await getMemberBalanceAtDate(member.id, endDate)
                 const sum = membershipPayments + specialPayments
                 
                 return {
@@ -185,7 +188,7 @@ export async function GET(req: NextRequest) {
                     membershipPayments: membershipPayments.toFixed(2),
                     specialPayments: specialPayments.toFixed(2),
                     sum: sum.toFixed(2),
-                    currentBalance: currentBalance.toFixed(2)
+                    currentBalance: balanceAtEndDate.toFixed(2)
                 }
             })
         )

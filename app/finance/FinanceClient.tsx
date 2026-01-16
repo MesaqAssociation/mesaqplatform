@@ -1360,16 +1360,7 @@ export default function FinanceClient({
           Edit Bank Account
         </Button>
         
-        {/* Destructive - at the end */}
         <div className="flex-1" />
-        <Button 
-          variant="destructive" 
-          onClick={handleClearAll} 
-          disabled={loading || transactions.length === 0}
-        >
-          <IconTrash className="mr-2 size-4" />
-          Clear All
-        </Button>
         <input
           id="statement-upload"
           type="file"
@@ -1742,9 +1733,9 @@ export default function FinanceClient({
 
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
-                {selectedTransaction?.category === 'Charges' ? (
+                {selectedTransaction?.category === 'Charges' || selectedTransaction?.transaction_type === 'adjustment' ? (
                   <div className="w-48 h-10 mt-1 bg-background text-foreground border border-input rounded-md flex items-center justify-center">
-                    Charges
+                    {selectedTransaction?.category === 'Charges' ? 'Charges' : 'Bank Adjustment'}
                   </div>
                 ) : selectedTransaction?.transaction_type === 'debit' ? (
                   <Select 
@@ -1776,8 +1767,8 @@ export default function FinanceClient({
                 )}
               </div>
 
-              {/* Only show Matched Member for credits, not debits */}
-              {selectedTransaction?.transaction_type !== 'debit' && (
+              {/* Only show Matched Member for credits, not debits or adjustments */}
+              {selectedTransaction?.transaction_type !== 'debit' && selectedTransaction?.transaction_type !== 'adjustment' && (
               <div>
                 <Label className="text-muted-foreground text-xs">Matched Member</Label>
                 <div className="mt-1">

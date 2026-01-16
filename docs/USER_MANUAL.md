@@ -1,0 +1,431 @@
+# Mesaq Platform User Manual
+
+## Table of Contents
+1. [Dashboard](#dashboard)
+2. [Calendar](#calendar)
+3. [Members](#members)
+4. [Finance](#finance)
+5. [Events](#events)
+6. [Documents](#documents)
+7. [Messaging](#messaging)
+8. [Community Settings](#community-settings)
+9. [Personal Settings](#personal-settings)
+10. [Regular Member View](#regular-member-view)
+11. [Roles & Permissions](#roles--permissions)
+
+---
+
+## Dashboard
+
+### What Each Card Means
+
+- **Total Members**: Number of active members in the community
+- **Upcoming Events**: Events scheduled in the near future
+- **Messages**: Recent message activity
+- **Account Balance**: Current bank account balance
+
+### Need Attention Section
+
+The dashboard shows items that require admin action:
+
+#### Unknown Payers
+Credit transactions that couldn't be automatically matched to any member. Click "View Unknown Transactions" to:
+- See all unmatched payments
+- Search and assign a member to each payment
+- Change the payment category
+- Click "Keep Unknown" to mark as reviewed without assigning
+
+#### Special Payments (Review Payments)
+Payments matched to members but categorized as "Special Payment" instead of "Membership Payment". Click "Review Payments" to:
+- View all special payments that need review
+- Click "Membership" to reclassify as a membership payment
+- Click "Keep Special" to confirm it's not a membership payment
+- Use bulk actions to process multiple payments at once
+
+---
+
+## Calendar
+
+### How to Schedule a Message
+1. Click on a date in the calendar
+2. Fill in the notification details:
+   - Title (for admin reference only, not sent to members)
+   - Message content
+   - Select recipients (all members or specific members)
+   - Set the scheduled time
+3. Click "Schedule"
+
+### How to Cancel a Message
+1. Click on the scheduled notification
+2. Click "Delete" or "Cancel"
+3. Confirm the cancellation
+
+### Using Placeholders in Messages
+Available placeholders:
+- `{name}` - Member's full name
+- `{group}` - Member's group name
+- `{first_name}` - Member's first name
+- `{balance}` - Member's current balance
+
+Example: "Hi {name}, your current balance is {balance}"
+
+---
+
+## Members
+
+### Creating Members
+
+#### Through the Website
+1. Go to Members → Create Member
+2. Fill in required fields:
+   - **Name**: Full name of the member
+   - **Phone**: Required for messaging
+   - **Email**: Optional but recommended
+3. Optional fields:
+   - **Member ID**: Unique identifier (auto-generated if blank)
+   - **Banking Name**: The name that appears in bank transactions (for auto-matching payments)
+   - **Payment Identifiers**: Additional keywords to help match payments
+   - **Payment Plan**: Monthly, Quarterly, Semi-annually, or Yearly
+   - **Group**: Assign to a group
+   - **Address**: Physical address
+4. Click "Create Member"
+
+#### Through Telegram Bot
+Members can self-register through the Telegram bot by:
+1. Finding the community's Telegram bot
+2. Sending `/start`
+3. Following the registration prompts
+
+### What Each Value Means
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Member's full name |
+| **ID** | Unique member identifier (e.g., MES001) |
+| **Banking Name** | Name used in bank transfers - for automatic payment matching |
+| **Payment Identifiers** | Additional keywords to identify their payments |
+| **Payment Plan** | Payment frequency (Monthly, Quarterly, Semi-annually, Yearly) |
+
+### Editing Member Information
+1. Click on a member's name to open their profile
+2. Click "Edit"
+3. Make changes
+4. Click "Save"
+
+### Deactivating Members
+Deactivating a member:
+- Removes them from all searches and bulk messaging
+- Prevents them from signing in
+- Keeps their information for records
+- Still matches future payments to them (if banking name matches)
+- Does NOT delete their data
+
+To deactivate:
+1. Open member's profile
+2. Scroll to "Danger Zone"
+3. Click "Deactivate Account"
+
+### Reactivating Members
+When reactivating a member:
+- Their date joined is reset to today
+- Their balance is cleared to $0
+- A "Reactivation Balance Adjustment" transaction is created
+- They can sign in again
+
+### Changing Member Passwords
+1. Open member's profile
+2. Enter new password in "Change Password" section
+3. Click "Change Password"
+
+### Payment Plans
+
+| Plan | Expected Payment Schedule |
+|------|--------------------------|
+| **Monthly** | Every month |
+| **Quarterly** | January, April, July, October |
+| **Semi-annually** | January and July |
+| **Yearly** | January only |
+
+Balance calculations and payment reminders adjust automatically based on the member's plan.
+
+---
+
+## Finance
+
+### How Balance is Calculated
+- Monthly membership fee: $40 (configurable)
+- Expected payments = Number of months since joining × Monthly fee
+- Paid amount = Sum of all "Membership Payment" transactions
+- **Balance = Paid amount - Expected payments**
+- **Special Payments do NOT count towards membership balance**
+
+### How Transactions are Matched to Members
+Automatic matching uses these criteria in order:
+1. **Banking Name**: Sender name matches member's banking name
+2. **Member Code**: Description contains member's ID (e.g., "MES001")
+3. **Member Name**: Description contains member's name
+
+### Uploading Bank Statements
+
+#### On Website
+1. Go to Finance
+2. Click "Upload Statement"
+3. Select a PDF bank statement file
+4. System automatically extracts transactions
+
+#### In Telegram Group
+1. Send the PDF statement file to the admin group chat
+2. Bot will process and import transactions
+
+### Changing Member Matches
+1. Click on a transaction to open details
+2. Click the member dropdown
+3. Search for the correct member
+4. Select them to update the match
+
+### Getting Transaction Info
+Click on any transaction to see:
+- Date, name, description
+- Amount and type
+- Matched member
+- Category
+- Bank statement source
+
+### Changing Categories
+1. Click on a transaction
+2. Use the Category dropdown to select:
+   - **For Credits**: Membership Payment, Special Payment, Donation
+   - **For Debits**: Event Expense, Special Expense
+
+### Deleting Transactions
+
+#### Single Transaction
+1. Click on the transaction
+2. Click "Delete"
+3. Confirm deletion
+
+#### Multiple Transactions
+1. Click "Select"
+2. Check the transactions to delete
+3. Click the delete icon
+4. Confirm deletion
+
+**Note**: Deleting transactions does NOT affect the bank balance. Balance is managed through statement uploads and manual adjustments only.
+
+### Adding Transactions
+1. Click "Add Transaction"
+2. Fill in:
+   - Date
+   - Name/Description
+   - Amount
+   - Type (Income/Expense)
+   - Category
+   - Optionally match to a member
+
+### Charging Members (Reconciliation)
+To add a charge/fine to a member:
+1. Click the charge icon
+2. Select the member
+3. Enter amount and reason
+4. Submit
+
+Charges appear in their expected payments but don't affect bank balance.
+
+### Need Action - Special Payments
+From dashboard → "Review Payments":
+1. See all special payments with matched members
+2. For each: Identify if it's actually a membership payment
+3. Click "Membership" to reclassify OR "Keep Special" to confirm as special
+
+### Searching for Payments
+1. Use the search box at the top of transactions
+2. Search by name, description, member name, or amount
+
+### Main Bank Account
+The "Main Membership Account" is used for:
+- Payment reminders
+- Balance calculations
+- Member payment tracking
+
+Set it in Bank Account Settings → Mark as "Main Membership Account"
+
+### Editing Bank Info
+1. Click "Edit Bank Account"
+2. Update account name, BSB, account number
+3. Save changes
+
+---
+
+## Events
+
+### What Events Are For
+Events are for book-keeping and organization:
+- Track community events
+- Record attendance
+- Send notifications to organizers
+
+### Creating Events
+
+#### Through Website
+1. Go to Events
+2. Click "Create Event"
+3. Fill in:
+   - Title
+   - Date and time
+   - Location
+   - Description
+   - Event type
+   - Organizing group
+4. Click "Create"
+
+#### Through Telegram Bot
+1. Use the `/event` command in the admin group
+2. Follow the prompts to enter event details
+
+### Organizer Messages
+When an event is created:
+- Members of the organizing group receive notifications
+- Notifications are sent via SMS/Telegram
+
+### Marking Events Complete
+1. Open the event
+2. Click "Mark Complete"
+3. Optionally add attendance records
+
+---
+
+## Documents
+
+### Uploading Documents
+1. Go to Documents
+2. Click "Upload"
+3. Enter title and description
+4. Select file
+5. Click "Upload"
+
+### Downloading Documents
+- Click "Download" on any document
+- File will download through the server (avoids CORS issues)
+
+### Deleting Documents
+1. Click the delete icon on the document
+2. Confirm deletion
+
+---
+
+## Messaging
+
+### Sending Bulk Messages
+1. Go to Messaging → Bulk Message tab
+2. Search and select members to message
+3. Type your message (can use placeholders)
+4. Click "Send"
+
+**Note**: Deactivated members are NOT included in bulk messaging.
+
+### Sending Individual Messages
+1. Go to Messaging → Conversations tab
+2. Search for a member or select an existing conversation
+3. Type and send your message
+
+**Note**: Deactivated members CAN be messaged individually.
+
+### Replying to Messages
+1. Open a conversation
+2. Type your reply
+3. Press Enter or click Send
+
+### Refreshing Messages
+Click the refresh icon to check for new messages
+
+### Limitations
+- Cannot receive files/videos via SMS
+- Only text messages supported
+
+### Topping Up Balance
+1. Go to Messaging → Balance tab
+2. Follow the "How to Top Up" instructions
+3. Add credits through the SMS provider's website
+
+---
+
+## Community Settings
+**Access: Manager only**
+
+### Membership Fee
+- Set the monthly membership fee
+- Changes take effect from the next month
+
+### Payment Keywords
+Add keywords for automatic payment classification:
+- Event payments
+- Membership payments
+- Donations
+
+### Export Data
+Export to CSV:
+- **Members**: All member info including balance
+- **Events**: All events
+- **Finance**: All transactions (includes expenses)
+
+### Custom Member Fields
+Add extra fields that appear in:
+- Member profiles
+- Registration forms
+
+### Backup & Restore
+- Create backups manually
+- Automatic backups on last day of each month
+- Contact admin to restore from backup
+
+---
+
+## Personal Settings
+
+### Change Profile Picture
+1. Go to Settings
+2. Click on profile picture
+3. Upload new image
+
+### Change Info
+1. Go to Settings
+2. Edit your details
+3. Click Save
+
+### Change Password
+1. Go to Settings
+2. Enter new password
+3. Click "Change Password"
+
+---
+
+## Regular Member View
+
+Regular members can:
+- **See current balance** and recent transactions
+- **View upcoming events** (but not scheduled messages)
+- **See all member names** (directory)
+- **View monthly payment breakdowns**
+- **See upcoming and past events**
+- **Download community documents**
+- **Change personal info and password**
+
+---
+
+## Roles & Permissions
+
+### Board Members
+All board members have access to the admin dashboard.
+
+| Role | Description | Special Access |
+|------|-------------|----------------|
+| **Manager** (Hussain Ammeri) | Full access | Community Settings |
+| **Public Officer** (Azizulah Ahmadi) | Admin dashboard | - |
+| **Logistics Officer** (Ali Hakimi) | Admin dashboard | - |
+| **Finance Officer** (Mahtab Rezaie) | Admin dashboard | Finance operations |
+
+### Access Summary
+- **Community Settings**: Manager only
+- **Admin Dashboard**: All board members
+- **Member View**: All other members
+
