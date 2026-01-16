@@ -181,26 +181,34 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
             let checkStr = amountStr
             
             while (checkStr.length > 0) {
-              if (/^\d{1,3}(?:,\d{3})*\.\d{2}$/.test(checkStr)) {
-                const offset = amountStr.length - checkStr.length
-                const checkStartInBefore = amountMatch.index! + offset
-                const charBefore = checkStartInBefore > 0 ? beforeDoubleDollar[checkStartInBefore - 1] : ''
+              // Valid currency format: 1-3 leading digits (no leading zeros except for < $1), 
+              // then optional ,XXX groups, then .XX
+              // Skip amounts with leading zeros (like 00.00, 07.50) as they're not valid currency
+              if (/^\d{1,3}(?:,\d{3})*\.\d{2}$/.test(checkStr) && !/^0\d/.test(checkStr)) {
+                const value = parseFloat(checkStr.replace(/,/g, ''))
                 
-                // Count consecutive digits immediately before this amount
-                let digitsBefore = ''
-                for (let i = checkStartInBefore - 1; i >= 0 && beforeDoubleDollar[i] >= '0' && beforeDoubleDollar[i] <= '9'; i--) {
-                  digitsBefore = beforeDoubleDollar[i] + digitsBefore
+                // Skip zero amounts (not meaningful transactions)
+                if (value > 0) {
+                  const offset = amountStr.length - checkStr.length
+                  const checkStartInBefore = amountMatch.index! + offset
+                  const charBefore = checkStartInBefore > 0 ? beforeDoubleDollar[checkStartInBefore - 1] : ''
+                  
+                  // Count consecutive digits immediately before this amount
+                  let digitsBefore = ''
+                  for (let i = checkStartInBefore - 1; i >= 0 && beforeDoubleDollar[i] >= '0' && beforeDoubleDollar[i] <= '9'; i--) {
+                    digitsBefore = beforeDoubleDollar[i] + digitsBefore
+                  }
+                  
+                  const leadingDigits = (checkStr.match(/^(\d+)/) || ['', ''])[1]
+                  const combinedLeading = digitsBefore + leadingDigits
+                  
+                  validAmounts.push({
+                    amount: checkStr,
+                    value: value,
+                    combinedLeading: combinedLeading,
+                    isCleanBoundary: charBefore === '' || (!(charBefore >= '0' && charBefore <= '9') && charBefore !== ',')
+                  })
                 }
-                
-                const leadingDigits = (checkStr.match(/^(\d+)/) || ['', ''])[1]
-                const combinedLeading = digitsBefore + leadingDigits
-                
-                validAmounts.push({
-                  amount: checkStr,
-                  value: parseFloat(checkStr.replace(/,/g, '')),
-                  combinedLeading: combinedLeading,
-                  isCleanBoundary: charBefore === '' || (!(charBefore >= '0' && charBefore <= '9') && charBefore !== ',')
-                })
               }
               checkStr = checkStr.substring(1)
               if (checkStr.startsWith(',')) checkStr = checkStr.substring(1)
@@ -327,9 +335,24 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
         balance = amounts[0].value
         // Don't assume credit, let balance-based detection handle it
       } else if (amounts.length >= 2) {
-        // Standard format: transaction amount + balance OR debit + credit + balance
-        const txnAmount = amounts[0]
-        balance = amounts[amounts.length - 1].value
+        // Check if any amount has isDebitFormat flag (CommBank debit: "2,500.00 $$")
+        // If so, that's the transaction amount and the other is the balance
+        const debitFormatAmount = amounts.find(a => a.isDebitFormat === true)
+        const nonDebitFormatAmounts = amounts.filter(a => a.isDebitFormat !== true)
+        
+        let txnAmount: { value: number; isNegative: boolean; isDebitFormat?: boolean }
+        
+        if (debitFormatAmount && nonDebitFormatAmounts.length > 0) {
+          // CommBank debit format detected - use the debit format amount as transaction
+          // and the other amount(s) as balance
+          txnAmount = debitFormatAmount
+          balance = nonDebitFormatAmounts[nonDebitFormatAmounts.length - 1].value
+          console.log(`   Found debit format amount: $${debitFormatAmount.value}, balance: $${balance}`)
+        } else {
+          // Standard format: transaction amount + balance OR debit + credit + balance
+          txnAmount = amounts[0]
+          balance = amounts[amounts.length - 1].value
+        }
         
         // Determine if debit or credit:
         // 1. Check if CommBank debit format (amount followed by $, e.g., "2,500.00 $")
@@ -350,7 +373,7 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
                            nameLower.includes('pay anyone')
         
         // CommBank shows debits as "2,500.00 $" ($ after amount)
-        const isDebitFormat = (txnAmount as any).isDebitFormat === true
+        const isDebitFormat = txnAmount.isDebitFormat === true
         
         if (txnAmount.isNegative || isDebitFormat || isDebitName) {
           debit = txnAmount.value
