@@ -101,7 +101,7 @@ export default function FinanceClient({
   const [newTransactionDescription, setNewTransactionDescription] = useState('')
   const [newTransactionAmount, setNewTransactionAmount] = useState('')
   const [newTransactionType, setNewTransactionType] = useState<'credit' | 'debit'>('credit')
-  const [newTransactionCategory, setNewTransactionCategory] = useState<'Membership Payment' | 'Special Payment' | 'Donation'>('Membership Payment')
+  const [newTransactionCategory, setNewTransactionCategory] = useState<string>('Membership Payment')
   const [newTransactionMemberId, setNewTransactionMemberId] = useState<string | null>(null)
   const [newTransactionMemberName, setNewTransactionMemberName] = useState<string>('')
   
@@ -2103,7 +2103,11 @@ export default function FinanceClient({
               </div>
               <div>
                 <Label htmlFor="txn-type">Type *</Label>
-                <Select value={newTransactionType} onValueChange={(value: 'credit' | 'debit') => setNewTransactionType(value)}>
+                <Select value={newTransactionType} onValueChange={(value: 'credit' | 'debit') => {
+                  setNewTransactionType(value)
+                  // Reset category to appropriate default when switching type
+                  setNewTransactionCategory(value === 'credit' ? 'Membership Payment' : 'Event Expense')
+                }}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -2117,14 +2121,24 @@ export default function FinanceClient({
 
           <div>
             <Label htmlFor="txn-category">Category *</Label>
-            <Select value={newTransactionCategory} onValueChange={(value: 'Membership Payment' | 'Special Payment' | 'Donation') => setNewTransactionCategory(value)}>
+            <Select value={newTransactionCategory} onValueChange={(value: string) => setNewTransactionCategory(value)}>
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                <SelectItem value="Event Payment">Event Payment</SelectItem>
-                <SelectItem value="Donation">Donation</SelectItem>
+                {newTransactionType === 'credit' ? (
+                  <>
+                    <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                    <SelectItem value="Event Payment">Event Payment</SelectItem>
+                    <SelectItem value="Donation">Donation</SelectItem>
+                    <SelectItem value="Special Payment">Special Payment</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="Event Expense">Event Expense</SelectItem>
+                    <SelectItem value="Special Expense">Special Expense</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -2250,6 +2264,7 @@ export default function FinanceClient({
                   setNewTransactionDescription('')
                   setNewTransactionAmount('')
                   setNewTransactionType('credit')
+                  setNewTransactionCategory('Membership Payment')
                   setNewTransactionMemberId(null)
                   setNewTransactionMemberName('')
                 }}
