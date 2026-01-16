@@ -33,14 +33,16 @@ async function verifyAdmin(): Promise<string | null> {
 // POST - Deactivate a member
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ member_id: string }> | { member_id: string } }
 ) {
   const adminId = await verifyAdmin()
   if (!adminId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const memberId = params.id
+  // Await params if it's a Promise (Next.js 15+)
+  const resolvedParams = params instanceof Promise ? await params : params
+  const memberId = resolvedParams.member_id
 
   try {
     // Check if member exists

@@ -25,10 +25,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, email, phone, password, address, image, role, group_name, banking_name, payment_identifiers, member_id, date_joined, household_members, custom_data, occupation } = body
+    const { name, email, phone, password, address, image, role, group_name, banking_name, payment_identifiers, member_id, date_joined, household_members, custom_data, occupation, payment_plan } = body
     if (!name || !phone || !password) {
       return NextResponse.json({ error: 'Name, phone number, and password are required' }, { status: 400 })
     }
+    
+    // Validate payment_plan
+    const validPlans = ['monthly', 'quarterly', 'semi_annually', 'yearly']
+    const memberPaymentPlan = validPlans.includes(payment_plan) ? payment_plan : 'monthly'
 
     // Check if banking_name is unique (if provided)
     if (banking_name && banking_name.trim()) {
@@ -47,16 +51,17 @@ export async function POST(req: NextRequest) {
     try {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_identifiers TEXT`)
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation TEXT`)
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_plan TEXT DEFAULT 'monthly'`)
     } catch {
       // Columns might already exist
     }
 
     const hashed = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, group_name, banking_name, payment_identifiers, member_id, date_joined, household_members, custom_data, occupation) 
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
-       RETURNING id, member_id, name, email, phone, role, group_name`,
-      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', group_name || null, banking_name || null, payment_identifiers || null, member_id || null, date_joined || null, household_members ? parseInt(household_members) : null, custom_data ? JSON.stringify(custom_data) : '{}', occupation || null]
+      `INSERT INTO users (id, name, email, phone, password_hash, address, image, role, group_name, banking_name, payment_identifiers, member_id, date_joined, household_members, custom_data, occupation, payment_plan) 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+       RETURNING id, member_id, name, email, phone, role, group_name, payment_plan`,
+      [name, email || null, phone, hashed, address || null, image || null, role || 'Community Member', group_name || null, banking_name || null, payment_identifiers || null, member_id || null, date_joined || null, household_members ? parseInt(household_members) : null, custom_data ? JSON.stringify(custom_data) : '{}', occupation || null, memberPaymentPlan]
     )
     return NextResponse.json({ member: result.rows[0] })
   } catch (err: any) {

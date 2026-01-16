@@ -45,6 +45,7 @@ type Member = {
   custom_data: Record<string, any>
   occupation: string | null
   is_active?: boolean
+  payment_plan?: string // monthly, quarterly, semi_annually, yearly
 }
 
 type Event = {
@@ -114,6 +115,7 @@ export default function MemberDetailClient({
     household_members: member.household_members || 1,
     payment_identifiers: (member.payment_identifiers || []).join(', '),
     occupation: member.occupation || '',
+    payment_plan: member.payment_plan || 'monthly',
   })
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -533,7 +535,7 @@ export default function MemberDetailClient({
                         {saveError && (
                           <span className="text-sm text-red-500 mr-2">{saveError}</span>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setSaveError(null); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', '), occupation: member.occupation || '' }); setCustomDataDraft(member.custom_data || {}) }}>
+                        <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setSaveError(null); setDraft({ ...draft, name: member.name || '', email: member.email || '', phone: member.phone || '', address: member.address || '', banking_name: member.banking_name || '', household_members: member.household_members || 1, payment_identifiers: (member.payment_identifiers || []).join(', '), occupation: member.occupation || '', payment_plan: member.payment_plan || 'monthly' }); setCustomDataDraft(member.custom_data || {}) }}>
                           Cancel
                         </Button>
                         <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
@@ -603,6 +605,35 @@ export default function MemberDetailClient({
                     />
                   ) : (
                     <p className="font-medium">{member.household_members || 1}</p>
+                  )}
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center gap-3">
+                <IconCreditCard className="size-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Payment Plan</p>
+                  {editMode ? (
+                    <Select 
+                      value={draft.payment_plan || "monthly"} 
+                      onValueChange={(value) => setDraft({ ...draft, payment_plan: value })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly (every 3 months)</SelectItem>
+                        <SelectItem value="semi_annually">Semi-Annually (every 6 months)</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="font-medium">
+                      {member.payment_plan === 'yearly' ? 'Yearly' :
+                       member.payment_plan === 'semi_annually' ? 'Semi-Annually' :
+                       member.payment_plan === 'quarterly' ? 'Quarterly' : 'Monthly'}
+                    </p>
                   )}
                 </div>
               </div>

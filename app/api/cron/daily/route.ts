@@ -155,6 +155,13 @@ export async function POST(req: NextRequest) {
 
 /**
  * Send payment reminders to members with negative balance
+ * Respects payment plans: monthly, quarterly, semi_annually, yearly
+ * 
+ * Payment plan reminder schedule:
+ * - Monthly: Every month (7th)
+ * - Quarterly: April, August, December (7th)
+ * - Semi-annually: July, January (7th)
+ * - Yearly: January only (7th)
  */
 async function sendPaymentReminders(): Promise<{ sent: number; failed: number; skipped: number }> {
   // Get main membership account
@@ -177,11 +184,46 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   )
   const monthlyFee = parseFloat(feeRows[0]?.value || '40')
 
-  // Get all members with their calculated balance
+  // Get current month (1-12)
+  const currentMonth = new Date().getMonth() + 1 // 1 = January, 12 = December
+  
+  // Determine which payment plans should get reminders this month
+  // Monthly: every month
+  // Quarterly: January (1), April (4), July (7), October (10)
+  // Semi-annually: January (1), July (7)
+  // Yearly: January (1) only
+  const quarterlyMonths = [1, 4, 7, 10]
+  const semiAnnualMonths = [1, 7]
+  const yearlyMonths = [1]
+  
+  // Build the payment plan filter
+  const eligiblePlans: string[] = ['monthly'] // Monthly always gets reminders
+  if (quarterlyMonths.includes(currentMonth)) {
+    eligiblePlans.push('quarterly')
+  }
+  if (semiAnnualMonths.includes(currentMonth)) {
+    eligiblePlans.push('semi_annually')
+  }
+  if (yearlyMonths.includes(currentMonth)) {
+    eligiblePlans.push('yearly')
+  }
+  
+  console.log(`📅 Current month: ${currentMonth}, eligible payment plans: ${eligiblePlans.join(', ')}`)
+
+  // Get all members with their calculated balance, filtered by eligible payment plans
+  // Balance calculation varies by payment plan
   const { rows: members } = await pool.query(`
     SELECT 
-      u.id, u.name, u.phone,
-      COALESCE(mp.total_paid, 0) - (months.expected_months * $1) AS balance
+      u.id, u.name, u.phone, 
+      COALESCE(u.payment_plan, 'monthly') as payment_plan,
+      COALESCE(mp.total_paid, 0) as total_paid,
+      months.expected_months,
+      CASE COALESCE(u.payment_plan, 'monthly')
+        WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * $1 * 12)
+        WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * $1 * 6)
+        WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * $1 * 3)
+        ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * $1)
+      END AS balance
     FROM users u
     LEFT JOIN (
       SELECT mp.user_id, SUM(mp.amount) as total_paid
@@ -198,11 +240,16 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
         interval '1 month'
       ) gs
     ) months
-    WHERE u.phone IS NOT NULL AND u.phone != ''
-  `, [monthlyFee])
+    WHERE u.phone IS NOT NULL 
+      AND u.phone != ''
+      AND COALESCE(u.is_active, true) = true
+      AND COALESCE(u.payment_plan, 'monthly') = ANY($2)
+  `, [monthlyFee, eligiblePlans])
 
   // Filter to members with negative balance
   const membersWithDebt = members.filter((m: any) => parseFloat(m.balance) < 0 && m.phone)
+  
+  console.log(`📊 Found ${membersWithDebt.length} members with debt (from ${members.length} eligible members)`)
 
   if (membersWithDebt.length === 0) {
     return { sent: 0, failed: 0, skipped: 0 }

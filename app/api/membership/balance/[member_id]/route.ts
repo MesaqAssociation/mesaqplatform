@@ -44,9 +44,9 @@ export async function GET(
     `)
     const monthlyFee = parseFloat(settingsRows[0]?.value || process.env.MONTHLY_FEE || '50.00')
 
-    // Get member info
+    // Get member info including payment_plan
     const { rows: memberRows } = await pool.query(
-      'SELECT id, member_id, name, created_at, date_joined FROM users WHERE id = $1',
+      'SELECT id, member_id, name, created_at, date_joined, COALESCE(payment_plan, \'monthly\') as payment_plan FROM users WHERE id = $1',
       [memberId]
     )
 
@@ -55,13 +55,14 @@ export async function GET(
     }
 
     const member = memberRows[0]
+    const paymentPlan = member.payment_plan || 'monthly' // monthly, quarterly, semi_annually, yearly
     
     // ONLY use date_joined (mandatory field) - ignore created_at
     const startDate = member.date_joined ? new Date(member.date_joined) : new Date('2025-05-01')
     const currentDate = new Date()
     
+    // Calculate expected payment periods based on payment plan
     // Generate list of months from start to PREVIOUS month (exclude current month)
-    // Since statements are uploaded on the 7th, we don't expect payment for current month yet
     const months: Array<{ month: string, monthName: string }> = []
     let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
     // End at previous month (current month - 1)
@@ -72,6 +73,38 @@ export async function GET(
       const monthName = currentMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
       months.push({ month: monthStr, monthName })
       currentMonth.setMonth(currentMonth.getMonth() + 1)
+    }
+    
+    // Calculate how many payment periods have passed based on payment plan
+    let expectedPayments = 0
+    let periodMonths = 1 // How many months in each payment period
+    let periodFee = monthlyFee
+    
+    switch (paymentPlan) {
+      case 'yearly':
+        periodMonths = 12
+        periodFee = monthlyFee * 12
+        // Count how many full years have passed
+        expectedPayments = Math.floor(months.length / 12)
+        break
+      case 'semi_annually':
+        periodMonths = 6
+        periodFee = monthlyFee * 6
+        // Count how many 6-month periods have passed
+        expectedPayments = Math.floor(months.length / 6)
+        break
+      case 'quarterly':
+        periodMonths = 3
+        periodFee = monthlyFee * 3
+        // Count how many quarters have passed
+        expectedPayments = Math.floor(months.length / 3)
+        break
+      case 'monthly':
+      default:
+        periodMonths = 1
+        periodFee = monthlyFee
+        expectedPayments = months.length
+        break
     }
 
     // Get all MEMBERSHIP payments for this member (only true membership payments)
@@ -112,11 +145,11 @@ export async function GET(
     // Calculate membership balance
     let runningBalance = 0
     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0)
-    const expectedPayments = months.length
       
     // Running balance = total paid - total expected - charges
-    // Charges REDUCE the balance (member owes more)
-    runningBalance = totalPaid - (expectedPayments * monthlyFee) - totalCharges
+    // For non-monthly plans, we calculate based on payment periods
+    const totalExpected = expectedPayments * periodFee
+    runningBalance = totalPaid - totalExpected - totalCharges
 
     // Calculate status
     let status: 'caught_up' | 'ahead' | 'behind' = 'caught_up'
@@ -161,7 +194,7 @@ export async function GET(
 
     const totalDonations = donationTxns.reduce((sum, txn) => sum + parseFloat(txn.amount || 0), 0)
 
-    // Build month-by-month breakdown
+    // Build month-by-month breakdown (always show months, but explain payment plan)
     const monthsBreakdown = months.map(m => {
       const paidAmount = paymentMap.get(m.month) || 0
       const expected = monthlyFee
@@ -174,6 +207,17 @@ export async function GET(
         status: isPaid ? 'paid' : 'unpaid'
       }
     })
+    
+    // Payment plan display info
+    const paymentPlanInfo = {
+      plan: paymentPlan,
+      periodMonths,
+      periodFee,
+      expectedPayments,
+      planLabel: paymentPlan === 'yearly' ? 'Yearly' : 
+                 paymentPlan === 'semi_annually' ? 'Semi-Annually' :
+                 paymentPlan === 'quarterly' ? 'Quarterly' : 'Monthly'
+    }
 
     // Get charge details for display
     const { rows: chargeDetails } = await pool.query(`
@@ -197,9 +241,12 @@ export async function GET(
         totalPaid,
         totalCharges,
         monthlyFee,
+        periodFee,
+        totalExpected,
         status,
         monthsBreakdown,
-        charges: chargeDetails
+        charges: chargeDetails,
+        paymentPlan: paymentPlanInfo
       },
       eventPaymentBalance: {
         totalSpecialPayments,

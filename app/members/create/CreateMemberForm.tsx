@@ -77,6 +77,7 @@ export default function CreateMemberForm() {
     date_joined: new Date().toISOString().split('T')[0],
     household_members: '1',
     occupation: '',
+    payment_plan: 'monthly', // monthly, quarterly, semi_annually, yearly
   })
 
   function getDaysInMonth(year: number, month: number) {
@@ -283,6 +284,24 @@ export default function CreateMemberForm() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="payment_plan">Payment Plan</Label>
+            <Select value={formData.payment_plan} onValueChange={(value) => setFormData({ ...formData, payment_plan: value })}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly (every 3 months)</SelectItem>
+                <SelectItem value="semi_annually">Semi-Annually (every 6 months)</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              How often this member pays their membership fee
+            </p>
           </div>
 
           <div>

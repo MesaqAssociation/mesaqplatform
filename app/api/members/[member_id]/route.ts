@@ -112,9 +112,13 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation } = body
+    const { name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation, payment_plan } = body
 
     const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
+    
+    // Validate payment_plan
+    const validPlans = ['monthly', 'quarterly', 'semi_annually', 'yearly']
+    const memberPaymentPlan = payment_plan && validPlans.includes(payment_plan) ? payment_plan : undefined
     
     // Check if banking_name is unique (if provided)
     if (banking_name && banking_name.trim()) {
@@ -139,11 +143,12 @@ export async function PATCH(
       }
     }
 
-    // Ensure occupation column exists
+    // Ensure columns exist
     try {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation TEXT`)
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_plan TEXT DEFAULT 'monthly'`)
     } catch {
-      // Column might already exist
+      // Columns might already exist
     }
 
     const { rows } = await pool.query(`
@@ -158,9 +163,10 @@ export async function PATCH(
         household_members = $7,
         payment_identifiers = $8,
         custom_data = COALESCE($9::jsonb, custom_data, '{}'),
-        occupation = $10
-      WHERE id = $11
-      RETURNING id, name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation
+        occupation = $10,
+        payment_plan = COALESCE($11, payment_plan, 'monthly')
+      WHERE id = $12
+      RETURNING id, name, email, phone, address, group_name, banking_name, household_members, payment_identifiers, custom_data, occupation, payment_plan
     `, [
       name?.trim() || null,
       email?.trim() || null,
@@ -172,6 +178,7 @@ export async function PATCH(
       paymentIdsArray.length > 0 ? paymentIdsArray : null,
       custom_data ? JSON.stringify(custom_data) : null,
       occupation?.trim() || null,
+      memberPaymentPlan || null,
       memberId
     ])
 
