@@ -65,7 +65,7 @@ export async function POST(
     const newStatus = !currentlyActive
 
     await pool.query(
-      'UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE users SET is_active = $1 WHERE id = $2',
       [newStatus, memberId]
     )
 

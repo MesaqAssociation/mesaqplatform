@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconAlertCircle, IconCheck, IconArrowUp } from '@tabler/icons-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { IconAlertCircle, IconCheck, IconArrowUp, IconChecks } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Payment = {
@@ -23,6 +24,8 @@ export default function ReviewPaymentsClient() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set())
+  const [bulkUpdating, setBulkUpdating] = useState(false)
 
   useEffect(() => {
     loadPayments()
@@ -86,6 +89,11 @@ export default function ReviewPaymentsClient() {
         showToast('✅ Confirmed as Special Payment', 'success')
         // Remove from list
         setPayments(prev => prev.filter(p => p.id !== paymentId))
+        setSelectedPayments(prev => {
+          const next = new Set(prev)
+          next.delete(paymentId)
+          return next
+        })
       } else {
         const data = await res.json()
         showToast(data.error || 'Failed to confirm payment', 'error')
@@ -96,6 +104,103 @@ export default function ReviewPaymentsClient() {
     } finally {
       setUpdating(null)
     }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedPayments.size === payments.length) {
+      setSelectedPayments(new Set())
+    } else {
+      setSelectedPayments(new Set(payments.map(p => p.id)))
+    }
+  }
+
+  const toggleSelectPayment = (paymentId: string) => {
+    setSelectedPayments(prev => {
+      const next = new Set(prev)
+      if (next.has(paymentId)) {
+        next.delete(paymentId)
+      } else {
+        next.add(paymentId)
+      }
+      return next
+    })
+  }
+
+  const handleBulkMembership = async () => {
+    if (selectedPayments.size === 0) return
+    setBulkUpdating(true)
+    
+    let success = 0
+    let failed = 0
+    
+    for (const paymentId of selectedPayments) {
+      try {
+        const res = await fetch('/api/finance/transactions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transactionId: paymentId,
+            category: 'Membership Payment',
+          }),
+        })
+        if (res.ok) {
+          success++
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+    }
+    
+    if (success > 0) {
+      showToast(`✅ ${success} payment${success > 1 ? 's' : ''} reclassified as Membership`, 'success')
+      setPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
+      setSelectedPayments(new Set())
+    }
+    if (failed > 0) {
+      showToast(`❌ ${failed} payment${failed > 1 ? 's' : ''} failed`, 'error')
+    }
+    
+    setBulkUpdating(false)
+  }
+
+  const handleBulkSpecial = async () => {
+    if (selectedPayments.size === 0) return
+    setBulkUpdating(true)
+    
+    let success = 0
+    let failed = 0
+    
+    for (const paymentId of selectedPayments) {
+      try {
+        const res = await fetch('/api/finance/review-payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transactionId: paymentId,
+          }),
+        })
+        if (res.ok) {
+          success++
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+    }
+    
+    if (success > 0) {
+      showToast(`✅ ${success} payment${success > 1 ? 's' : ''} confirmed as Special`, 'success')
+      setPayments(prev => prev.filter(p => !selectedPayments.has(p.id)))
+      setSelectedPayments(new Set())
+    }
+    if (failed > 0) {
+      showToast(`❌ ${failed} payment${failed > 1 ? 's' : ''} failed`, 'error')
+    }
+    
+    setBulkUpdating(false)
   }
 
   const formatDate = (dateStr: string) => {
@@ -132,18 +237,48 @@ export default function ReviewPaymentsClient() {
       {/* Payments Table */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <IconAlertCircle className="size-5 text-yellow-500" />
                 {loading ? '...' : payments.length} Payment{payments.length !== 1 ? 's' : ''} Need Review
               </h2>
             </div>
+            {/* Bulk Actions */}
+            {payments.length > 0 && selectedPayments.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{selectedPayments.size} selected</span>
+                <Button
+                  onClick={handleBulkMembership}
+                  disabled={bulkUpdating}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <IconChecks className="size-4 mr-1" />
+                  {bulkUpdating ? 'Processing...' : 'Mark All as Membership'}
+                </Button>
+                <Button
+                  onClick={handleBulkSpecial}
+                  disabled={bulkUpdating}
+                  variant="outline"
+                  size="sm"
+                >
+                  {bulkUpdating ? 'Processing...' : 'Keep All Special'}
+                </Button>
+              </div>
+            )}
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="border-b">
+                  <th className="text-left py-3 px-2 w-10">
+                    <Checkbox
+                      checked={payments.length > 0 && selectedPayments.size === payments.length}
+                      onCheckedChange={toggleSelectAll}
+                      disabled={loading || payments.length === 0}
+                    />
+                  </th>
                   <th className="text-left py-3 px-2">Date</th>
                   <th className="text-left py-3 px-2">Name</th>
                   <th className="text-left py-3 px-2">Description</th>
@@ -158,6 +293,9 @@ export default function ReviewPaymentsClient() {
                   // Grey shimmers while loading
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`skeleton-${i}`} className="border-b">
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-4 w-4" />
+                      </td>
                       <td className="py-3 px-2">
                         <Skeleton className="h-4 w-20" />
                       </td>
@@ -183,7 +321,7 @@ export default function ReviewPaymentsClient() {
                   ))
                 ) : payments.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12">
+                    <td colSpan={8} className="text-center py-12">
                       <IconCheck className="size-12 text-green-500 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
                       <p className="text-muted-foreground">No special payments need review</p>
@@ -191,7 +329,17 @@ export default function ReviewPaymentsClient() {
                   </tr>
                 ) : (
                   payments.map((payment) => (
-                    <tr key={payment.id} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr 
+                      key={payment.id} 
+                      className={`border-b hover:bg-muted/50 transition-colors ${selectedPayments.has(payment.id) ? 'bg-primary/5' : ''}`}
+                    >
+                      <td className="py-3 px-2">
+                        <Checkbox
+                          checked={selectedPayments.has(payment.id)}
+                          onCheckedChange={() => toggleSelectPayment(payment.id)}
+                          disabled={updating === payment.id || bulkUpdating}
+                        />
+                      </td>
                       <td className="py-3 px-2 whitespace-nowrap">
                         {formatDate(payment.transaction_date)}
                       </td>
