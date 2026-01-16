@@ -37,12 +37,17 @@ export async function POST(req: Request) {
 
     // Try to find user by phone or email (no longer by name to avoid duplicates)
     const { rows } = await pool.query(
-      'SELECT id, password_hash, name, image, phone, role, email, address, banking_name, date_joined, household_members, member_id FROM users WHERE phone = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
+      'SELECT id, password_hash, name, image, phone, role, email, address, banking_name, date_joined, household_members, member_id, COALESCE(is_active, true) as is_active FROM users WHERE phone = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
       [identifier]
     )
     const user = rows[0]
     if (!user) {
       return NextResponse.json({ error: 'No account found with this phone number or email' }, { status: 401, headers: corsHeaders })
+    }
+    
+    // Check if account is deactivated
+    if (user.is_active === false) {
+      return NextResponse.json({ error: 'Your account has been deactivated. Please contact an administrator.' }, { status: 401, headers: corsHeaders })
     }
     
     if (!user.password_hash) {

@@ -34,8 +34,15 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const searchQuery = searchParams.get('search')
+    const includeInactive = searchParams.get('includeInactive') === 'true'
 
     // Get members with balance calculation
+    // Filter out deactivated members by default (is_active = false)
+    const activeFilter = includeInactive ? '' : 'WHERE COALESCE(u.is_active, true) = true'
+    const searchFilter = searchQuery 
+      ? (includeInactive ? 'WHERE' : 'AND') + ` (LOWER(u.name) LIKE LOWER($1) OR LOWER(u.email) LIKE LOWER($1) OR u.phone LIKE $1 OR LOWER(u.member_id) LIKE LOWER($1))`
+      : ''
+    
     const query = `
       SELECT 
         u.id, 
@@ -48,6 +55,7 @@ export async function GET(req: NextRequest) {
         u.role, 
         u.group_name,
         u.household_members,
+        COALESCE(u.is_active, true) as is_active,
         COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
         CASE 
           WHEN COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) >= 0 THEN 'PAID'
@@ -78,7 +86,8 @@ export async function GET(req: NextRequest) {
           interval '1 month'
         ) gs
       ) months
-      ${searchQuery ? `WHERE LOWER(u.name) LIKE LOWER($1) OR LOWER(u.email) LIKE LOWER($1) OR u.phone LIKE $1 OR LOWER(u.member_id) LIKE LOWER($1)` : ''}
+      ${activeFilter}
+      ${searchFilter}
       ORDER BY u.name ASC 
       LIMIT 200
     `

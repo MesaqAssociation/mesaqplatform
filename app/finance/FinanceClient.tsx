@@ -554,15 +554,24 @@ export default function FinanceClient({
 
   const handleTransactionClick = (txn: Transaction) => {
     setSelectedTransaction(txn)
-    // Normalize category to valid dropdown options
-    let category = txn.category?.trim() || 'Special Payment'
-    // Convert legacy 'Event Payment' to 'Special Payment'
-    if (category === 'Event Payment') {
-      category = 'Special Payment'
-    }
-    // Only allow valid categories
-    if (!['Membership Payment', 'Special Payment', 'Donation', 'Charges'].includes(category)) {
-      category = 'Special Payment'
+    // Normalize category to valid dropdown options based on transaction type
+    let category = txn.category?.trim() || ''
+    
+    if (txn.transaction_type === 'debit' && txn.category !== 'Charges') {
+      // For expenses, default to Special Expense
+      if (!['Event Expense', 'Special Expense'].includes(category)) {
+        category = 'Special Expense'
+      }
+    } else {
+      // For credits and charges
+      // Convert legacy 'Event Payment' to 'Special Payment'
+      if (category === 'Event Payment') {
+        category = 'Special Payment'
+      }
+      // Only allow valid categories
+      if (!['Membership Payment', 'Special Payment', 'Donation', 'Charges'].includes(category)) {
+        category = 'Special Payment'
+      }
     }
     setDialogCategory(category)
     setShowTransactionDialog(true)
@@ -1517,7 +1526,7 @@ export default function FinanceClient({
                         </p>
                       </td>
                       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
-                        {txn.transaction_type === 'debit' ? (
+                        {txn.transaction_type === 'debit' && txn.category !== 'Charges' ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                             N/A
                           </span>
@@ -1840,7 +1849,10 @@ export default function FinanceClient({
                       ? 'text-red-600 dark:text-red-400'
                       : 'text-blue-600 dark:text-blue-400'
                   }`}>
-                    {selectedTransaction.category === 'Charges' ? 'Charge' : selectedTransaction.transaction_type}
+                    {selectedTransaction.category === 'Charges' ? 'Charge' : 
+                     selectedTransaction.transaction_type === 'debit' ? 'Expense' :
+                     selectedTransaction.transaction_type === 'credit' ? 'Income' :
+                     selectedTransaction.transaction_type}
                   </p>
                 </div>
                 <div>

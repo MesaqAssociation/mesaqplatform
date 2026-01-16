@@ -98,6 +98,7 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
   const [reviewPayments, setReviewPayments] = useState<ReviewPayment[]>([])
   const [reviewExpenses, setReviewExpenses] = useState<ReviewExpense[]>([])
+  const [unknownTransactionsCount, setUnknownTransactionsCount] = useState(0)
   const [loadingReviewPayments, setLoadingReviewPayments] = useState(true)
   const [selectedReviewPayment, setSelectedReviewPayment] = useState<ReviewPayment | null>(null)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
@@ -119,11 +120,20 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
     // Load payments and expenses needing review
     const loadReviewPayments = async () => {
       try {
-        const res = await fetch('/api/finance/review-payments')
-        if (res.ok) {
-          const data = await res.json()
+        const [reviewRes, unknownRes] = await Promise.all([
+          fetch('/api/finance/review-payments'),
+          fetch('/api/finance/unknown-transactions')
+        ])
+        
+        if (reviewRes.ok) {
+          const data = await reviewRes.json()
           setReviewPayments(data.payments || [])
           setReviewExpenses(data.expenses || [])
+        }
+        
+        if (unknownRes.ok) {
+          const data = await unknownRes.json()
+          setUnknownTransactionsCount(data.transactions?.length || 0)
         }
       } catch (err) {
         console.error('Failed to load review payments:', err)
@@ -491,12 +501,31 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
         </div>
       )}
 
-      {!loadingReviewPayments && (reviewPayments.length > 0 || reviewExpenses.length > 0) && (
+      {!loadingReviewPayments && (reviewPayments.length > 0 || reviewExpenses.length > 0 || unknownTransactionsCount > 0) && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
             <IconAlertCircle className="size-5" />
             NEED ACTION
           </h2>
+          
+          {/* Unknown Transactions Row */}
+          {unknownTransactionsCount > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {unknownTransactionsCount} transaction{unknownTransactionsCount !== 1 ? 's' : ''} with unknown member
+                  </span>
+                </div>
+                <Link 
+                  href="/unknown-transactions"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Review Unknown
+                </Link>
+              </div>
+            </div>
+          )}
           
           {/* Review Payments Row */}
           {reviewPayments.length > 0 && (

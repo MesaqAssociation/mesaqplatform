@@ -116,6 +116,19 @@ export async function PATCH(
 
     const hh = Number.isFinite(Number(household_members)) ? Number(household_members) : 1
     
+    // Check if banking_name is unique (if provided)
+    if (banking_name && banking_name.trim()) {
+      const { rows: existingBanking } = await pool.query(
+        'SELECT id, name FROM users WHERE LOWER(banking_name) = LOWER($1) AND id != $2',
+        [banking_name.trim(), memberId]
+      )
+      if (existingBanking.length > 0) {
+        return NextResponse.json({ 
+          error: `Banking name "${banking_name}" is already used by ${existingBanking[0].name}. Each member must have a unique banking name.` 
+        }, { status: 400 })
+      }
+    }
+    
     // Parse payment_identifiers from comma-separated string to array
     let paymentIdsArray: string[] = []
     if (payment_identifiers) {

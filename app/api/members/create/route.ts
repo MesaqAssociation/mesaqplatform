@@ -30,6 +30,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, phone number, and password are required' }, { status: 400 })
     }
 
+    // Check if banking_name is unique (if provided)
+    if (banking_name && banking_name.trim()) {
+      const { rows: existingBanking } = await pool.query(
+        'SELECT id, name FROM users WHERE LOWER(banking_name) = LOWER($1)',
+        [banking_name.trim()]
+      )
+      if (existingBanking.length > 0) {
+        return NextResponse.json({ 
+          error: `Banking name "${banking_name}" is already used by ${existingBanking[0].name}. Each member must have a unique banking name.` 
+        }, { status: 400 })
+      }
+    }
+
     // Ensure columns exist
     try {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_identifiers TEXT`)

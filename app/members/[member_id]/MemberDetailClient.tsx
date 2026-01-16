@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown, IconCheck } from '@tabler/icons-react'
+import { IconArrowLeft, IconMail, IconPhone, IconMapPin, IconCalendar, IconUsers, IconCreditCard, IconUserCircle, IconTrash, IconArrowUp, IconArrowDown, IconReceipt, IconChevronDown, IconCheck, IconUserOff, IconUserCheck } from '@tabler/icons-react'
 // BalanceCardNew removed per request (special balance hidden)
 import { showToast } from '@/lib/toast'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -44,6 +44,7 @@ type Member = {
   payment_identifiers: string[]
   custom_data: Record<string, any>
   occupation: string | null
+  is_active?: boolean
 }
 
 type Event = {
@@ -120,6 +121,8 @@ export default function MemberDetailClient({
   const [settingLeader, setSettingLeader] = useState(false)
   const [customFields, setCustomFields] = useState<Array<{key: string, name: string}>>([])
   const [customDataDraft, setCustomDataDraft] = useState<Record<string, any>>(member.custom_data || {})
+  const [isActive, setIsActive] = useState(member.is_active !== false)
+  const [togglingActive, setTogglingActive] = useState(false)
 
   // Load groups and custom fields
   useEffect(() => {
@@ -469,7 +472,14 @@ export default function MemberDetailClient({
                       className="text-xl font-semibold"
                     />
                   ) : (
-                    <h1 className="text-2xl font-semibold mb-1">{member.name}</h1>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h1 className="text-2xl font-semibold">{member.name}</h1>
+                      {!isActive && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          Deactivated
+                        </span>
+                      )}
+                    </div>
                   )}
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2 ${
                     member.role === 'Manager' 
@@ -1047,6 +1057,57 @@ export default function MemberDetailClient({
                 <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Deactivate Account */}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {isActive 
+                      ? 'Deactivate this account. Member will be excluded from searches, messages, and cannot sign in. Their data and transaction history will be preserved.'
+                      : 'This account is deactivated. Reactivate to restore full access.'}
+                  </p>
+                  <Button
+                    variant={isActive ? "outline" : "default"}
+                    onClick={async () => {
+                      if (!confirm(isActive 
+                        ? 'Deactivate this member? They will be excluded from all community features but their data will be preserved.'
+                        : 'Reactivate this member? They will regain access to all community features.'
+                      )) return
+                      
+                      setTogglingActive(true)
+                      try {
+                        const res = await fetch(`/api/members/${member.id}/deactivate`, { method: 'POST' })
+                        const data = await res.json()
+                        if (res.ok) {
+                          setIsActive(data.is_active)
+                          showToast(data.message, 'success')
+                        } else {
+                          showToast(data.error || 'Failed to update status', 'error')
+                        }
+                      } catch (err) {
+                        showToast('Failed to update status', 'error')
+                      } finally {
+                        setTogglingActive(false)
+                      }
+                    }}
+                    disabled={togglingActive}
+                    className={`w-full ${isActive ? 'border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950' : ''}`}
+                  >
+                    {isActive ? (
+                      <>
+                        <IconUserOff className="mr-2 size-4" />
+                        {togglingActive ? 'Deactivating...' : 'Deactivate Account'}
+                      </>
+                    ) : (
+                      <>
+                        <IconUserCheck className="mr-2 size-4" />
+                        {togglingActive ? 'Reactivating...' : 'Reactivate Account'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                <Separator />
+                
+                {/* Delete Account */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-3">Permanently delete this member account. This action cannot be undone.</p>
                   <Button
