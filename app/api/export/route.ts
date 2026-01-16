@@ -58,9 +58,10 @@ export async function GET(req: NextRequest) {
   }
   
   const userRole = (userRows[0].role || '').toLowerCase()
-  const allowedRoles = ['board', 'admin', 'manager']
+  // Allow board members, admins, and managers - check variations
+  const allowedRoles = ['board', 'admin', 'manager', 'finance officer', 'head', 'public officer', 'logistics officer']
   
-  console.log(`Export request from user with role: ${userRole}`)
+  console.log(`Export request from user with role: "${userRole}"`)
   
   if (!allowedRoles.includes(userRole)) {
     console.log(`❌ Role "${userRole}" not in allowed list:`, allowedRoles)
@@ -82,13 +83,22 @@ export async function GET(req: NextRequest) {
 
     switch (type) {
       case 'members':
+        console.log('📊 Starting member export...')
+        
         // Get monthly fee for balance calculation
-        const { rows: feeRows } = await pool.query(
-          "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
-        )
-        const monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+        let monthlyFee = 40.00
+        try {
+          const { rows: feeRows } = await pool.query(
+            "SELECT value FROM system_settings WHERE key = 'monthly_membership_fee'"
+          )
+          monthlyFee = parseFloat(feeRows[0]?.value || '40.00')
+          console.log(`✅ Monthly fee: $${monthlyFee}`)
+        } catch (feeErr) {
+          console.log('⚠️ Could not fetch monthly fee, using default $40:', feeErr)
+        }
 
-        // Get members with basic info
+        // Get members with basic info using simple query
+        console.log('📋 Fetching members...')
         const { rows: members } = await pool.query(`
           SELECT 
             u.id,
@@ -105,101 +115,97 @@ export async function GET(req: NextRequest) {
             COALESCE(u.payment_plan, 'monthly') as payment_plan,
             COALESCE(u.is_active, true) as is_active,
             to_char(u.date_joined, 'YYYY-MM-DD') as date_joined,
-            to_char(u.created_at, 'YYYY-MM-DD') as created_at,
-            u.date_joined as date_joined_raw
+            to_char(u.created_at, 'YYYY-MM-DD') as created_at
           FROM users u
           ORDER BY u.name ASC
         `)
+        console.log(`✅ Found ${members.length} members`)
 
         // Get total paid for all members
-        const { rows: payments } = await pool.query(`
-          SELECT mp.user_id, SUM(mp.amount) as total_paid
-          FROM membership_payments mp
-          LEFT JOIN transactions t ON t.id = mp.transaction_id
-          WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
-          GROUP BY mp.user_id
-        `)
-        const paymentMap = new Map(payments.map((p: any) => [p.user_id, parseFloat(p.total_paid || 0)]))
+        console.log('💰 Fetching payment totals...')
+        let paymentMap = new Map<string, number>()
+        try {
+          const { rows: payments } = await pool.query(`
+            SELECT mp.user_id, COALESCE(SUM(mp.amount), 0) as total_paid
+            FROM membership_payments mp
+            LEFT JOIN transactions t ON t.id = mp.transaction_id
+            WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
+            GROUP BY mp.user_id
+          `)
+          paymentMap = new Map(payments.map((p: any) => [p.user_id, parseFloat(p.total_paid || '0')]))
+          console.log(`✅ Found payment data for ${payments.length} members`)
+        } catch (payErr) {
+          console.log('⚠️ Could not fetch payments, will show 0 for all:', payErr)
+        }
 
+        // Get current date info for month calculations
+        const now = new Date()
+        const currentYear = now.getFullYear()
+        const currentMonth = now.getMonth() // 0-indexed
+        
         // Calculate balance for each member based on payment_plan
+        console.log('🔢 Calculating balances...')
         data = members.map((m: any) => {
+          const totalPaid = paymentMap.get(m.id) || 0
+          
+          // Calculate expected months from date_joined to previous month
+          let expectedMonths = 0
+          const dateJoinedStr = m.date_joined || '2025-05-01'
+          
           try {
-            const totalPaid = paymentMap.get(m.id) || 0
-            
-            // Parse date_joined safely - use date_joined string (YYYY-MM-DD format)
-            let expectedMonths = 0
-            const dateJoinedStr = m.date_joined || '2025-05-01'
-            
-            // Parse YYYY-MM-DD format
-            const dateParts = dateJoinedStr.split('-')
-            if (dateParts.length === 3) {
-              const startYear = parseInt(dateParts[0], 10)
-              const startMonth = parseInt(dateParts[1], 10) - 1 // 0-indexed
+            const parts = dateJoinedStr.split('-')
+            if (parts.length === 3) {
+              const startYear = parseInt(parts[0], 10)
+              const startMonth = parseInt(parts[1], 10) - 1 // Convert to 0-indexed
               
-              const now = new Date()
-              const endYear = now.getFullYear()
-              const endMonth = now.getMonth() - 1 // Previous month (0-indexed)
+              // End at previous month
+              const endYear = currentYear
+              const endMonth = currentMonth - 1 // Previous month
               
-              // Calculate total months between start and end
+              // Total months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1
               expectedMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1
               if (expectedMonths < 0) expectedMonths = 0
             }
-            
-            // Calculate balance based on payment plan
-            let balance = 0
-            const plan = m.payment_plan || 'monthly'
-            if (plan === 'yearly') {
-              balance = totalPaid - (Math.floor(expectedMonths / 12) * monthlyFee * 12)
-            } else if (plan === 'semi_annually') {
-              balance = totalPaid - (Math.floor(expectedMonths / 6) * monthlyFee * 6)
-            } else if (plan === 'quarterly') {
-              balance = totalPaid - (Math.floor(expectedMonths / 3) * monthlyFee * 3)
-            } else {
-              balance = totalPaid - (expectedMonths * monthlyFee)
-            }
-            
-            return {
-              member_id: m.member_id || '',
-              name: m.name || '',
-              email: m.email || '',
-              phone: m.phone || '',
-              address: m.address || '',
-              role: m.role || '',
-              group_name: m.group_name || '',
-              household_members: m.household_members || 0,
-              banking_name: m.banking_name || '',
-              payment_plan: m.payment_plan || 'monthly',
-              is_active: m.is_active,
-              date_joined: m.date_joined || '',
-              created_at: m.created_at || '',
-              total_paid: totalPaid,
-              expected_months: expectedMonths,
-              balance: balance.toFixed(2),
-              payment_status: balance >= 0 ? 'PAID' : 'UNPAID'
-            }
-          } catch (err) {
-            console.error('Error processing member:', m.id, err)
-            return {
-              member_id: m.member_id || '',
-              name: m.name || '',
-              email: m.email || '',
-              phone: m.phone || '',
-              address: m.address || '',
-              role: m.role || '',
-              group_name: m.group_name || '',
-              household_members: m.household_members || 0,
-              banking_name: m.banking_name || '',
-              payment_plan: m.payment_plan || 'monthly',
-              is_active: m.is_active,
-              date_joined: m.date_joined || '',
-              created_at: m.created_at || '',
-              total_paid: 0,
-              expected_months: 0,
-              balance: '0.00',
-              payment_status: 'UNKNOWN'
-            }
+          } catch (dateErr) {
+            console.log(`⚠️ Date parse error for ${m.name}:`, dateErr)
+            expectedMonths = 0
+          }
+          
+          // Calculate balance based on payment plan
+          let balance = 0
+          const plan = m.payment_plan || 'monthly'
+          if (plan === 'yearly') {
+            balance = totalPaid - (Math.floor(expectedMonths / 12) * monthlyFee * 12)
+          } else if (plan === 'semi_annually') {
+            balance = totalPaid - (Math.floor(expectedMonths / 6) * monthlyFee * 6)
+          } else if (plan === 'quarterly') {
+            balance = totalPaid - (Math.floor(expectedMonths / 3) * monthlyFee * 3)
+          } else {
+            balance = totalPaid - (expectedMonths * monthlyFee)
+          }
+          
+          return {
+            member_id: m.member_id || '',
+            name: m.name || '',
+            email: m.email || '',
+            phone: m.phone || '',
+            address: m.address || '',
+            role: m.role || '',
+            group_name: m.group_name || '',
+            household_members: m.household_members ?? 0,
+            banking_name: m.banking_name || '',
+            payment_plan: plan,
+            is_active: m.is_active ?? true,
+            date_joined: m.date_joined || '',
+            created_at: m.created_at || '',
+            total_paid: totalPaid,
+            expected_months: expectedMonths,
+            balance: isNaN(balance) ? '0.00' : balance.toFixed(2),
+            payment_status: balance >= 0 ? 'PAID' : 'UNPAID'
           }
         })
+        
+        console.log(`✅ Processed ${data.length} member records`)
         headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'group_name', 'household_members', 'banking_name', 'payment_plan', 'is_active', 'date_joined', 'created_at', 'total_paid', 'expected_months', 'balance', 'payment_status']
         filename = `members_export_${new Date().toISOString().split('T')[0]}`
         break

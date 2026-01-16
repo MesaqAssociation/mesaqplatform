@@ -117,6 +117,9 @@ export default function FinanceClient({
   const [loadingRemindersPreview, setLoadingRemindersPreview] = useState(false)
   const [sendingReminders, setSendingReminders] = useState(false)
   
+  // Latest statement date for "As of" display
+  const [latestStatementDate, setLatestStatementDate] = useState<string | null>(null)
+  
   const [chargeAmount, setChargeAmount] = useState('')
   const [chargeReason, setChargeReason] = useState('')
   const [chargeMemberId, setChargeMemberId] = useState<string | null>(null)
@@ -252,6 +255,41 @@ export default function FinanceClient({
       loadTransactions()
     }
   }, [selectedAccountId, currentMonth, loadTransactions])
+  
+  // Fetch latest statement date for the selected account
+  useEffect(() => {
+    if (!selectedAccountId) return
+    
+    const fetchLatestStatementDate = async () => {
+      try {
+        const res = await fetch(`/api/finance/statements?accountId=${selectedAccountId}`)
+        if (res.ok) {
+          const data = await res.json()
+          // Find the statement with the latest statement_date_to
+          if (data.statements && data.statements.length > 0) {
+            const latestStatement = data.statements.reduce((latest: any, current: any) => {
+              const latestDate = latest?.statement_date_to ? new Date(latest.statement_date_to) : new Date(0)
+              const currentDate = current?.statement_date_to ? new Date(current.statement_date_to) : new Date(0)
+              return currentDate > latestDate ? current : latest
+            }, data.statements[0])
+            
+            if (latestStatement?.statement_date_to) {
+              setLatestStatementDate(latestStatement.statement_date_to)
+            } else {
+              setLatestStatementDate(null)
+            }
+          } else {
+            setLatestStatementDate(null)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch statement date:', err)
+        setLatestStatementDate(null)
+      }
+    }
+    
+    fetchLatestStatementDate()
+  }, [selectedAccountId])
   
   const handleAddAccount = async () => {
     if (!newAccountName.trim() || !newAccountNumber.trim() || !newAccountBSB.trim()) {
@@ -1200,7 +1238,10 @@ export default function FinanceClient({
               </div>
             )}
             <p className="text-xs text-muted-foreground/70 mt-2">
-              As of {new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+              As of {latestStatementDate 
+                ? new Date(latestStatementDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+                : new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
+              }
             </p>
           </div>
         </CardContent>
