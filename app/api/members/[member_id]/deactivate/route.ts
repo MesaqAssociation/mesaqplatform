@@ -66,26 +66,11 @@ export async function POST(
     const currentlyActive = existing[0].is_active !== false // Default to true if null
     const newStatus = !currentlyActive
 
-    if (newStatus) {
-      // REACTIVATING: Clear their balance by deleting payments and resetting date_joined
-      // This effectively sets balance to $0 without creating any transactions
-      
-      // Delete their old membership payments - this resets total_paid to 0
-      await pool.query('DELETE FROM membership_payments WHERE user_id = $1', [memberId])
-
-      // Update user: set is_active = true and reset date_joined to current month
-      // With date_joined = today and total_paid = 0, balance becomes $0
-      await pool.query(
-        'UPDATE users SET is_active = $1, date_joined = CURRENT_DATE WHERE id = $2',
-        [newStatus, memberId]
-      )
-    } else {
-      // DEACTIVATING: Just set is_active to false
-      await pool.query(
-        'UPDATE users SET is_active = $1 WHERE id = $2',
-        [newStatus, memberId]
-      )
-    }
+    // Simply toggle is_active status - don't modify balance or payments
+    await pool.query(
+      'UPDATE users SET is_active = $1 WHERE id = $2',
+      [newStatus, memberId]
+    )
 
     return NextResponse.json({ 
       success: true, 

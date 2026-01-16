@@ -403,8 +403,9 @@ Below is the inventory of API route files and the HTTP methods they export. In N
 - **`/api/members/[member_id]/role`**: PATCH — set member role (`app/api/members/[member_id]/role/route.ts`)
 - **`/api/members/[member_id]/set-leader`**: POST — mark member as group leader (`app/api/members/[member_id]/set-leader/route.ts`)
 - **`/api/members/[member_id]/deactivate`**: POST — toggle member active status (`app/api/members/[member_id]/deactivate/route.ts`)
-  - Deactivating: Sets `is_active = false`; member can't log in, hidden from lists, but payments still match
-  - Reactivating: Deletes all membership_payments, resets date_joined to today, balance becomes $0
+  - Deactivating: Sets `is_active = false`; member can't log in, hidden from lists (except for admins), but payments still match
+  - Reactivating: Sets `is_active = true`; member can log in again, balance remains unchanged
+  - UI shows red profile picture and "Deactivated" badge for deactivated members
 - **`/api/members/events`**: POST, DELETE — manage member event attendance (`app/api/members/events/route.ts`)
 
 ### Groups
@@ -439,6 +440,10 @@ Below is the inventory of API route files and the HTTP methods they export. In N
 
 - **`/api/membership/status/[member_id]`**: GET, OPTIONS — membership status (`app/api/membership/status/[member_id]/route.ts`)
 - **`/api/membership/balance/[member_id]`**: GET, OPTIONS — membership balance (`app/api/membership/balance/[member_id]/route.ts`)
+  - Returns `lastUpdated` date (date of last membership payment or start of current month)
+  - Balance calculation: `total_paid - (expected_periods * period_fee) - charges`
+  - Expected months count from `date_joined` to **previous month** (not current month)
+  - For non-monthly plans, expected_periods = floor(months / period_length)
 - **`/api/membership/detect-payments`**: POST — run payment detection (AI step currently disabled) (`app/api/membership/detect-payments/route.ts`)
 
 ### Messaging (Admin + Incoming)

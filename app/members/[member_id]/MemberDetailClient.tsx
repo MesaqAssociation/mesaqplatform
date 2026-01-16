@@ -101,6 +101,7 @@ export default function MemberDetailClient({
   const [convertingTxn, setConvertingTxn] = useState<string | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
+  const [balanceLastUpdated, setBalanceLastUpdated] = useState<string | null>(null)
   const [monthsBreakdown, setMonthsBreakdown] = useState<MonthBreakdown[]>([])
   const [memberCharges, setMemberCharges] = useState<Array<{id: string, date: string, name: string, amount: number, description: string}>>([])
   const [totalCharges, setTotalCharges] = useState(0)
@@ -165,6 +166,7 @@ export default function MemberDetailClient({
           // Use membershipBalance.currentBalance and ignore special/donation
           const current = Number(data?.membershipBalance?.currentBalance ?? 0)
           setBalance(current)
+          setBalanceLastUpdated(data?.membershipBalance?.lastUpdated || null)
           setMonthsBreakdown(data?.membershipBalance?.monthsBreakdown || [])
           setMemberCharges(data?.membershipBalance?.charges || [])
           setTotalCharges(Number(data?.membershipBalance?.totalCharges || 0))
@@ -462,9 +464,9 @@ export default function MemberDetailClient({
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={member.image || undefined} alt={member.name} />
-                  <AvatarFallback className="text-3xl">{getInitials(member.name)}</AvatarFallback>
+                <Avatar className={`h-24 w-24 ${!isActive ? 'ring-4 ring-red-500' : ''}`}>
+                  <AvatarImage src={member.image || undefined} alt={member.name} className={!isActive ? 'opacity-50 grayscale' : ''} />
+                  <AvatarFallback className={`text-3xl ${!isActive ? 'bg-red-100 text-red-700' : ''}`}>{getInitials(member.name)}</AvatarFallback>
                 </Avatar>
                 <div>
                   {editMode ? (
@@ -511,6 +513,11 @@ export default function MemberDetailClient({
                     <p className="text-xs text-muted-foreground">
                       {Number(balance ?? 0) < 0 ? 'Outstanding' : 'Credit'}
                     </p>
+                    {balanceLastUpdated && (
+                      <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                        As of {balanceLastUpdated}
+                      </p>
+                    )}
                   </>
                 )}
               </div>

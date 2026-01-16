@@ -33,6 +33,7 @@ export default async function MembersPage() {
   
   if (isAdminOrBoard) {
     // Admins see full details
+    // Use 'date_trunc('month', CURRENT_DATE) - interval '1 month'' for expected_months to match balance API
     const result = await pool.query(`
     SELECT 
       u.id, 
@@ -45,7 +46,8 @@ export default async function MembersPage() {
       u.role, 
       u.group_name,
       u.household_members,
-      -- Compute balance based on membership payments vs expected months
+      COALESCE(u.is_active, true) as is_active,
+      -- Compute balance based on membership payments vs expected months (up to LAST month, not current)
       COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
       CASE 
         WHEN COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) >= 0 THEN 'PAID'
@@ -69,10 +71,10 @@ export default async function MembersPage() {
       GROUP BY mp.user_id
     ) mp ON mp.user_id = u.id
     CROSS JOIN LATERAL (
-      SELECT COUNT(*)::int AS expected_months
+      SELECT GREATEST(0, COUNT(*)::int) AS expected_months
       FROM generate_series(
         date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-        date_trunc('month', CURRENT_DATE),
+        date_trunc('month', CURRENT_DATE) - interval '1 month',
         interval '1 month'
       ) gs
     ) months
@@ -88,16 +90,18 @@ export default async function MembersPage() {
         u.member_id, 
         u.name, 
         u.image,
+        COALESCE(u.is_active, true) as is_active,
         NULL as phone,
         NULL as email,
         NULL as address,
         NULL as role,
         NULL as household_members,
-      NULL as current_balance,
+        NULL as current_balance,
         NULL as payment_status,
         NULL as total_paid,
         NULL as monthly_fee
       FROM users u
+      WHERE COALESCE(u.is_active, true) = true
       ORDER BY u.name ASC 
       LIMIT 200
     `)

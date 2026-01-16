@@ -123,54 +123,79 @@ export async function GET(req: NextRequest) {
 
         // Calculate balance for each member based on payment_plan
         data = members.map((m: any) => {
-          const totalPaid = paymentMap.get(m.id) || 0
-          const dateJoined = m.date_joined_raw ? new Date(m.date_joined_raw) : new Date('2025-05-01')
-          const now = new Date()
-          
-          // Calculate months from date_joined to last month
-          let expectedMonths = 0
-          const startMonth = new Date(dateJoined.getFullYear(), dateJoined.getMonth(), 1)
-          const endMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1) // Last month
-          
-          if (endMonth >= startMonth) {
-            let current = new Date(startMonth)
-            while (current <= endMonth) {
-              expectedMonths++
-              current.setMonth(current.getMonth() + 1)
+          try {
+            const totalPaid = paymentMap.get(m.id) || 0
+            
+            // Parse date_joined safely
+            let expectedMonths = 0
+            if (m.date_joined_raw) {
+              const dateJoined = new Date(m.date_joined_raw)
+              const now = new Date()
+              
+              // Calculate months using simple date math
+              const startYear = dateJoined.getFullYear()
+              const startMonth = dateJoined.getMonth()
+              const endYear = now.getFullYear()
+              const endMonth = now.getMonth() - 1 // Last month
+              
+              // Calculate total months between start and end
+              expectedMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1
+              if (expectedMonths < 0) expectedMonths = 0
             }
-          }
-          
-          // Calculate balance based on payment plan
-          let balance = 0
-          const plan = m.payment_plan || 'monthly'
-          if (plan === 'yearly') {
-            balance = totalPaid - (Math.floor(expectedMonths / 12) * monthlyFee * 12)
-          } else if (plan === 'semi_annually') {
-            balance = totalPaid - (Math.floor(expectedMonths / 6) * monthlyFee * 6)
-          } else if (plan === 'quarterly') {
-            balance = totalPaid - (Math.floor(expectedMonths / 3) * monthlyFee * 3)
-          } else {
-            balance = totalPaid - (expectedMonths * monthlyFee)
-          }
-          
-          return {
-            member_id: m.member_id,
-            name: m.name,
-            email: m.email,
-            phone: m.phone,
-            address: m.address,
-            role: m.role,
-            group_name: m.group_name,
-            household_members: m.household_members,
-            banking_name: m.banking_name,
-            payment_plan: m.payment_plan,
-            is_active: m.is_active,
-            date_joined: m.date_joined,
-            created_at: m.created_at,
-            total_paid: totalPaid,
-            expected_months: expectedMonths,
-            balance: balance.toFixed(2),
-            payment_status: balance >= 0 ? 'PAID' : 'UNPAID'
+            
+            // Calculate balance based on payment plan
+            let balance = 0
+            const plan = m.payment_plan || 'monthly'
+            if (plan === 'yearly') {
+              balance = totalPaid - (Math.floor(expectedMonths / 12) * monthlyFee * 12)
+            } else if (plan === 'semi_annually') {
+              balance = totalPaid - (Math.floor(expectedMonths / 6) * monthlyFee * 6)
+            } else if (plan === 'quarterly') {
+              balance = totalPaid - (Math.floor(expectedMonths / 3) * monthlyFee * 3)
+            } else {
+              balance = totalPaid - (expectedMonths * monthlyFee)
+            }
+            
+            return {
+              member_id: m.member_id || '',
+              name: m.name || '',
+              email: m.email || '',
+              phone: m.phone || '',
+              address: m.address || '',
+              role: m.role || '',
+              group_name: m.group_name || '',
+              household_members: m.household_members || 0,
+              banking_name: m.banking_name || '',
+              payment_plan: m.payment_plan || 'monthly',
+              is_active: m.is_active,
+              date_joined: m.date_joined || '',
+              created_at: m.created_at || '',
+              total_paid: totalPaid,
+              expected_months: expectedMonths,
+              balance: balance.toFixed(2),
+              payment_status: balance >= 0 ? 'PAID' : 'UNPAID'
+            }
+          } catch (err) {
+            console.error('Error processing member:', m.id, err)
+            return {
+              member_id: m.member_id || '',
+              name: m.name || '',
+              email: m.email || '',
+              phone: m.phone || '',
+              address: m.address || '',
+              role: m.role || '',
+              group_name: m.group_name || '',
+              household_members: m.household_members || 0,
+              banking_name: m.banking_name || '',
+              payment_plan: m.payment_plan || 'monthly',
+              is_active: m.is_active,
+              date_joined: m.date_joined || '',
+              created_at: m.created_at || '',
+              total_paid: 0,
+              expected_months: 0,
+              balance: '0.00',
+              payment_status: 'UNKNOWN'
+            }
           }
         })
         headers = ['member_id', 'name', 'email', 'phone', 'address', 'role', 'group_name', 'household_members', 'banking_name', 'payment_plan', 'is_active', 'date_joined', 'created_at', 'total_paid', 'expected_months', 'balance', 'payment_status']

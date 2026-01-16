@@ -119,6 +119,8 @@ Deactivating a member:
 - Keeps their information for records
 - Still matches future payments to them (if banking name matches)
 - Does NOT delete their data
+- Does NOT change their balance
+- Shows red profile picture and "Deactivated" badge
 
 To deactivate:
 1. Open member's profile
@@ -127,10 +129,9 @@ To deactivate:
 
 ### Reactivating Members
 When reactivating a member:
-- Their date joined is reset to today
-- Their membership payment history is cleared
-- Their balance becomes $0 (no transaction created)
 - They can sign in again
+- Their balance remains unchanged
+- They appear in searches again
 
 ### Changing Member Passwords
 1. Open member's profile
