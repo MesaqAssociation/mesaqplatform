@@ -38,10 +38,28 @@ export async function GET(req: NextRequest) {
 
     // Get members with balance calculation
     // Filter out deactivated members by default (is_active = false)
-    const activeFilter = includeInactive ? '' : 'WHERE COALESCE(u.is_active, true) = true'
-    const searchFilter = searchQuery 
-      ? (includeInactive ? 'WHERE' : 'AND') + ` (LOWER(u.name) LIKE LOWER($1) OR LOWER(u.email) LIKE LOWER($1) OR u.phone LIKE $1 OR LOWER(u.member_id) LIKE LOWER($1))`
-      : ''
+    // Build WHERE clause properly
+    let whereConditions: string[] = []
+    let queryParams: any[] = []
+    let paramIndex = 1
+    
+    if (!includeInactive) {
+      whereConditions.push('COALESCE(u.is_active, true) = true')
+    }
+    
+    if (searchQuery) {
+      whereConditions.push(`(
+        LOWER(u.name) LIKE LOWER($${paramIndex}) 
+        OR LOWER(COALESCE(u.email, '')) LIKE LOWER($${paramIndex}) 
+        OR u.phone LIKE $${paramIndex} 
+        OR LOWER(COALESCE(u.member_id, '')) LIKE LOWER($${paramIndex})
+        OR LOWER(COALESCE(u.banking_name, '')) LIKE LOWER($${paramIndex})
+      )`)
+      queryParams.push(`%${searchQuery.trim()}%`)
+      paramIndex++
+    }
+    
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : ''
     
     const query = `
       SELECT 
@@ -55,6 +73,7 @@ export async function GET(req: NextRequest) {
         u.role, 
         u.group_name,
         u.household_members,
+        u.banking_name,
         COALESCE(u.is_active, true) as is_active,
         COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
         CASE 
@@ -79,22 +98,19 @@ export async function GET(req: NextRequest) {
         GROUP BY mp.user_id
       ) mp ON mp.user_id = u.id
       CROSS JOIN LATERAL (
-        SELECT COUNT(*)::int AS expected_months
+        SELECT GREATEST(0, COUNT(*)::int) AS expected_months
         FROM generate_series(
           date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-          date_trunc('month', CURRENT_DATE),
+          date_trunc('month', CURRENT_DATE) - interval '1 month',
           interval '1 month'
         ) gs
       ) months
-      ${activeFilter}
-      ${searchFilter}
+      ${whereClause}
       ORDER BY u.name ASC 
       LIMIT 200
     `
 
-    const { rows } = searchQuery 
-      ? await pool.query(query, [`%${searchQuery.trim()}%`])
-      : await pool.query(query)
+    const { rows } = await pool.query(query, queryParams)
 
     return NextResponse.json({ members: rows }, { headers: corsHeaders })
   } catch (e) {

@@ -71,6 +71,33 @@ export default function ReviewPaymentsClient() {
     }
   }
 
+  const handleMarkAsSpecial = async (paymentId: string) => {
+    setUpdating(paymentId)
+    try {
+      const res = await fetch('/api/finance/review-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: paymentId,
+        }),
+      })
+
+      if (res.ok) {
+        showToast('✅ Confirmed as Special Payment', 'success')
+        // Remove from list
+        setPayments(prev => prev.filter(p => p.id !== paymentId))
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Failed to confirm payment', 'error')
+      }
+    } catch (err) {
+      console.error('Failed to confirm:', err)
+      showToast('Failed to confirm payment', 'error')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
   const formatDate = (dateStr: string) => {
     try {
       let dateObj: Date
@@ -191,15 +218,25 @@ export default function ReviewPaymentsClient() {
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        <Button
-                          onClick={() => handleReclassify(payment.id)}
-                          disabled={updating === payment.id}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white"
-                          size="sm"
-                        >
-                          <IconCheck className="size-4 mr-1" />
-                          {updating === payment.id ? 'Updating...' : 'Mark as Membership'}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleReclassify(payment.id)}
+                            disabled={updating === payment.id}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            size="sm"
+                          >
+                            <IconCheck className="size-4 mr-1" />
+                            {updating === payment.id ? '...' : 'Membership'}
+                          </Button>
+                          <Button
+                            onClick={() => handleMarkAsSpecial(payment.id)}
+                            disabled={updating === payment.id}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {updating === payment.id ? '...' : 'Keep Special'}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
