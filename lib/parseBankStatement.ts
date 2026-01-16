@@ -219,18 +219,36 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
             if (cleanBoundary) {
               found.push({ value: cleanBoundary.value, isNegative: false, isDebitFormat: true })
             } else {
-              // Find amounts where digits before BREAK the currency pattern (combined leading > 3)
-              // Among these, pick the smallest (most reasonable transaction amount)
-              const brokenBoundaryAmounts = validAmounts
-                .filter(v => v.combinedLeading.length > 3)
-                .sort((a, b) => a.value - b.value)
+              // Check if original amount string has commas (proper currency formatting)
+              const hasCommas = amountStr.includes(',')
               
-              if (brokenBoundaryAmounts.length > 0) {
-                found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
-              } else if (validAmounts.length > 0) {
-                // Fallback: smallest valid amount
-                const smallest = validAmounts.reduce((a, b) => a.value < b.value ? a : b)
-                found.push({ value: smallest.value, isNegative: false, isDebitFormat: true })
+              if (hasCommas) {
+                // With commas, the comma placement indicates structure
+                // Pick the amount that respects comma grouping (smallest valid)
+                const brokenBoundaryAmounts = validAmounts
+                  .filter(v => v.combinedLeading.length > 3)
+                  .sort((a, b) => a.value - b.value)
+                
+                if (brokenBoundaryAmounts.length > 0) {
+                  found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
+                } else if (validAmounts.length > 0) {
+                  const smallest = validAmounts.reduce((a, b) => a.value < b.value ? a : b)
+                  found.push({ value: smallest.value, isNegative: false, isDebitFormat: true })
+                }
+              } else {
+                // No commas - garbage reference numbers are prepended (e.g., "2067375.00")
+                // Pick the LARGEST valid amount (more likely to be the actual transaction)
+                const brokenBoundaryAmounts = validAmounts
+                  .filter(v => v.combinedLeading.length > 3)
+                  .sort((a, b) => b.value - a.value) // Sort DESCENDING - pick largest
+                
+                if (brokenBoundaryAmounts.length > 0) {
+                  found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
+                } else if (validAmounts.length > 0) {
+                  // Fallback: largest valid amount
+                  const largest = validAmounts.reduce((a, b) => a.value > b.value ? a : b)
+                  found.push({ value: largest.value, isNegative: false, isDebitFormat: true })
+                }
               }
             }
           }
