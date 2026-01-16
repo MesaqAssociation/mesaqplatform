@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconAlertCircle, IconCheck } from '@tabler/icons-react'
+import { IconAlertCircle, IconCheck, IconArrowUp } from '@tabler/icons-react'
 import { showToast } from '@/lib/toast'
 
 type Payment = {
@@ -13,6 +13,7 @@ type Payment = {
   transaction_name: string
   description: string
   amount: number
+  category: string
   member_name: string
   member_id: string
   account_name: string
@@ -71,97 +72,143 @@ export default function ReviewPaymentsClient() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    try {
+      let dateObj: Date
+      if (dateStr.includes('T')) {
+        dateObj = new Date(dateStr)
+      } else if (dateStr.includes('-')) {
+        const [year, month, day] = dateStr.split('-').map(Number)
+        dateObj = new Date(year, month - 1, day)
+      } else {
+        dateObj = new Date(dateStr)
+      }
+      return dateObj.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+    }).format(amount)
   }
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Review Payments</h1>
+        <h1 className="text-2xl font-semibold">Review Payments</h1>
         <p className="text-muted-foreground">Special payments that may need to be reclassified as membership payments</p>
       </div>
 
-      {loading ? (
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-64" />
-                </div>
-                <Skeleton className="h-10 w-32" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : payments.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <IconAlertCircle className="size-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Payments to Review</h3>
-            <p className="text-muted-foreground">All special payments have been reviewed</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <IconAlertCircle className="size-5 text-yellow-500" />
-              {payments.length} Payment{payments.length !== 1 ? 's' : ''} Need Review
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {payments.map((payment) => (
-              <div 
-                key={payment.id}
-                className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-semibold">{payment.member_name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                      Special Payment
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(payment.transaction_date)} • {payment.transaction_name}
-                  </p>
-                  {payment.description && (
-                    <p className="text-xs text-muted-foreground mt-1 truncate max-w-2xl">
-                      {payment.description}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Account: {payment.account_name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 ml-4">
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-green-500">
-                      +${Math.abs(payment.amount).toFixed(2)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleReclassify(payment.id)}
-                    disabled={updating === payment.id}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <IconCheck className="size-4" />
-                    {updating === payment.id ? 'Updating...' : 'Mark as Membership'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      {/* Payments Table */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <IconAlertCircle className="size-5 text-yellow-500" />
+                {loading ? '...' : payments.length} Payment{payments.length !== 1 ? 's' : ''} Need Review
+              </h2>
+            </div>
+          </div>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <table className="w-full text-sm min-w-[900px]">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-2">Date</th>
+                  <th className="text-left py-3 px-2">Name</th>
+                  <th className="text-left py-3 px-2">Description</th>
+                  <th className="text-left py-3 px-2">Member</th>
+                  <th className="text-left py-3 px-2">Category</th>
+                  <th className="text-right py-3 px-2">Amount</th>
+                  <th className="text-center py-3 px-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  // Grey shimmers while loading
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`skeleton-${i}`} className="border-b">
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-4 w-20" />
+                      </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-4 w-32" />
+                      </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-4 w-48" />
+                      </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                      </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-6 w-28" />
+                      </td>
+                      <td className="py-3 px-2 text-right">
+                        <Skeleton className="h-4 w-16 ml-auto" />
+                      </td>
+                      <td className="py-3 px-2">
+                        <Skeleton className="h-10 w-full" />
+                      </td>
+                    </tr>
+                  ))
+                ) : payments.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12">
+                      <IconCheck className="size-12 text-green-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
+                      <p className="text-muted-foreground">No special payments need review</p>
+                    </td>
+                  </tr>
+                ) : (
+                  payments.map((payment) => (
+                    <tr key={payment.id} className="border-b hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-2 whitespace-nowrap">
+                        {formatDate(payment.transaction_date)}
+                      </td>
+                      <td className="py-3 px-2 font-medium max-w-[200px] truncate">
+                        {payment.transaction_name}
+                      </td>
+                      <td className="py-3 px-2 text-muted-foreground max-w-[250px] truncate">
+                        {payment.description || '-'}
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          {payment.member_name}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                          {payment.category || 'Special Payment'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium text-green-600 dark:text-green-400">
+                        <div className="flex items-center justify-end gap-1">
+                          <IconArrowUp className="size-3" />
+                          {formatCurrency(Math.abs(payment.amount))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <Button
+                          onClick={() => handleReclassify(payment.id)}
+                          disabled={updating === payment.id}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white"
+                          size="sm"
+                        >
+                          <IconCheck className="size-4 mr-1" />
+                          {updating === payment.id ? 'Updating...' : 'Mark as Membership'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-

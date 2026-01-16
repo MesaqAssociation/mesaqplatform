@@ -144,6 +144,9 @@ export default function FinanceClient({
   const [selectMode, setSelectMode] = useState(false)
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
   const [deletingSelected, setDeletingSelected] = useState(false)
+  
+  // Transaction filter
+  const [transactionFilter, setTransactionFilter] = useState<string>('all')
 
   // Load members when charge dialog opens
   useEffect(() => {
@@ -994,9 +997,31 @@ export default function FinanceClient({
     })
   }
 
+  // Filter transactions based on selected filter
+  const filteredTransactions = transactions.filter(txn => {
+    switch (transactionFilter) {
+      case 'membership':
+        return txn.category === 'Membership Payment'
+      case 'special':
+        return txn.category === 'Special Payment' || txn.category === 'Event Payment'
+      case 'donation':
+        return txn.category === 'Donation'
+      case 'all_expenses':
+        return txn.transaction_type === 'debit'
+      case 'event_expense':
+        return txn.transaction_type === 'debit' && txn.category === 'Event Expense'
+      case 'special_expense':
+        return txn.transaction_type === 'debit' && (txn.category === 'Special Expense' || !txn.category || txn.category === 'Special Payment')
+      case 'membership_under_fee':
+        return txn.category === 'Membership Payment' && Math.abs(txn.amount) < monthlyFee
+      default:
+        return true
+    }
+  })
+
   // Select all visible transactions
   const selectAllTransactions = () => {
-    const allIds = new Set(transactions.map(t => t.id))
+    const allIds = new Set(filteredTransactions.map(t => t.id))
     setSelectedTransactions(allIds)
   }
 
@@ -1397,7 +1422,24 @@ export default function FinanceClient({
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground md:hidden">Swipe to see more →</p>
+            <div className="flex items-center gap-2">
+              <Select value={transactionFilter} onValueChange={setTransactionFilter}>
+                <SelectTrigger className="w-[200px] h-8 text-xs">
+                  <SelectValue placeholder="Filter transactions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Transactions</SelectItem>
+                  <SelectItem value="membership">Membership Payments</SelectItem>
+                  <SelectItem value="special">Special Payments</SelectItem>
+                  <SelectItem value="donation">Donations</SelectItem>
+                  <SelectItem value="all_expenses">All Expenses</SelectItem>
+                  <SelectItem value="event_expense">Event Expenses</SelectItem>
+                  <SelectItem value="special_expense">Special Expenses</SelectItem>
+                  <SelectItem value="membership_under_fee">Membership &lt; Fee</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground md:hidden">Swipe →</p>
+            </div>
           </div>
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <table className="w-full text-sm min-w-[800px]">
@@ -1437,14 +1479,14 @@ export default function FinanceClient({
                       </td>
                     </tr>
                   ))
-                ) : transactions.length === 0 ? (
+                ) : filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={selectMode ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                      No transactions yet
+                      {transactions.length === 0 ? 'No transactions yet' : 'No transactions match the selected filter'}
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((txn) => (
+                  filteredTransactions.map((txn) => (
                     <tr 
                       key={txn.id} 
                       className={`border-b hover:bg-muted/50 transition-colors cursor-pointer ${
@@ -1560,9 +1602,22 @@ export default function FinanceClient({
                             Charges
                           </div>
                         ) : txn.transaction_type === 'debit' ? (
-                          <div className="w-[150px] h-8 text-xs bg-muted text-muted-foreground border border-input rounded-md flex items-center justify-center">
-                            N/A
-                          </div>
+                          <Select 
+                            value={
+                              // Normalize expense category
+                              txn.category === 'Event Expense' ? 'Event Expense' :
+                              'Special Expense' // Default fallback for debits
+                            }
+                            onValueChange={(value) => handleUpdateCategory(txn.id, value)}
+                          >
+                            <SelectTrigger className="w-[150px] h-8 text-xs bg-background text-foreground border-input justify-center">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border-input">
+                              <SelectItem value="Event Expense" className="text-foreground cursor-pointer">Event Expense</SelectItem>
+                              <SelectItem value="Special Expense" className="text-foreground cursor-pointer">Special Expense</SelectItem>
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Select 
                             value={
@@ -1683,9 +1738,18 @@ export default function FinanceClient({
                     Charges
                   </div>
                 ) : selectedTransaction?.transaction_type === 'debit' ? (
-                  <div className="w-48 h-10 mt-1 bg-muted text-muted-foreground border border-input rounded-md flex items-center justify-center">
-                    N/A
-                  </div>
+                  <Select 
+                    value={dialogCategory} 
+                    onValueChange={(v) => setDialogCategory(v)}
+                  >
+                    <SelectTrigger className="w-48 mt-1 justify-center">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Event Expense">Event Expense</SelectItem>
+                      <SelectItem value="Special Expense">Special Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <Select 
                     value={dialogCategory} 
