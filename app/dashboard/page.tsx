@@ -116,14 +116,12 @@ export default async function DashboardPage() {
         bs.account_id,
         bs.statement_date_from,
         bs.statement_date_to,
-        -- Get closing balance from the last transaction in this period
+        -- Get closing balance from the last transaction from this specific bank statement
         COALESCE(
           (
             SELECT t.balance_after
             FROM transactions t
-            WHERE t.account_id = bs.account_id
-              AND t.transaction_date >= bs.statement_date_from
-              AND t.transaction_date <= bs.statement_date_to
+            WHERE t.statement_id = bs.id
               AND t.balance_after IS NOT NULL
             ORDER BY t.transaction_date DESC, t.created_at DESC
             LIMIT 1
@@ -133,28 +131,22 @@ export default async function DashboardPage() {
         (
           SELECT COALESCE(SUM(ABS(t.amount)), 0)
           FROM transactions t 
-          WHERE t.account_id = bs.account_id 
+          WHERE t.statement_id = bs.id
             AND t.transaction_type = 'credit'
-            AND t.transaction_date >= bs.statement_date_from
-            AND t.transaction_date <= bs.statement_date_to
         ) as total_credits,
         (
           SELECT COALESCE(SUM(ABS(t.amount)), 0)
           FROM transactions t 
-          WHERE t.account_id = bs.account_id 
+          WHERE t.statement_id = bs.id
             AND t.transaction_type = 'debit'
-            AND t.transaction_date >= bs.statement_date_from
-            AND t.transaction_date <= bs.statement_date_to
         ) as total_debits,
         (
           SELECT json_agg(json_build_object('category', sub.category, 'total', sub.total))
           FROM (
             SELECT category, COALESCE(SUM(ABS(amount)), 0) as total
             FROM transactions t
-            WHERE t.account_id = bs.account_id
+            WHERE t.statement_id = bs.id
               AND t.transaction_type = 'credit'
-              AND t.transaction_date >= bs.statement_date_from
-              AND t.transaction_date <= bs.statement_date_to
             GROUP BY category
           ) sub
         ) as credit_breakdown,
@@ -163,10 +155,8 @@ export default async function DashboardPage() {
           FROM (
             SELECT category, COALESCE(SUM(ABS(amount)), 0) as total
             FROM transactions t
-            WHERE t.account_id = bs.account_id
+            WHERE t.statement_id = bs.id
               AND t.transaction_type = 'debit'
-              AND t.transaction_date >= bs.statement_date_from
-              AND t.transaction_date <= bs.statement_date_to
             GROUP BY category
           ) sub
         ) as debit_breakdown
