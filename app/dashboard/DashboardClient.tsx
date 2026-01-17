@@ -50,6 +50,7 @@ type UnpaidBalance = {
 }
 
 type StatementSummary = {
+  statement_id: string
   account_id: string
   statement_date_from: string
   statement_date_to: string
@@ -95,6 +96,7 @@ type ReviewExpense = {
 export default function DashboardClient({ memberStats, recentTransactions, upcomingEvents, accounts, unpaidBalances, statementSummaries }: Props) {
   const { t } = useI18n()
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
+  const [selectedStatementId, setSelectedStatementId] = useState<string | null>(null)
   const [accountTransactions, setAccountTransactions] = useState<Transaction[]>([])
   const [reviewPayments, setReviewPayments] = useState<ReviewPayment[]>([])
   const [reviewExpenses, setReviewExpenses] = useState<ReviewExpense[]>([])
@@ -105,6 +107,19 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
   const [updatingCategory, setUpdatingCategory] = useState(false)
   const [showDebitsBreakdown, setShowDebitsBreakdown] = useState(false)
   const [showCreditsBreakdown, setShowCreditsBreakdown] = useState(false)
+  
+  // Get all statements for the selected account for the dropdown
+  const accountStatements = statementSummaries.filter(s => s.account_id === selectedAccountId)
+  
+  // Set default selected statement to the most recent one when account changes
+  useEffect(() => {
+    const latestStatement = accountStatements[0]
+    if (latestStatement) {
+      setSelectedStatementId(latestStatement.statement_id)
+    } else {
+      setSelectedStatementId(null)
+    }
+  }, [selectedAccountId])
 
   useEffect(() => {
     // Filter transactions by selected account and limit to 3
@@ -296,7 +311,9 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
 
           {/* Statement Summary */}
           {(() => {
-            const summary = statementSummaries.find(s => s.account_id === selectedAccountId)
+            const summary = selectedStatementId 
+              ? statementSummaries.find(s => s.statement_id === selectedStatementId)
+              : accountStatements[0]
             const account = accounts.find(a => a.id === selectedAccountId)
             
             if (!summary && account) {
@@ -321,10 +338,37 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
             
             return (
               <div className="space-y-3">
-                {/* Period Header */}
-                <div className="text-center py-2 bg-muted/30 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Statement Period</p>
-                  <p className="text-sm font-semibold">{periodLabel}</p>
+                {/* Period Header with Dropdown */}
+                <div className="py-2 bg-muted/30 rounded-lg px-3">
+                  <p className="text-xs text-muted-foreground text-center mb-1">Statement Period</p>
+                  {accountStatements.length > 1 ? (
+                    <Select 
+                      value={selectedStatementId || accountStatements[0]?.statement_id} 
+                      onValueChange={(value) => {
+                        setSelectedStatementId(value)
+                        setShowDebitsBreakdown(false)
+                        setShowCreditsBreakdown(false)
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-sm font-semibold justify-center border-0 bg-transparent shadow-none">
+                        <SelectValue>{periodLabel}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accountStatements.map((stmt) => {
+                          const from = new Date(stmt.statement_date_from)
+                          const to = new Date(stmt.statement_date_to)
+                          const label = `${from.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} - ${to.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          return (
+                            <SelectItem key={stmt.statement_id} value={stmt.statement_id}>
+                              {label}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm font-semibold text-center">{periodLabel}</p>
+                  )}
                 </div>
 
                 {/* Opening Balance */}
@@ -358,10 +402,20 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                           </div>
                         ))
                       ) : (
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">Cheques</span>
-                          <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
-                        </div>
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Event Expense</span>
+                            <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Special Expense</span>
+                            <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Cheques</span>
+                            <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}

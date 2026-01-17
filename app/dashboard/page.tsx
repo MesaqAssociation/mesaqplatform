@@ -108,9 +108,10 @@ export default async function DashboardPage() {
   }
 
   try {
-    // Get latest statement summary per account
+    // Get ALL statement summaries (not just latest) for historical dropdown
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (bs.account_id)
+      SELECT
+        bs.id as statement_id,
         bs.account_id,
         bs.statement_date_from,
         bs.statement_date_to,
