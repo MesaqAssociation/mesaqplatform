@@ -109,13 +109,26 @@ export default async function DashboardPage() {
 
   try {
     // Get ALL statement summaries (not just latest) for historical dropdown
+    // Calculate closing balance by subtracting transactions that happened AFTER this period from current balance
     const { rows } = await pool.query(`
       SELECT
         bs.id as statement_id,
         bs.account_id,
         bs.statement_date_from,
         bs.statement_date_to,
-        fa.current_balance as closing_balance,
+        -- Calculate closing balance: current balance minus net of transactions after this period
+        fa.current_balance - COALESCE((
+          SELECT SUM(
+            CASE 
+              WHEN t.transaction_type = 'credit' THEN t.amount 
+              WHEN t.transaction_type = 'debit' THEN -ABS(t.amount)
+              ELSE 0 
+            END
+          )
+          FROM transactions t
+          WHERE t.account_id = bs.account_id
+            AND t.transaction_date > bs.statement_date_to
+        ), 0) as closing_balance,
         (
           SELECT COALESCE(SUM(ABS(t.amount)), 0)
           FROM transactions t 

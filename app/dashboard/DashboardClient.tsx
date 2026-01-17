@@ -411,10 +411,6 @@ export default function DashboardClient({ memberStats, recentTransactions, upcom
                             <span className="text-muted-foreground">Special Expense</span>
                             <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
                           </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Cheques</span>
-                            <span className="text-red-600 dark:text-red-400">{formatCurrency(0)}</span>
-                          </div>
                         </>
                       )}
                     </div>
