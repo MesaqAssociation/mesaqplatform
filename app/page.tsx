@@ -143,6 +143,9 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
+          <p className="text-center text-xs text-muted-foreground/60 mt-4 pt-4 border-t border-border/50">
+            © Scale up with AI 2026
+          </p>
         </CardContent>
       </Card>
       </div>

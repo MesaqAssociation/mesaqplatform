@@ -315,9 +315,9 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { transactionId, memberId, category } = body
+    const { transactionId, memberId, category, description } = body
 
-    console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId, 'category:', category)
+    console.log('PATCH request - transactionId:', transactionId, 'memberId:', memberId, 'category:', category, 'description:', description !== undefined ? '(updating)' : '(not updating)')
 
     if (!transactionId) {
       return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400, headers: corsHeaders })
@@ -334,11 +334,11 @@ export async function PATCH(req: NextRequest) {
       }, { status: 500, headers: corsHeaders })
     }
 
-    // Handle category-only update
-    if (category !== undefined && memberId === undefined) {
+    // Handle description-only update
+    if (description !== undefined && category === undefined && memberId === undefined) {
       const { rows: updatedTransaction } = await pool.query(`
         UPDATE transactions 
-        SET category = $1
+        SET description = $1
         WHERE id = $2
         RETURNING 
           id,
@@ -356,7 +356,54 @@ export async function PATCH(req: NextRequest) {
           matched_member_id,
           statement_id,
           created_at
-      `, [category, transactionId])
+      `, [description, transactionId])
+
+      if (updatedTransaction.length === 0) {
+        return NextResponse.json({ error: 'Transaction not found' }, { status: 404, headers: corsHeaders })
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        transaction: updatedTransaction[0]
+      }, { headers: corsHeaders })
+    }
+
+    // Handle category update (with optional description)
+    if (category !== undefined && memberId === undefined) {
+      // Build dynamic update query
+      const setClauses = ['category = $1']
+      const params: any[] = [category]
+      let paramIndex = 2
+
+      if (description !== undefined) {
+        setClauses.push(`description = $${paramIndex}`)
+        params.push(description)
+        paramIndex++
+      }
+
+      params.push(transactionId)
+
+      const { rows: updatedTransaction } = await pool.query(`
+        UPDATE transactions 
+        SET ${setClauses.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING 
+          id,
+          account_id,
+          to_char(transaction_date, 'YYYY-MM-DD') as transaction_date,
+          transaction_name,
+          description,
+          category,
+          amount,
+          transaction_type,
+          reference,
+          balance_after,
+          created_by,
+          source,
+          matched_member_id,
+          statement_id,
+          created_at
+      `, params)
 
       if (updatedTransaction.length === 0) {
         return NextResponse.json({ error: 'Transaction not found' }, { status: 404, headers: corsHeaders })

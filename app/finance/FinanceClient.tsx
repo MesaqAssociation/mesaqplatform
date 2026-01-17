@@ -197,6 +197,7 @@ export default function FinanceClient({
   
   // Dialog edit states
   const [dialogCategory, setDialogCategory] = useState<string>('')
+  const [dialogDescription, setDialogDescription] = useState<string>('')
   const [dialogMemberId, setDialogMemberId] = useState<string | null>(null)
   const [dialogMemberSearchQuery, setDialogMemberSearchQuery] = useState('')
   const [dialogMemberResults, setDialogMemberResults] = useState<Member[]>([])
@@ -612,6 +613,7 @@ export default function FinanceClient({
       }
     }
     setDialogCategory(category)
+    setDialogDescription(txn.description || '')
     setShowTransactionDialog(true)
   }
 
@@ -1768,12 +1770,19 @@ export default function FinanceClient({
                 <p className="font-medium text-lg">{selectedTransaction.transaction_name}</p>
               </div>
 
-              {selectedTransaction.description && (
-                <div>
-                  <Label className="text-muted-foreground text-xs">Description</Label>
-                  <p className="font-medium">{selectedTransaction.description}</p>
-                </div>
-              )}
+              <div>
+                <Label className="text-muted-foreground text-xs">Description</Label>
+                {selectedTransaction.transaction_type === 'debit' && selectedTransaction.category !== 'Charges' ? (
+                  <Input
+                    value={dialogDescription}
+                    onChange={(e) => setDialogDescription(e.target.value)}
+                    placeholder="Add a description..."
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="font-medium">{selectedTransaction.description || <span className="text-muted-foreground italic">No description</span>}</p>
+                )}
+              </div>
 
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
@@ -2003,28 +2012,34 @@ export default function FinanceClient({
                   Delete
                 </Button>
                 <div className="flex gap-2">
-                  {dialogCategory && dialogCategory !== selectedTransaction.category && (
+                  {((dialogCategory && dialogCategory !== selectedTransaction.category) || 
+                    (selectedTransaction.transaction_type === 'debit' && dialogDescription !== (selectedTransaction.description || ''))) && (
                     <Button 
                       onClick={async () => {
                         setSavingDialog(true)
                         try {
+                          const updates: any = { transactionId: selectedTransaction.id }
+                          if (dialogCategory !== selectedTransaction.category) {
+                            updates.category = dialogCategory
+                          }
+                          if (selectedTransaction.transaction_type === 'debit' && dialogDescription !== (selectedTransaction.description || '')) {
+                            updates.description = dialogDescription
+                          }
+                          
                           const res = await fetch('/api/finance/transactions', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              transactionId: selectedTransaction.id,
-                              category: dialogCategory
-                            })
+                            body: JSON.stringify(updates)
                           })
                           if (res.ok) {
-                            showToast('Category updated!', 'success')
+                            showToast('Changes saved!', 'success')
                             loadTransactions()
                             setShowTransactionDialog(false)
                           } else {
-                            showToast('Failed to update category', 'error')
+                            showToast('Failed to save changes', 'error')
                           }
                         } catch (err) {
-                          showToast('Failed to update category', 'error')
+                          showToast('Failed to save changes', 'error')
                         } finally {
                           setSavingDialog(false)
                         }
@@ -2039,6 +2054,7 @@ export default function FinanceClient({
                     onClick={() => {
                       setShowTransactionDialog(false)
                       setDialogCategory('')
+                      setDialogDescription('')
                     }}
                 >
                   Close
