@@ -16,7 +16,7 @@ const pool = new Pool({
 /**
  * Unified Daily Cron Job - Runs at 1pm AEST
  * 
- * 1. On 1st of month: Send payment reminders to members with negative balance (includes current month expected)
+ * 1. On 14th of month: Send payment reminders for PREVIOUS month (Feb 14 sends January balance)
  * 2. Every day: Send scheduled notifications that are due
  */
 export async function GET(req: NextRequest) {
@@ -88,10 +88,10 @@ export async function GET(req: NextRequest) {
     }
 
     // ============================================
-    // 1. PAYMENT REMINDERS (1st of the month)
+    // 1. PAYMENT REMINDERS (14th of the month)
     // ============================================
-    if (dayOfMonth === 1) {
-      console.log('📅 1st of month - Sending payment reminders')
+    if (dayOfMonth === 14) {
+      console.log('📅 14th of month - Sending payment reminders for previous month')
       results.paymentReminders.processed = true
       
       try {
@@ -157,13 +157,13 @@ export async function POST(req: NextRequest) {
  * Send payment reminders to members with negative balance
  * Respects payment plans: monthly, quarterly, semi_annually, yearly
  * 
- * Payment plan reminder schedule (1st of month):
+ * Payment plan reminder schedule (14th of month, for PREVIOUS month):
  * - Monthly: Every month
- * - Quarterly: January, April, July, October
- * - Semi-annually: January, July
- * - Yearly: January only
+ * - Quarterly: February (for Jan), May (for Apr), August (for Jul), November (for Oct)
+ * - Semi-annually: February (for Jan), August (for Jul)
+ * - Yearly: February only (for January)
  * 
- * Note: On the 1st, balance includes current month as expected (no -1 month offset)
+ * Note: On the 14th, we calculate balance up to the PREVIOUS month
  */
 async function sendPaymentReminders(): Promise<{ sent: number; failed: number; skipped: number }> {
   // Get main membership account
@@ -186,10 +186,13 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   )
   const monthlyFee = parseFloat(feeRows[0]?.value || '40')
 
-  // Get current month (1-12)
-  const currentMonth = new Date().getMonth() + 1 // 1 = January, 12 = December
+  // Get PREVIOUS month (since we send on the 14th for the previous month's balance)
+  // On Feb 14, we send January's balance, so prevMonth = 1 (January)
+  const now = new Date()
+  const currentMonthNum = now.getMonth() + 1 // 1-12
+  const prevMonth = currentMonthNum === 1 ? 12 : currentMonthNum - 1 // Previous month 1-12
   
-  // Determine which payment plans should get reminders this month
+  // Determine which payment plans should get reminders based on the PREVIOUS month
   // Monthly: every month
   // Quarterly: January (1), April (4), July (7), October (10)
   // Semi-annually: January (1), July (7)
@@ -198,23 +201,23 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   const semiAnnualMonths = [1, 7]
   const yearlyMonths = [1]
   
-  // Build the payment plan filter
+  // Build the payment plan filter based on previous month
   const eligiblePlans: string[] = ['monthly'] // Monthly always gets reminders
-  if (quarterlyMonths.includes(currentMonth)) {
+  if (quarterlyMonths.includes(prevMonth)) {
     eligiblePlans.push('quarterly')
   }
-  if (semiAnnualMonths.includes(currentMonth)) {
+  if (semiAnnualMonths.includes(prevMonth)) {
     eligiblePlans.push('semi_annually')
   }
-  if (yearlyMonths.includes(currentMonth)) {
+  if (yearlyMonths.includes(prevMonth)) {
     eligiblePlans.push('yearly')
   }
   
-  console.log(`📅 Current month: ${currentMonth}, eligible payment plans: ${eligiblePlans.join(', ')}`)
+  console.log(`📅 Sending reminders for previous month: ${prevMonth}, eligible payment plans: ${eligiblePlans.join(', ')}`)
 
   // Get all members with their calculated balance, filtered by eligible payment plans
   // Balance calculation varies by payment plan
-  // On 1st of month, include CURRENT month in expected payments (no -1 month offset)
+  // On 14th of month, calculate balance up to PREVIOUS month (use -1 month offset)
   const { rows: members } = await pool.query(`
     SELECT 
       u.id, u.name, u.phone, 
@@ -239,7 +242,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(
         date_trunc('month', COALESCE(u.date_joined, '2025-05-01'::timestamp)),
-        date_trunc('month', CURRENT_DATE),
+        date_trunc('month', CURRENT_DATE) - interval '1 month',
         interval '1 month'
       ) gs
     ) months
