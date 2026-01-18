@@ -189,25 +189,25 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
                 
                 // Skip zero amounts (not meaningful transactions)
                 if (value > 0) {
-                  const offset = amountStr.length - checkStr.length
-                  const checkStartInBefore = amountMatch.index! + offset
-                  const charBefore = checkStartInBefore > 0 ? beforeDoubleDollar[checkStartInBefore - 1] : ''
-                  
-                  // Count consecutive digits immediately before this amount
-                  let digitsBefore = ''
-                  for (let i = checkStartInBefore - 1; i >= 0 && beforeDoubleDollar[i] >= '0' && beforeDoubleDollar[i] <= '9'; i--) {
-                    digitsBefore = beforeDoubleDollar[i] + digitsBefore
-                  }
-                  
-                  const leadingDigits = (checkStr.match(/^(\d+)/) || ['', ''])[1]
-                  const combinedLeading = digitsBefore + leadingDigits
-                  
-                  validAmounts.push({
-                    amount: checkStr,
+                const offset = amountStr.length - checkStr.length
+                const checkStartInBefore = amountMatch.index! + offset
+                const charBefore = checkStartInBefore > 0 ? beforeDoubleDollar[checkStartInBefore - 1] : ''
+                
+                // Count consecutive digits immediately before this amount
+                let digitsBefore = ''
+                for (let i = checkStartInBefore - 1; i >= 0 && beforeDoubleDollar[i] >= '0' && beforeDoubleDollar[i] <= '9'; i--) {
+                  digitsBefore = beforeDoubleDollar[i] + digitsBefore
+                }
+                
+                const leadingDigits = (checkStr.match(/^(\d+)/) || ['', ''])[1]
+                const combinedLeading = digitsBefore + leadingDigits
+                
+                validAmounts.push({
+                  amount: checkStr,
                     value: value,
-                    combinedLeading: combinedLeading,
-                    isCleanBoundary: charBefore === '' || (!(charBefore >= '0' && charBefore <= '9') && charBefore !== ',')
-                  })
+                  combinedLeading: combinedLeading,
+                  isCleanBoundary: charBefore === '' || (!(charBefore >= '0' && charBefore <= '9') && charBefore !== ',')
+                })
                 }
               }
               checkStr = checkStr.substring(1)
@@ -225,15 +225,15 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
               if (hasCommas) {
                 // With commas, the comma placement indicates structure
                 // Pick the amount that respects comma grouping (smallest valid)
-                const brokenBoundaryAmounts = validAmounts
-                  .filter(v => v.combinedLeading.length > 3)
-                  .sort((a, b) => a.value - b.value)
-                
-                if (brokenBoundaryAmounts.length > 0) {
-                  found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
-                } else if (validAmounts.length > 0) {
-                  const smallest = validAmounts.reduce((a, b) => a.value < b.value ? a : b)
-                  found.push({ value: smallest.value, isNegative: false, isDebitFormat: true })
+              const brokenBoundaryAmounts = validAmounts
+                .filter(v => v.combinedLeading.length > 3)
+                .sort((a, b) => a.value - b.value)
+              
+              if (brokenBoundaryAmounts.length > 0) {
+                found.push({ value: brokenBoundaryAmounts[0].value, isNegative: false, isDebitFormat: true })
+              } else if (validAmounts.length > 0) {
+                const smallest = validAmounts.reduce((a, b) => a.value < b.value ? a : b)
+                found.push({ value: smallest.value, isNegative: false, isDebitFormat: true })
                 }
               } else {
                 // No commas - garbage reference numbers are prepended (e.g., "2067375.00")
@@ -367,9 +367,9 @@ export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedState
           balance = nonDebitFormatAmounts[nonDebitFormatAmounts.length - 1].value
           console.log(`   Found debit format amount: $${debitFormatAmount.value}, balance: $${balance}`)
         } else {
-          // Standard format: transaction amount + balance OR debit + credit + balance
+        // Standard format: transaction amount + balance OR debit + credit + balance
           txnAmount = amounts[0]
-          balance = amounts[amounts.length - 1].value
+        balance = amounts[amounts.length - 1].value
         }
         
         // Determine if debit or credit:

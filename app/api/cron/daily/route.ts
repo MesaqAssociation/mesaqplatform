@@ -220,7 +220,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   // On 14th of month, calculate balance up to PREVIOUS month (use -1 month offset)
   const { rows: members } = await pool.query(`
     SELECT 
-      u.id, u.name, u.phone, 
+      u.id, u.name, u.phone,
       COALESCE(u.payment_plan, 'monthly') as payment_plan,
       COALESCE(mp.total_paid, 0) as total_paid,
       months.expected_months,

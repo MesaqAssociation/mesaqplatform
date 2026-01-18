@@ -194,7 +194,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
                     <AvatarFallback className={m.is_active === false ? 'bg-red-100 text-red-700' : ''}>{getInitials(m.name)}</AvatarFallback>
                   </Avatar>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{m.name || '-'}</span>
+                  <span className="font-medium">{m.name || '-'}</span>
                     {m.is_active === false && (
                       <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1 rounded">
                         Deactivated
@@ -245,7 +245,7 @@ export default function MembersClient({ initial, isAdmin = true }: { initial: Me
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium truncate">{m.name || '-'}</p>
+                <p className="font-medium truncate">{m.name || '-'}</p>
                   {m.is_active === false && (
                     <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1 rounded flex-shrink-0">
                       Deactivated

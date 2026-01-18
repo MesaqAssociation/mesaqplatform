@@ -227,35 +227,35 @@ export default function DocumentsClient({ user }: { user: User | null }) {
                   )}
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={async () => {
-                      try {
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={async () => {
+                        try {
                         // Use proxy endpoint to avoid CORS issues
                         const response = await fetch(`/api/documents/download/${doc.id}`)
                         if (!response.ok) {
                           const error = await response.json()
                           throw new Error(error.error || 'Download failed')
                         }
-                        const blob = await response.blob()
-                        const url = window.URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = doc.file_name
-                        document.body.appendChild(a)
-                        a.click()
-                        window.URL.revokeObjectURL(url)
-                        document.body.removeChild(a)
+                          const blob = await response.blob()
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = doc.file_name
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
                       } catch (err: any) {
                         showToast(err.message || 'Failed to download file', 'error')
-                      }
-                    }}
-                  >
-                    <IconDownload className="mr-2 size-4" />
-                    Download
-                  </Button>
+                        }
+                      }}
+                    >
+                      <IconDownload className="mr-2 size-4" />
+                      Download
+                    </Button>
                   {isAdmin && (
                     <Button
                       size="sm"

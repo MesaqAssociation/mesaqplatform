@@ -635,7 +635,7 @@ export default function MessagingClient() {
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-0.5">
-                                <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <span className={`font-medium truncate text-sm ${conv.unreadCount > 0 ? 'text-foreground' : 'text-foreground/80'}`}>
                                   {displayName}
                                 </span>
@@ -1096,10 +1096,10 @@ export default function MessagingClient() {
                     {topupSteps.map((step, index) => (
                       <div key={index} className="space-y-2">
                         <div className="flex items-start gap-3">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          <p className="text-sm">{step.text}</p>
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm">{step.text}</p>
                         </div>
                         {step.image && (
                           <img 
@@ -1108,7 +1108,7 @@ export default function MessagingClient() {
                             className="rounded-lg border ml-9 max-w-full md:max-w-md"
                           />
                         )}
-                      </div>
+                    </div>
                   ))}
                 </div>
                 </CardContent>

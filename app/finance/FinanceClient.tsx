@@ -603,13 +603,13 @@ export default function FinanceClient({
       }
     } else {
       // For credits and charges
-      // Convert legacy 'Event Payment' to 'Special Payment'
-      if (category === 'Event Payment') {
-        category = 'Special Payment'
-      }
-      // Only allow valid categories
-      if (!['Membership Payment', 'Special Payment', 'Donation', 'Charges'].includes(category)) {
-        category = 'Special Payment'
+    // Convert legacy 'Event Payment' to 'Special Payment'
+    if (category === 'Event Payment') {
+      category = 'Special Payment'
+    }
+    // Only allow valid categories
+    if (!['Membership Payment', 'Special Payment', 'Donation', 'Charges'].includes(category)) {
+      category = 'Special Payment'
       }
     }
     setDialogCategory(category)
@@ -1770,8 +1770,8 @@ export default function FinanceClient({
                 <p className="font-medium text-lg">{selectedTransaction.transaction_name}</p>
               </div>
 
-              <div>
-                <Label className="text-muted-foreground text-xs">Description</Label>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Description</Label>
                 {selectedTransaction.transaction_type === 'debit' && selectedTransaction.category !== 'Charges' ? (
                   <Input
                     value={dialogDescription}
@@ -1782,7 +1782,7 @@ export default function FinanceClient({
                 ) : (
                   <p className="font-medium">{selectedTransaction.description || <span className="text-muted-foreground italic">No description</span>}</p>
                 )}
-              </div>
+                </div>
 
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
@@ -2255,9 +2255,9 @@ export default function FinanceClient({
               <SelectContent>
                 {newTransactionType === 'credit' ? (
                   <>
-                    <SelectItem value="Membership Payment">Membership Payment</SelectItem>
-                    <SelectItem value="Event Payment">Event Payment</SelectItem>
-                    <SelectItem value="Donation">Donation</SelectItem>
+                <SelectItem value="Membership Payment">Membership Payment</SelectItem>
+                <SelectItem value="Event Payment">Event Payment</SelectItem>
+                <SelectItem value="Donation">Donation</SelectItem>
                     <SelectItem value="Special Payment">Special Payment</SelectItem>
                   </>
                 ) : (

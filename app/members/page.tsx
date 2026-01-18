@@ -96,7 +96,7 @@ export default async function MembersPage() {
         NULL as address,
         NULL as role,
         NULL as household_members,
-        NULL as current_balance,
+      NULL as current_balance,
         NULL as payment_status,
         NULL as total_paid,
         NULL as monthly_fee

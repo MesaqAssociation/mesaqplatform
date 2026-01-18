@@ -595,10 +595,10 @@ export async function DELETE(req: NextRequest) {
 
     // Get current balance (we no longer modify balance when deleting transactions)
     // Balance should be managed through bank statement uploads and manual adjustments only
-    const { rows: accountRows } = await pool.query(
-      'SELECT current_balance FROM financial_accounts WHERE id = $1',
-      [transaction.account_id]
-    )
+      const { rows: accountRows } = await pool.query(
+        'SELECT current_balance FROM financial_accounts WHERE id = $1',
+        [transaction.account_id]
+      )
     const newBalance = accountRows[0]?.current_balance
 
     console.log(`Transaction ${transactionId} deleted successfully`)
