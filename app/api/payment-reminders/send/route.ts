@@ -98,11 +98,11 @@ export async function POST(req: NextRequest) {
 
     // If specific member requested (test mode), send to just that member
     if (memberId) {
-      // Get member with their balance
+      // Get member with their balance (including charges)
       const { rows: memberRows } = await pool.query(`
         SELECT 
           u.id, u.name, u.phone,
-          COALESCE(mp.total_paid, 0) - (months.expected_months * $1) AS balance
+          COALESCE(mp.total_paid, 0) - (months.expected_months * $1) - COALESCE(charges.total_charges, 0) AS balance
         FROM users u
         LEFT JOIN (
           SELECT mp.user_id, SUM(mp.amount) as total_paid
@@ -111,6 +111,12 @@ export async function POST(req: NextRequest) {
           WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
           GROUP BY mp.user_id
         ) mp ON mp.user_id = u.id
+        LEFT JOIN (
+          SELECT matched_member_id, SUM(amount) as total_charges
+          FROM transactions
+          WHERE category = 'Charges' AND transaction_type = 'debit'
+          GROUP BY matched_member_id
+        ) charges ON charges.matched_member_id = u.id
         CROSS JOIN LATERAL (
           SELECT COUNT(*)::int AS expected_months
           FROM generate_series(
@@ -172,11 +178,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Get all members with their balances
+    // Get all members with their balances (including charges)
     const { rows: members } = await pool.query(`
       SELECT 
         u.id, u.name, u.phone,
-        COALESCE(mp.total_paid, 0) - (months.expected_months * $1) AS balance
+        COALESCE(mp.total_paid, 0) - (months.expected_months * $1) - COALESCE(charges.total_charges, 0) AS balance
       FROM users u
       LEFT JOIN (
         SELECT mp.user_id, SUM(mp.amount) as total_paid
@@ -185,6 +191,12 @@ export async function POST(req: NextRequest) {
         WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
         GROUP BY mp.user_id
       ) mp ON mp.user_id = u.id
+      LEFT JOIN (
+        SELECT matched_member_id, SUM(amount) as total_charges
+        FROM transactions
+        WHERE category = 'Charges' AND transaction_type = 'debit'
+        GROUP BY matched_member_id
+      ) charges ON charges.matched_member_id = u.id
       CROSS JOIN LATERAL (
         SELECT COUNT(*)::int AS expected_months
         FROM generate_series(
@@ -286,11 +298,11 @@ export async function GET(req: NextRequest) {
     )
     const monthlyFee = parseFloat(feeRows[0]?.value || '40')
 
-    // Get members with negative balance
+    // Get members with negative balance (including charges)
     const { rows: members } = await pool.query(`
       SELECT 
         u.id, u.name, u.phone, u.member_id,
-        COALESCE(mp.total_paid, 0) - (months.expected_months * $1) AS balance
+        COALESCE(mp.total_paid, 0) - (months.expected_months * $1) - COALESCE(charges.total_charges, 0) AS balance
       FROM users u
       LEFT JOIN (
         SELECT mp.user_id, SUM(mp.amount) as total_paid
@@ -299,6 +311,12 @@ export async function GET(req: NextRequest) {
         WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
         GROUP BY mp.user_id
       ) mp ON mp.user_id = u.id
+      LEFT JOIN (
+        SELECT matched_member_id, SUM(amount) as total_charges
+        FROM transactions
+        WHERE category = 'Charges' AND transaction_type = 'debit'
+        GROUP BY matched_member_id
+      ) charges ON charges.matched_member_id = u.id
       CROSS JOIN LATERAL (
         SELECT COUNT(*)::int AS expected_months
         FROM generate_series(

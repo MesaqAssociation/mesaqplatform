@@ -48,9 +48,10 @@ export default async function MembersPage() {
       u.household_members,
       COALESCE(u.is_active, true) as is_active,
       -- Compute balance based on membership payments vs expected months (up to LAST month, not current)
-      COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) AS balance,
+      -- Also subtract charges (debit transactions with category 'Charges')
+      COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) - COALESCE(charges.total_charges, 0) AS balance,
       CASE 
-        WHEN COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) >= 0 THEN 'PAID'
+        WHEN COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) - COALESCE(charges.total_charges, 0) >= 0 THEN 'PAID'
         ELSE 'UNPAID'
       END AS payment_status,
       mp.total_paid,
@@ -70,6 +71,12 @@ export default async function MembersPage() {
         OR t.category = 'Membership Payment'
       GROUP BY mp.user_id
     ) mp ON mp.user_id = u.id
+    LEFT JOIN (
+      SELECT matched_member_id, SUM(amount) as total_charges
+      FROM transactions
+      WHERE category = 'Charges' AND transaction_type = 'debit'
+      GROUP BY matched_member_id
+    ) charges ON charges.matched_member_id = u.id
     CROSS JOIN LATERAL (
       SELECT GREATEST(0, COUNT(*)::int) AS expected_months
       FROM generate_series(

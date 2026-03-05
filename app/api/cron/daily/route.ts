@@ -215,7 +215,7 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
   
   console.log(`📅 Sending reminders for previous month: ${prevMonth}, eligible payment plans: ${eligiblePlans.join(', ')}`)
 
-  // Get all members with their calculated balance, filtered by eligible payment plans
+  // Get all members with their calculated balance (including charges), filtered by eligible payment plans
   // Balance calculation varies by payment plan
   // On 14th of month, calculate balance up to PREVIOUS month (use -1 month offset)
   const { rows: members } = await pool.query(`
@@ -225,10 +225,10 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
       COALESCE(mp.total_paid, 0) as total_paid,
       months.expected_months,
       CASE COALESCE(u.payment_plan, 'monthly')
-        WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * $1 * 12)
-        WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * $1 * 6)
-        WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * $1 * 3)
-        ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * $1)
+        WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * $1 * 12) - COALESCE(charges.total_charges, 0)
+        WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * $1 * 6) - COALESCE(charges.total_charges, 0)
+        WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * $1 * 3) - COALESCE(charges.total_charges, 0)
+        ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * $1) - COALESCE(charges.total_charges, 0)
       END AS balance
     FROM users u
     LEFT JOIN (
@@ -238,6 +238,12 @@ async function sendPaymentReminders(): Promise<{ sent: number; failed: number; s
       WHERE mp.transaction_id IS NULL OR t.category = 'Membership Payment'
       GROUP BY mp.user_id
     ) mp ON mp.user_id = u.id
+    LEFT JOIN (
+      SELECT matched_member_id, SUM(amount) as total_charges
+      FROM transactions
+      WHERE category = 'Charges' AND transaction_type = 'debit'
+      GROUP BY matched_member_id
+    ) charges ON charges.matched_member_id = u.id
     CROSS JOIN LATERAL (
       SELECT COUNT(*)::int AS expected_months
       FROM generate_series(

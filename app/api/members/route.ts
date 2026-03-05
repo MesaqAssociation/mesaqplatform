@@ -77,17 +77,17 @@ export async function GET(req: NextRequest) {
         COALESCE(u.is_active, true) as is_active,
         COALESCE(u.payment_plan, 'monthly') as payment_plan,
         CASE COALESCE(u.payment_plan, 'monthly')
-          WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12)
-          WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6)
-          WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3)
-          ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0))
+          WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12) - COALESCE(charges.total_charges, 0)
+          WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6) - COALESCE(charges.total_charges, 0)
+          WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3) - COALESCE(charges.total_charges, 0)
+          ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) - COALESCE(charges.total_charges, 0)
         END AS balance,
         CASE 
           WHEN (CASE COALESCE(u.payment_plan, 'monthly')
-            WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12)
-            WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6)
-            WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3)
-            ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0))
+            WHEN 'yearly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 12.0) * COALESCE(fee.monthly_fee, 40.0) * 12) - COALESCE(charges.total_charges, 0)
+            WHEN 'semi_annually' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 6.0) * COALESCE(fee.monthly_fee, 40.0) * 6) - COALESCE(charges.total_charges, 0)
+            WHEN 'quarterly' THEN COALESCE(mp.total_paid, 0) - (FLOOR(months.expected_months / 3.0) * COALESCE(fee.monthly_fee, 40.0) * 3) - COALESCE(charges.total_charges, 0)
+            ELSE COALESCE(mp.total_paid, 0) - (months.expected_months * COALESCE(fee.monthly_fee, 40.0)) - COALESCE(charges.total_charges, 0)
           END) >= 0 THEN 'PAID'
           ELSE 'UNPAID'
         END AS payment_status,
@@ -108,6 +108,12 @@ export async function GET(req: NextRequest) {
           OR t.category = 'Membership Payment'
         GROUP BY mp.user_id
       ) mp ON mp.user_id = u.id
+      LEFT JOIN (
+        SELECT matched_member_id, SUM(amount) as total_charges
+        FROM transactions
+        WHERE category = 'Charges' AND transaction_type = 'debit'
+        GROUP BY matched_member_id
+      ) charges ON charges.matched_member_id = u.id
       CROSS JOIN LATERAL (
         SELECT GREATEST(0, COUNT(*)::int) AS expected_months
         FROM generate_series(
