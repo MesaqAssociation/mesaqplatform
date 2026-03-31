@@ -64,7 +64,7 @@ export function VariableTextarea({
   const htmlToText = (html: string): string => {
     const temp = document.createElement('div')
     temp.innerHTML = html
-    
+
     // Replace variable spans with {{key}}
     const spans = temp.querySelectorAll('[data-variable]')
     spans.forEach(span => {
@@ -72,20 +72,26 @@ export function VariableTextarea({
       const textNode = document.createTextNode(`{{${varKey}}}`)
       span.replaceWith(textNode)
     })
-    
-    // Get text content, handling br tags
+
+    // Get text content, handling br tags and block elements
     let text = ''
-    const processNode = (node: Node) => {
+    const blockTags = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE'])
+    const processNode = (node: Node, isRoot: boolean) => {
       if (node.nodeType === Node.TEXT_NODE) {
         text += node.textContent
       } else if (node.nodeName === 'BR') {
         text += '\n'
       } else if (node.childNodes) {
-        node.childNodes.forEach(processNode)
+        // Block-level elements add a newline before them (unless at start)
+        const isBlock = blockTags.has(node.nodeName)
+        if (isBlock && !isRoot && text.length > 0 && !text.endsWith('\n')) {
+          text += '\n'
+        }
+        node.childNodes.forEach(child => processNode(child, false))
       }
     }
-    processNode(temp)
-    
+    processNode(temp, true)
+
     return text.replace(/\u00A0/g, ' ') // Replace &nbsp; with regular space
   }
 
